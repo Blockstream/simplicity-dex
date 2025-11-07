@@ -12,7 +12,9 @@ pub async fn handle(
 ) -> crate::error::Result<EventId> {
     let client_signer = client.get_signer().await?;
     let client_pubkey = client_signer.get_public_key().await?;
+
     let timestamp_now = Timestamp::now();
+
     let taker_response = EventBuilder::new(TakerOrderKind::get_kind(), BLOCKSTREAM_TAKER_CONTENT)
         .tags([
             Tag::public_key(client_pubkey),
@@ -21,8 +23,10 @@ pub async fn handle(
             Tag::custom(TagKind::Custom(Cow::from("tx_id")), [tags.tx_id]),
         ])
         .custom_created_at(timestamp_now);
+
     let reply_event = taker_response.build(client_pubkey);
     let reply_event = client_signer.sign_event(reply_event).await?;
+
     let event_id = client.publish_event(&reply_event).await?;
 
     Ok(event_id)

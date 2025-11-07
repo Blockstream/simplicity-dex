@@ -28,6 +28,7 @@ impl RelayClient {
         client_config: ClientConfig,
     ) -> crate::error::Result<Self> {
         tracing::debug!(client_config = ?client_config, "Connecting to Nostr Relay Client(s)");
+
         let client = match keys {
             None => Client::default(),
             Some(keys) => {
@@ -36,6 +37,7 @@ impl RelayClient {
                 client
             }
         };
+
         for url in relay_urls {
             let url = url
                 .try_into_url()
@@ -44,7 +46,9 @@ impl RelayClient {
                 })?;
             client.add_relay(url).await?;
         }
+
         client.connect().await;
+
         Ok(Self {
             client,
             timeout: client_config.timeout,

@@ -7,7 +7,9 @@ use std::borrow::Cow;
 pub async fn handle(client: &RelayClient, tags: OrderPlaceEventTags) -> crate::error::Result<EventId> {
     let client_signer = client.get_signer().await?;
     let client_pubkey = client_signer.get_public_key().await?;
+
     let timestamp_now = Timestamp::now();
+
     let maker_order = EventBuilder::new(MakerOrderKind::get_kind(), BLOCKSTREAM_MAKER_CONTENT)
         .tags([
             Tag::public_key(client_pubkey),
@@ -21,8 +23,11 @@ pub async fn handle(client: &RelayClient, tags: OrderPlaceEventTags) -> crate::e
             Tag::custom(TagKind::Custom(Cow::from("price")), [tags.price.to_string()]),
         ])
         .custom_created_at(timestamp_now);
+
     let text_note = maker_order.build(client_pubkey);
     let signed_event = client_signer.sign_event(text_note).await?;
-    let text_note_event_id = client.publish_event(&signed_event).await?;
-    Ok(text_note_event_id)
+
+    let maker_order_event_id = client.publish_event(&signed_event).await?;
+
+    Ok(maker_order_event_id)
 }

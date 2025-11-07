@@ -1,1 +1,1 @@
-wss://relay.damus.io
+<your_preferred_relays>
