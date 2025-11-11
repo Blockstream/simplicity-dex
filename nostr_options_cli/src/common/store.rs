@@ -45,6 +45,10 @@ impl Store {
         Ok(self.store.insert(key, value)?)
     }
 
+    pub fn get_value<K: AsRef<[u8]>>(&self, key: K) -> Result<Option<IVec>> {
+        Ok(self.store.get(key)?)
+    }
+
     pub fn import_arguments<A>(
         &self,
         taproot_pubkey_gen: &str,

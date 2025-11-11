@@ -94,6 +94,30 @@ enum HelperCommands {
         #[arg(long = "broadcast", default_value = "true")]
         broadcast: bool,
     },
+    #[command(about = "Mint already created test tokens from already saved asset [only testing purposes]")]
+    MintTokens {
+        /// Transaction id (hex) and output index (vout) of the REISSUANCE ASSET UTXO you will spend
+        #[arg(long = "reissue-asset-utxo")]
+        reissue_asset_outpoint: OutPoint,
+        /// Transaction id (hex) and output index (vout) of the LBTC UTXO used to pay fees and reissue the asset
+        #[arg(long = "fee-utxo")]
+        fee_utxo_outpoint: OutPoint,
+        /// Asset name
+        #[arg(long = "asset-name")]
+        asset_name: String,
+        /// Amount to reissue of the asset in its satoshi units
+        #[arg(long = "reissue-sats")]
+        reissue_amount: u64,
+        /// Miner fee in satoshis (LBTC). A separate fee output is added.
+        #[arg(long = "fee-sats")]
+        fee_amount: u64,
+        /// Account index to use for change address
+        #[arg(long = "account-index", default_value_t = 0)]
+        account_index: u32,
+        /// When set, broadcast the built transaction via Esplora and print txid
+        #[arg(long = "broadcast")]
+        broadcast: bool,
+    },
     #[command(about = "Splits given utxo into given amount of outs [only testing purposes]")]
     SplitUtxo {
         #[arg(long = "split-amount")]
@@ -276,11 +300,31 @@ impl Cli {
                         account_index,
                         broadcast,
                     } => {
-                        let tx_res = contract_handlers::faucet::handle(
+                        let tx_res = contract_handlers::faucet::create_asset(
                             account_index,
                             asset_name,
                             fee_utxo_outpoint,
                             issue_amount,
+                            fee_amount,
+                            broadcast,
+                        )?;
+                        format!("Faucet tx result: {tx_res:?}")
+                    }
+                    HelperCommands::MintTokens {
+                        reissue_asset_outpoint,
+                        fee_utxo_outpoint,
+                        asset_name,
+                        reissue_amount,
+                        fee_amount,
+                        account_index,
+                        broadcast,
+                    } => {
+                        let tx_res = contract_handlers::faucet::mint_asset(
+                            account_index,
+                            asset_name,
+                            reissue_asset_outpoint,
+                            fee_utxo_outpoint,
+                            reissue_amount,
                             fee_amount,
                             broadcast,
                         )?;

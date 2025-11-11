@@ -32,4 +32,8 @@ pub enum CliError {
     SledError(#[from] SledError),
     #[error("Asset name already exists, name: '{name}'")]
     AssetNameExists { name: String },
+    #[error("Asset name is absent, name: '{name}'")]
+    AssetNameAbsent { name: String },
+    #[error("Failed to covert value from hex, err: '{0}', value: '{1}'")]
+    FromHex(hex::FromHexError, String),
 }

@@ -11,7 +11,8 @@ pub enum LiquidNetwork {
 
 pub type UtxoList = [OutPoint; 3];
 pub type AssetEntropyList = [String; 3];
-pub type AssetEntropy = String;
+pub type AssetEntropyBytes = [u8; 32];
+pub type AssetEntropyHex = String;
 
 impl LiquidNetwork {
     pub fn addr_params(&self) -> &'static simplicity::elements::AddressParams {

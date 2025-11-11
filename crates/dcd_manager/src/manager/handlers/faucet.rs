@@ -1,6 +1,7 @@
 use crate::manager::common::{derive_public_blinder_key, obtain_utxo_value};
-use crate::manager::types::AssetEntropy;
+use crate::manager::types::{AssetEntropyBytes, AssetEntropyHex};
 use anyhow::bail;
+use elements::hashes::sha256;
 use simplicity::bitcoin::secp256k1::Keypair;
 use simplicity::elements::confidential::{AssetBlindingFactor, ValueBlindingFactor};
 use simplicity::elements::hex::ToHex;
@@ -15,7 +16,7 @@ use simplicityhl_core::{
     fetch_utxo, finalize_p2pk_transaction, get_new_asset_entropy, get_p2pk_address, get_random_seed,
 };
 
-pub fn handle(
+pub fn handle_creation(
     keypair: secp256k1::Keypair,
     fee_utxo: OutPoint,
     fee_amount: u64,
@@ -23,7 +24,7 @@ pub fn handle(
     address_params: &'static AddressParams,
     change_asset: AssetId,
     genesis_block_hash: elements::BlockHash,
-) -> anyhow::Result<(Transaction, AssetEntropy)> {
+) -> anyhow::Result<(Transaction, AssetEntropyHex)> {
     let utxo_fee = fetch_utxo(fee_utxo)?;
 
     let fee_utxo_value = obtain_utxo_value(&utxo_fee)?;
@@ -35,6 +36,7 @@ pub fn handle(
 
     let asset_entropy = get_random_seed();
 
+    let mut inp_txout_secrets = std::collections::HashMap::new();
     let mut issuance_info_input = Input::from_prevout(fee_utxo);
     issuance_info_input.witness_utxo = Some(utxo_fee.clone());
     issuance_info_input.issuance_value_amount = Some(issue_amount);
@@ -52,6 +54,14 @@ pub fn handle(
     {
         issuance_info_input.blinded_issuance = Some(0x00);
         pst.add_input(issuance_info_input);
+
+        let issuance_secrets = TxOutSecrets {
+            asset_bf: AssetBlindingFactor::zero(),
+            value_bf: ValueBlindingFactor::zero(),
+            value: fee_utxo_value,
+            asset: change_asset,
+        };
+        inp_txout_secrets.insert(0, issuance_secrets);
     }
     {
         let mut output = Output::new_explicit(
@@ -80,17 +90,7 @@ pub fn handle(
 
     pst.add_output(Output::from_txout(TxOut::new_fee(fee_amount, change_asset)));
 
-    let issuance_secrets = TxOutSecrets {
-        asset_bf: AssetBlindingFactor::zero(),
-        value_bf: ValueBlindingFactor::zero(),
-        value: fee_utxo_value,
-        asset: change_asset,
-    };
-
-    let mut inp_txout_sec = std::collections::HashMap::new();
-    inp_txout_sec.insert(0, issuance_secrets);
-
-    pst.blind_last(&mut thread_rng(), &Secp256k1::new(), &inp_txout_sec)?;
+    pst.blind_last(&mut thread_rng(), &Secp256k1::new(), &inp_txout_secrets)?;
 
     let tx = pst.extract_tx()?;
     let utxos_to_spend = std::slice::from_ref(&utxo_fee);
@@ -99,4 +99,103 @@ pub fn handle(
     tx.verify_tx_amt_proofs(secp256k1::SECP256K1, utxos_to_spend)?;
 
     Ok((tx, asset_entropy_to_return))
+}
+
+pub fn handle_minting(
+    keypair: secp256k1::Keypair,
+    fee_utxo: OutPoint,
+    reissue_asset_utxo: OutPoint,
+    reissue_amount: u64,
+    fee_amount: u64,
+    mut asset_entropy: AssetEntropyBytes,
+    address_params: &'static AddressParams,
+    change_asset: AssetId,
+    genesis_block_hash: elements::BlockHash,
+) -> anyhow::Result<Transaction> {
+    asset_entropy.reverse();
+    let asset_entropy = sha256::Midstate::from_byte_array(asset_entropy);
+
+    let utxo_reissue = fetch_utxo(reissue_asset_utxo)?;
+    let fee_utxo_tx_out = fetch_utxo(fee_utxo)?;
+
+    let fee_utxo_value = obtain_utxo_value(&fee_utxo_tx_out)?;
+    if fee_amount > fee_utxo_value {
+        bail!("Fee exceeds fee input, fee_amount: {fee_amount}, total_input_fee: {fee_utxo_value}")
+    }
+
+    let blinding_key = derive_public_blinder_key()?;
+    let blinding_sk = blinding_key.secret_key();
+
+    let asset_id = AssetId::from_entropy(asset_entropy);
+    let reissuance_asset_id = AssetId::reissuance_token_from_entropy(asset_entropy, false);
+
+    tracing::info!("Asset: '{asset_id}', Reissuance Asset: '{reissuance_asset_id}'");
+
+    let mut reissuance_input = Input::from_prevout(reissue_asset_utxo);
+    reissuance_input.witness_utxo = Some(utxo_reissue.clone());
+    reissuance_input.issuance_value_amount = Some(reissue_amount);
+    reissuance_input.issuance_inflation_keys = None;
+    reissuance_input.issuance_asset_entropy = Some(asset_entropy.to_byte_array());
+
+    let change_recipient = get_p2pk_address(&keypair.x_only_public_key().0, address_params)?;
+
+    let mut inp_txout_sec = std::collections::HashMap::new();
+    let mut pst = PartiallySignedTransaction::new_v2();
+
+    {
+        let unblinded = utxo_reissue.unblind(&Secp256k1::new(), blinding_sk)?;
+        let asset_bf = unblinded.asset_bf;
+        inp_txout_sec.insert(0, unblinded);
+
+        reissuance_input.blinded_issuance = Some(0x00);
+        reissuance_input.issuance_blinding_nonce = Some(asset_bf.into_inner());
+        pst.add_input(reissuance_input);
+    }
+
+    let mut fee_input = Input::from_prevout(fee_utxo);
+    fee_input.witness_utxo = Some(fee_utxo_tx_out.clone());
+    pst.add_input(fee_input);
+
+    {
+        let mut output = Output::new_explicit(
+            change_recipient.script_pubkey(),
+            1,
+            reissuance_asset_id,
+            Some(blinding_key.public_key().into()),
+        );
+        output.blinder_index = Some(0);
+        pst.add_output(output);
+    }
+
+    pst.add_output(Output::new_explicit(
+        change_recipient.script_pubkey(),
+        reissue_amount,
+        asset_id,
+        None,
+    ));
+
+    pst.add_output(Output::new_explicit(
+        change_recipient.script_pubkey(),
+        fee_utxo_value - fee_amount,
+        change_asset,
+        None,
+    ));
+
+    pst.add_output(Output::from_txout(TxOut::new_fee(fee_amount, change_asset)));
+
+    pst.blind_last(&mut thread_rng(), &Secp256k1::new(), &inp_txout_sec)?;
+
+    let utxos = vec![utxo_reissue, fee_utxo_tx_out];
+    let tx = finalize_p2pk_transaction(
+        pst.extract_tx()?,
+        &utxos,
+        &keypair,
+        0,
+        address_params,
+        genesis_block_hash,
+    )?;
+    let tx = finalize_p2pk_transaction(tx, &utxos, &keypair, 1, address_params, genesis_block_hash)?;
+    tx.verify_tx_amt_proofs(secp256k1::SECP256K1, &utxos)?;
+
+    Ok(tx)
 }

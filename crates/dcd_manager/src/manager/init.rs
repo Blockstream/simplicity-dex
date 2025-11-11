@@ -1,5 +1,5 @@
-use crate::manager::types::AssetEntropy;
-use anyhow::Context;
+use crate::manager::types::{AssetEntropyBytes, AssetEntropyHex};
+use anyhow::{Context, anyhow};
 use simplicityhl::elements;
 use simplicityhl::elements::bitcoin::secp256k1;
 use simplicityhl::elements::{AddressParams, AssetId, OutPoint, Transaction};
@@ -7,7 +7,7 @@ use simplicityhl::elements::{AddressParams, AssetId, OutPoint, Transaction};
 pub struct DcdManager;
 
 impl DcdManager {
-    pub fn faucet(
+    pub fn create_asset(
         keypair: secp256k1::Keypair,
         fee_utxo: OutPoint,
         fee_amount: u64,
@@ -15,8 +15,8 @@ impl DcdManager {
         address_params: &'static AddressParams,
         change_asset: AssetId,
         genesis_block_hash: elements::BlockHash,
-    ) -> anyhow::Result<(Transaction, AssetEntropy)> {
-        crate::manager::handlers::faucet::handle(
+    ) -> anyhow::Result<(Transaction, AssetEntropyHex)> {
+        crate::manager::handlers::faucet::handle_creation(
             keypair,
             fee_utxo,
             fee_amount,
@@ -25,6 +25,33 @@ impl DcdManager {
             change_asset,
             genesis_block_hash,
         )
+        .context("Faucet handler failed")
+    }
+    pub fn mint_asset(
+        keypair: secp256k1::Keypair,
+        fee_utxo: OutPoint,
+        reissue_asset_utxo: OutPoint,
+        reissue_amount: u64,
+        fee_amount: u64,
+        asset_entropy: impl AsRef<[u8]>,
+        address_params: &'static AddressParams,
+        change_asset: AssetId,
+        genesis_block_hash: elements::BlockHash,
+    ) -> anyhow::Result<Transaction> {
+        {
+            let asset_entropy = convert_asset_entropy(asset_entropy)?;
+            crate::manager::handlers::faucet::handle_minting(
+                keypair,
+                fee_utxo,
+                reissue_asset_utxo,
+                reissue_amount,
+                fee_amount,
+                asset_entropy,
+                address_params,
+                change_asset,
+                genesis_block_hash,
+            )
+        }
         .context("Faucet handler failed")
     }
     pub fn maker_init(
@@ -105,4 +132,16 @@ impl DcdManager {
         )
         .context("Splitting of Utxo failed")
     }
+}
+
+fn convert_asset_entropy(val: impl AsRef<[u8]>) -> anyhow::Result<AssetEntropyBytes> {
+    let asset_entropy_vec = val.as_ref().to_vec();
+    let asset_entropy: AssetEntropyBytes = asset_entropy_vec.try_into().map_err(|x: Vec<u8>| {
+        anyhow!(
+            "Failed to parse asset entropy, got len: {}, has to be: {}",
+            x.len(),
+            AssetEntropyBytes::default().len()
+        )
+    })?;
+    Ok(asset_entropy)
 }
