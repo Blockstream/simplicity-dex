@@ -22,7 +22,6 @@ nostr_relay_processor = { workspace = true }
 simplicity-lang = { workspace = true }
 simplicityhl = { workspace = true }
 simplicityhl-core = { workspace = true }
-simplicity = { workspace = true }
 elements = { workspace = true }
 hex = { workspace = true }
 

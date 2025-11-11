@@ -69,11 +69,31 @@ enum DexCommands {
 enum HelperCommands {
     #[command(about = "Display P2PK address, which will be used for testing purposes [only testing purposes]")]
     Address {
+        /// Account index to use for change address
         #[arg(long = "account-index", default_value = "0")]
         account_index: u32,
     },
     #[command(about = "Create test tokens for user to put some collateral values in order [only testing purposes]")]
-    Faucet,
+    Faucet {
+        /// Transaction id (hex) and output index (vout) of the LBTC UTXO used to pay fees and issue the asset
+        #[arg(long = "fee-utxo")]
+        fee_utxo_outpoint: OutPoint,
+        /// Asset name
+        #[arg(long = "asset-name")]
+        asset_name: String,
+        /// Amount to issue of the asset in its satoshi units
+        #[arg(long = "issue-sats")]
+        issue_amount: u64,
+        /// Miner fee in satoshis (LBTC). A separate fee output is added.
+        #[arg(long = "fee-sats")]
+        fee_amount: u64,
+        /// Account index to use for change address
+        #[arg(long = "account-index", default_value = "0")]
+        account_index: u32,
+        /// When set, broadcast the built transaction via Esplora and print txid
+        #[arg(long = "broadcast", default_value = "true")]
+        broadcast: bool,
+    },
     #[command(about = "Splits given utxo into given amount of outs [only testing purposes]")]
     SplitUtxo {
         #[arg(long = "split-amount")]
@@ -83,8 +103,10 @@ enum HelperCommands {
         fee_utxo: OutPoint,
         #[arg(long = "fee-amount")]
         fee_amount: u64,
+        /// Account index to use for change address
         #[arg(long = "account-index", default_value = "0")]
         account_index: u32,
+        /// When set, broadcast the built transaction via Esplora and print txid
         #[arg(long = "broadcast", default_value = "true")]
         broadcast: bool,
     },
@@ -246,8 +268,22 @@ impl Cli {
                     }
                 },
                 Command::Helpers(x) => match x {
-                    HelperCommands::Faucet => {
-                        let tx_res = contract_handlers::faucet::handle()?;
+                    HelperCommands::Faucet {
+                        fee_utxo_outpoint,
+                        asset_name,
+                        issue_amount,
+                        fee_amount,
+                        account_index,
+                        broadcast,
+                    } => {
+                        let tx_res = contract_handlers::faucet::handle(
+                            account_index,
+                            asset_name,
+                            fee_utxo_outpoint,
+                            issue_amount,
+                            fee_amount,
+                            broadcast,
+                        )?;
                         format!("Faucet tx result: {tx_res:?}")
                     }
                     HelperCommands::SplitUtxo {

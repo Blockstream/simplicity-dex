@@ -1,6 +1,5 @@
 use crate::common::FileError;
 use config::ConfigError;
-use dcd_manager::error::DcdManagerError;
 use nostr_relay_connector::error::RelayClientError;
 use nostr_relay_processor::error::RelayProcessorError;
 
@@ -16,8 +15,8 @@ pub enum CliError {
     RelayClient(#[from] RelayClientError),
     #[error(transparent)]
     RelayProcessor(#[from] RelayProcessorError),
-    #[error(transparent)]
-    DcdManager(#[from] DcdManagerError),
+    #[error("Occurred error with usage of Dcd manager, err: {0}")]
+    DcdManager(String),
     #[error("Configuration error, err: '{0}'")]
     Config(#[from] ConfigError),
     #[error("Failed to obtain utxo, '{0}'")]

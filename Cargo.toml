@@ -30,7 +30,6 @@ nostr_relay_connector = { path = "./crates/nostr_relay_connector" }
 nostr_relay_processor = { path = "./crates/nostr_relay_processor" }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = { version = "1.0.145" }
-simplicity = { version = "0.4.2" }
 simplicity-contracts = { git = "https://github.com/BlockstreamResearch/simplicity-contracts", rev = "f775137", package = "contracts" }
 simplicity-lang = { version = "0.6.0" }
 simplicityhl = { version = "0.2.0" }

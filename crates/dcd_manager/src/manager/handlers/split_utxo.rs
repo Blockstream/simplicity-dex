@@ -1,10 +1,11 @@
+use anyhow::anyhow;
 use simplicityhl::elements;
 use simplicityhl::elements::bitcoin::secp256k1;
 use simplicityhl::elements::hex::ToHex;
 use simplicityhl::elements::pset::{Input, Output, PartiallySignedTransaction};
 use simplicityhl::elements::{AddressParams, AssetId, OutPoint, Script, Transaction, TxOut};
 
-use crate::error::DcdManagerError;
+use crate::manager::common::obtain_utxo_value;
 use simplicityhl_core::{fetch_utxo, finalize_p2pk_transaction, get_p2pk_address};
 use tracing::{debug, info, instrument};
 
@@ -17,14 +18,10 @@ pub fn handle(
     address_params: &'static AddressParams,
     change_asset: AssetId,
     genesis_block_hash: elements::BlockHash,
-) -> crate::error::Result<Transaction> {
-    let (utxo_tx_out, utxo_outpoint) = (
-        fetch_utxo(fee_utxo).map_err(|err| DcdManagerError::Internal(err.to_string()))?,
-        fee_utxo,
-    );
+) -> anyhow::Result<Transaction> {
+    let (utxo_tx_out, utxo_outpoint) = (fetch_utxo(fee_utxo)?, fee_utxo);
 
-    let change_recipient = get_p2pk_address(&keypair.x_only_public_key().0, address_params)
-        .map_err(|err| DcdManagerError::Internal(err.to_string()))?;
+    let change_recipient = get_p2pk_address(&keypair.x_only_public_key().0, address_params)?;
     let total_input_utxo_value: u64 = obtain_utxo_value(&utxo_tx_out)?;
 
     let mut pst = PartiallySignedTransaction::new_v2();
@@ -50,19 +47,10 @@ pub fn handle(
 
     let utxos = [utxo_tx_out];
 
-    tx = finalize_p2pk_transaction(tx.clone(), &utxos, &keypair, 0, address_params, genesis_block_hash)
-        .map_err(|err| DcdManagerError::Internal(err.to_string()))?;
+    tx = finalize_p2pk_transaction(tx.clone(), &utxos, &keypair, 0, address_params, genesis_block_hash)?;
 
     tx.verify_tx_amt_proofs(secp256k1::SECP256K1, &utxos)?;
 
     info!("Successfully formed tx_id: {}", tx.txid().to_hex());
     Ok(tx)
-}
-
-#[inline]
-fn obtain_utxo_value(tx_out: &TxOut) -> crate::error::Result<u64> {
-    tx_out
-        .value
-        .explicit()
-        .ok_or_else(|| DcdManagerError::Internal(format!("No value in utxo, check it, tx_out: {tx_out:?}")))
 }

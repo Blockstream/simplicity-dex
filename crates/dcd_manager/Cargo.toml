@@ -7,8 +7,10 @@ authors.workspace = true
 readme.workspace = true
 
 [dependencies]
+anyhow = { workspace = true }
 thiserror = { workspace = true }
-tracing= { workspace = true }
-simplicity = { workspace = true }
+tracing = { workspace = true }
+simplicity-lang = { workspace = true }
 simplicityhl = { workspace = true }
 simplicityhl-core = { workspace = true }
+elements = { workspace = true }

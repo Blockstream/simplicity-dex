@@ -1,3 +1,3 @@
-pub fn handle() -> crate::error::Result<()> {
+pub fn handle() -> anyhow::Result<()> {
     Ok(())
 }

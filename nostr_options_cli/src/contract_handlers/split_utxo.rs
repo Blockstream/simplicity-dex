@@ -29,7 +29,8 @@ pub fn handle(
         &AddressParams::LIQUID_TESTNET,
         LIQUID_TESTNET_BITCOIN_ASSET,
         *LIQUID_TESTNET_GENESIS,
-    )?;
+    )
+    .map_err(|err| crate::error::CliError::DcdManager(err.to_string()))?;
 
     match broadcast {
         true => println!("Broadcasted txid: {}", broadcast_tx_inner(&transaction)?),
