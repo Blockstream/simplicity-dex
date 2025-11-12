@@ -1,6 +1,7 @@
 use crate::common::FileError;
 use crate::common::store::SledError;
 use config::ConfigError;
+use elements::bitcoin::secp256k1;
 use nostr_relay_connector::error::RelayClientError;
 use nostr_relay_processor::error::RelayProcessorError;
 
@@ -36,4 +37,14 @@ pub enum CliError {
     AssetNameAbsent { name: String },
     #[error("Failed to covert value from hex, err: '{0}', value: '{1}'")]
     FromHex(hex::FromHexError, String),
+    #[error("Failed to convert dcd inner params into dcd params, err msg: '{0}'")]
+    InnerDcdConversion(String),
+    #[error("Expected at least {expected} elements, got {got}")]
+    InvalidElementsSize { got: usize, expected: usize },
+    #[error("Secp256k1 error: '{0}'")]
+    EcCurve(#[from] secp256k1::Error),
+    #[error("Failed to create DcdRatioArgs, msg: '{0}'")]
+    DcdRatioArgs(String),
+    #[error("Occurred error with msg: '{0}'")]
+    Custom(String),
 }

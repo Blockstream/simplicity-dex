@@ -1,5 +1,6 @@
-use simplicity::elements::OutPoint;
+use simplicity::elements::{AssetId, OutPoint};
 use simplicityhl::elements::Txid;
+use simplicityhl_core::LIQUID_TESTNET_BITCOIN_ASSET;
 use std::net::SocketAddr;
 
 #[derive(Clone, Copy, Debug)]
@@ -13,6 +14,13 @@ pub type UtxoList = [OutPoint; 3];
 pub type AssetEntropyList = [String; 3];
 pub type AssetEntropyBytes = [u8; 32];
 pub type AssetEntropyHex = String;
+pub type FillerTokenEntropyHex = AssetEntropyHex;
+pub type FillerTokenEntropyBytes = AssetEntropyBytes;
+pub type GrantorCollateralAssetEntropyHex = AssetEntropyHex;
+pub type GrantorCollateralAssetEntropyBytes = AssetEntropyBytes;
+pub type GrantorSettlementAssetEntropyHex = AssetEntropyHex;
+pub type GrantorSettlementAssetEntropyBytes = AssetEntropyBytes;
+pub const COLLATERAL_ASSET_ID: AssetId = LIQUID_TESTNET_BITCOIN_ASSET;
 
 impl LiquidNetwork {
     pub fn addr_params(&self) -> &'static simplicity::elements::AddressParams {

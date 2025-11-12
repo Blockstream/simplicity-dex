@@ -13,4 +13,5 @@ tracing = { workspace = true }
 simplicity-lang = { workspace = true }
 simplicityhl = { workspace = true }
 simplicityhl-core = { workspace = true }
+simplicity-contracts = { workspace = true }
 elements = { workspace = true }

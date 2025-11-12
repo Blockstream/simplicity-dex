@@ -1,7 +1,7 @@
-use crate::common::broadcast_tx_inner;
 use crate::common::keys::derive_secret_key_from_index;
 use crate::common::settings::Settings;
 use crate::common::store::Store;
+use crate::common::{broadcast_tx_inner, decode_hex};
 use dcd_manager::manager::init::DcdManager;
 use elements::bitcoin::hex::DisplayHex;
 use elements::bitcoin::secp256k1;
@@ -42,10 +42,12 @@ pub fn create_asset(
     )
     .map_err(|err| crate::error::CliError::DcdManager(err.to_string()))?;
 
-    store.insert_value(asset_name, token_asset_entropy.as_bytes())?;
-
+    println!("Test token asset entropy: {}", token_asset_entropy);
     match broadcast {
-        true => println!("Broadcasted txid: {}", broadcast_tx_inner(&transaction)?),
+        true => {
+            println!("Broadcasted txid: {}", broadcast_tx_inner(&transaction)?);
+            store.insert_value(asset_name, token_asset_entropy.as_bytes())?;
+        }
         false => println!("{}", transaction.serialize().to_lower_hex_string()),
     }
     Ok(())
@@ -65,8 +67,7 @@ pub fn mint_asset(
     let Some(asset_entropy) = store.get_value(&asset_name)? else {
         return Err(crate::error::CliError::AssetNameExists { name: asset_name });
     };
-    let asset_entropy =
-        hex::decode(&asset_entropy).map_err(|err| crate::error::CliError::FromHex(err, asset_entropy.to_hex()))?;
+    let asset_entropy = decode_hex(&asset_entropy)?;
 
     let settings = Settings::load().map_err(|err| crate::error::CliError::EnvNotSet(err.to_string()))?;
     let keypair = secp256k1::Keypair::from_secret_key(

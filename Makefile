@@ -25,3 +25,8 @@ clippy:
 ## Show lints for all features
 clippy_all_features:
 	cargo clippy --workspace --all-targets --all-features -- -D warnings
+
+## Build release binary and move
+build_dev:
+	cargo build -r
+	mv ./target/release/simplicity-dex ./simplicity-dex

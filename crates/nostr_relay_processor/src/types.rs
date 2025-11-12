@@ -13,7 +13,8 @@ pub trait CustomKind {
 pub const POW_DIFFICULTY: u8 = 1;
 pub const BLOCKSTREAM_MAKER_CONTENT: &str = "Liquid order [Maker]!";
 pub const BLOCKSTREAM_TAKER_CONTENT: &str = "Liquid order [Taker]!";
-pub const MAKER_EXPIRATION_TIME: u64 = 60;
+/// 31 days
+pub const MAKER_EXPIRATION_TIME: u64 = 2_678_400_000;
 
 pub struct MakerOrderKind;
 pub struct TakerOrderKind;
