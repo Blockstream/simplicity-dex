@@ -1,8 +1,7 @@
-use crate::manager::common::{derive_public_blinder_key, obtain_utxo_value, raw_asset_entropy_bytes_to_midstate};
+use crate::manager::common::{derive_public_blinder_key, obtain_utxo_value};
 use crate::manager::init::DcdInitParams;
 use crate::manager::types::{
-    AssetEntropyBytes, COLLATERAL_ASSET_ID, FillerTokenEntropyHex, GrantorCollateralAssetEntropyHex,
-    GrantorSettlementAssetEntropyHex,
+    COLLATERAL_ASSET_ID, FillerTokenEntropyHex, GrantorCollateralAssetEntropyHex, GrantorSettlementAssetEntropyHex,
 };
 use elements::hex::ToHex;
 use elements::schnorr::Keypair;
@@ -10,7 +9,6 @@ use simplicity::elements::{BlockHash, TxOut};
 use simplicity_contracts::{DCDArguments, DCDRatioArguments};
 use simplicityhl::elements::bitcoin::secp256k1;
 use simplicityhl::elements::confidential::{AssetBlindingFactor, ValueBlindingFactor};
-use simplicityhl::elements::pset::serialize::Serialize;
 use simplicityhl::elements::secp256k1_zkp::Secp256k1;
 use simplicityhl::elements::secp256k1_zkp::rand::thread_rng;
 use simplicityhl::elements::{AssetId, OutPoint, Transaction, TxOutSecrets};
@@ -100,14 +98,15 @@ pub fn handle(
         strike_price: dcd_init_params.strike_price,
         incentive_basis_points: dcd_init_params.incentive_basis_points,
         collateral_asset_id_hex_le: COLLATERAL_ASSET_ID.to_string(),
-        settlement_asset_id_hex_le: dcd_init_params.settlement_asset_id.to_hex(),
+        settlement_asset_id_hex_le: dcd_init_params.settlement_asset_id,
         filler_token_asset_id_hex_le: first_asset.to_string(),
         grantor_collateral_token_asset_id_hex_le: second_asset.to_string(),
         grantor_settlement_token_asset_id_hex_le: third_asset.to_string(),
         ratio_args: ratio_args.clone(),
-        oracle_public_key: dcd_init_params.oracle_public_key.to_string(),
+        oracle_public_key: dcd_init_params.oracle_public_key.x_only_public_key().0.to_hex(),
     };
 
+    tracing::info!("Generated dcd_arguments: {dcd_arguments:?}");
     let dcd_taproot_pubkey_gen = TaprootPubkeyGen::from(
         &dcd_arguments,
         &AddressParams::LIQUID_TESTNET,

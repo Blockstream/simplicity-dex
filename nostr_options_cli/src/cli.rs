@@ -1,16 +1,14 @@
 use crate::common::{
-    DCDCliArguments, DEFAULT_CLIENT_TIMEOUT_SECS, check_file_existence, default_key_path, default_relays_path,
-    derive_oracle_pubkey, get_valid_key_from_file, get_valid_urls_from_file, vec_to_arr, write_into_stdout,
+    DCDCliArguments, DEFAULT_CLIENT_TIMEOUT_SECS, InitOrderArgs, check_file_existence, default_key_path,
+    default_relays_path, derive_oracle_pubkey, get_valid_key_from_file, get_valid_urls_from_file, vec_to_arr,
+    write_into_stdout,
 };
 use crate::contract_handlers;
-use crate::contract_handlers::maker_init::InnerDcdInitParams;
 use clap::{Args, Parser, Subcommand};
-use dcd_manager::manager::init::DcdInitParams;
-use dcd_manager::manager::types::{AssetEntropyHex, COLLATERAL_ASSET_ID};
+use dcd_manager::manager::types::AssetEntropyHex;
 use nostr::{EventId, PublicKey};
 use nostr_relay_connector::relay_client::ClientConfig;
 use nostr_relay_processor::relay_processor::{OrderPlaceEventTags, OrderReplyEventTags, RelayProcessor};
-use simplicity_contracts::DCDArguments;
 use simplicityhl::elements::OutPoint;
 use simplicityhl::elements::bitcoin::secp256k1;
 use std::path::PathBuf;
@@ -125,8 +123,8 @@ enum HelperCommands {
     },
     #[command(about = "Splits given utxo into given amount of outs [only testing purposes]")]
     SplitUtxo {
-        #[arg(long = "split-amount")]
-        split_amount: u64,
+        #[arg(long = "split-parts")]
+        split_parts: u64,
         /// Fee utxo
         #[arg(long = "fee-utxo")]
         fee_utxo: OutPoint,
@@ -140,70 +138,19 @@ enum HelperCommands {
         broadcast: bool,
     },
 }
-#[derive(Debug, Args)]
-struct InitOrderArgs {
-    /// Taker funding start time
-    #[arg(long = "taker-funding-start-time")]
-    taker_funding_start_time: u32,
-    /// Taker funding end time
-    #[arg(long = "taker-funding-end-time")]
-    taker_funding_end_time: u32,
-    /// Contract expiry time
-    #[arg(long = "contract-expiry-time")]
-    contract_expiry_time: u32,
-    /// Early termination end time
-    #[arg(long = "early-termination-end-time")]
-    early_termination_end_time: u32,
-    /// Settlement height
-    #[arg(long = "settlement-height")]
-    settlement_height: u32,
-    /// Principal collateral amount
-    #[arg(long = "principal-collateral-amount")]
-    principal_collateral_amount: u64,
-    /// Incentive basis points
-    #[arg(long = "incentive-basis-points")]
-    incentive_basis_points: u64,
-    /// Filler per principal collateral
-    #[arg(long = "filler-per-principal-collateral")]
-    filler_per_principal_collateral: u64,
-    /// Strike price
-    #[arg(long = "strike-price")]
-    strike_price: u64,
-    /// Settlement asset id
-    #[arg(long = "settlement-asset-id")]
-    settlement_asset_id: String,
-    /// Oracle public key
-    #[arg(long = "oracle-public-key", default_value_t = derive_oracle_pubkey().unwrap())]
-    oracle_public_key: secp256k1::PublicKey,
-}
 
-impl From<InitOrderArgs> for InnerDcdInitParams {
-    fn from(args: InitOrderArgs) -> Self {
-        InnerDcdInitParams {
-            taker_funding_start_time: args.taker_funding_start_time,
-            taker_funding_end_time: args.taker_funding_end_time,
-            contract_expiry_time: args.contract_expiry_time,
-            early_termination_end_time: args.early_termination_end_time,
-            settlement_height: args.settlement_height,
-            principal_collateral_amount: args.principal_collateral_amount,
-            incentive_basis_points: args.incentive_basis_points,
-            filler_per_principal_collateral: args.filler_per_principal_collateral,
-            strike_price: args.strike_price,
-            collateral_asset_id: COLLATERAL_ASSET_ID.to_string(),
-            settlement_asset_id: args.settlement_asset_id,
-            oracle_public_key: args.oracle_public_key,
-        }
-    }
-}
 #[derive(Debug, Subcommand)]
 enum MakerCommands {
-    #[command(about = "Responsible for minting three distinct types of tokens. \
+    #[command(
+        about = "Responsible for minting three distinct types of tokens. Initializes Maker offer to Taker, which later has to be funded.",
+        long_about = "Responsible for minting three distinct types of tokens. \
         These tokens represent the claims of the Maker and Taker on the collateral and \
         settlement assets they have deposited into the contract (used to manage \
-        the contract's lifecycle, including early termination and final settlement)")]
+        the contract's lifecycle, including early termination and final settlement)."
+    )]
     InitOrder {
         /// Utxos to construct assets on them
-        #[arg(long = "fee-utxos")]
+        #[arg(long = "fee-utxos", value_delimiter = ',')]
         fee_utxos: Vec<OutPoint>,
         #[command(flatten)]
         init_order_args: InitOrderArgs,
@@ -217,17 +164,18 @@ enum MakerCommands {
         #[arg(long = "broadcast", default_value_t = true)]
         broadcast: bool,
     },
-    #[command(about = "Constructs funding transaction, which transfers appropriate users tokens \
-        onto contract address. Creates order as Maker on Relays specified [authentication required]")]
-    FundAndPlaceOrder {
-        /// Expects only 5 reissue utxos in this order (filler_token, grantor_collateral_token, grantor_settlement_token, settlement_asset, fee_utxo)
-        #[arg(long = "fee-utxos")]
+    #[command(
+        about = "Constructs funding transaction, which transfers appropriate users tokens \
+        onto contract address. Creates order as Maker on Relays specified [authentication required]",
+        alias = "fund"
+    )]
+    Fund {
+        /// Expects only 5 utxos in this order (filler_token, grantor_collateral_token, grantor_settlement_token, settlement_asset, fee_utxo)
+        #[arg(long = "fee-utxos", value_delimiter = ',')]
         fee_utxos: Vec<OutPoint>,
-        /// Expects only 5 assets hex entropy in BE (filler_token, grantor_collateral_token, grantor_settlement_token, settlement_asset, fee_utxo)
-        #[arg(long = "fee-utxos")]
-        tokens_entropies: Vec<AssetEntropyHex>,
-        #[command(flatten)]
-        init_order_args: InitOrderArgs,
+        /// Expects only 4 asset hex entropies (filler_token_asset_id, grantor_collateral_token_asset_id, grantor_settlement_token_asset_id, settlement_asset_id)
+        #[arg(long = "token-entropies", value_delimiter = ',')]
+        token_entropies: Vec<AssetEntropyHex>,
         /// Fee amount
         #[arg(long = "fee-amount", default_value_t = 1500)]
         fee_amount: u64,
@@ -239,9 +187,6 @@ enum MakerCommands {
         /// Account index to use for change address
         #[arg(long = "account-index", default_value_t = 0)]
         account_index: u32,
-        /// When set, broadcast the built transaction via Esplora and print txid
-        #[arg(long = "broadcast", default_value_t = true)]
-        broadcast: bool,
         //TODO: review params
         #[arg(short = 's', long, default_value = "")]
         asset_to_sell: String,
@@ -255,6 +200,9 @@ enum MakerCommands {
         compiler_name: String,
         #[arg(short = 's', long, default_value = "")]
         compiler_build_hash: String,
+        /// When set, broadcast the built transaction via Esplora and print txid
+        #[arg(long = "broadcast", default_value_t = true)]
+        broadcast: bool,
     },
     #[command(about = "Allows the Maker to withdraw their collateral from the \
         Dual Currency Deposit (DCD) contract by returning their grantor collateral tokens")]
@@ -299,10 +247,9 @@ enum TakerCommands {
 }
 
 impl Cli {
-    #[instrument(skip(self))]
-    pub async fn process(self) -> crate::error::Result<()> {
+    pub async fn init_relays(&self) -> crate::error::Result<RelayProcessor> {
         let keys = {
-            match get_valid_key_from_file(&self.key_path.unwrap_or(default_key_path())) {
+            match get_valid_key_from_file(&self.key_path.clone().unwrap_or(default_key_path())) {
                 Ok(keys) => Some(keys),
                 Err(err) => {
                     tracing::warn!("Failed to parse key, {err}");
@@ -310,7 +257,7 @@ impl Cli {
                 }
             }
         };
-        let relays_urls = get_valid_urls_from_file(&self.relays_path.unwrap_or(default_relays_path()))?;
+        let relays_urls = get_valid_urls_from_file(&self.relays_path.clone().unwrap_or(default_relays_path()))?;
         let relay_processor = RelayProcessor::try_from_config(
             relays_urls,
             keys,
@@ -319,7 +266,12 @@ impl Cli {
             },
         )
         .await?;
+        Ok(relay_processor)
+    }
 
+    #[instrument(skip(self))]
+    pub async fn process(self) -> crate::error::Result<()> {
+        let relay_processor = self.init_relays().await?;
         let msg = {
             match self.command {
                 Command::Maker { action } => match action {
@@ -341,10 +293,9 @@ impl Cli {
                         contract_handlers::maker_init::save_args_to_cache(args_to_save)?;
                         format!("[Maker] Init order tx result: {tx_res:?}")
                     }
-                    MakerCommands::FundAndPlaceOrder {
+                    MakerCommands::Fund {
                         fee_utxos,
-                        tokens_entropies,
-                        init_order_args,
+                        token_entropies,
                         fee_amount,
                         dcd_taproot_pubkey_gen,
                         dcd_arguments,
@@ -357,14 +308,14 @@ impl Cli {
                         compiler_name,
                         compiler_build_hash,
                     } => {
-                        let dcd_arguments = contract_handlers::maker_funding::process_args(
+                        let processed_args = contract_handlers::maker_funding::process_args(
                             account_index,
                             dcd_arguments,
                             dcd_taproot_pubkey_gen,
                             fee_utxos,
-                            tokens_entropies,
+                            token_entropies,
                         )?;
-                        let tx_res = contract_handlers::maker_funding::handle(dcd_arguments, fee_amount, broadcast)?;
+                        let tx_res = contract_handlers::maker_funding::handle(processed_args, fee_amount, broadcast)?;
                         // contract_handlers::maker_init::save_args_to_cache(args_to_save)?;
                         let res = relay_processor
                             .place_order(OrderPlaceEventTags {
@@ -459,7 +410,7 @@ impl Cli {
                         format!("Faucet tx result: {tx_res:?}")
                     }
                     HelperCommands::SplitUtxo {
-                        split_amount,
+                        split_parts: split_amount,
                         fee_utxo,
                         fee_amount,
                         account_index,

@@ -1,9 +1,11 @@
+use elements::bitcoin::XOnlyPublicKey;
 use elements::hex::ToHex;
 use elements::secp256k1_zkp::PublicKey;
+use hex::FromHex;
 use nostr::{Keys, RelayUrl};
 use simplicity::bitcoin::secp256k1;
 use simplicity::bitcoin::secp256k1::SecretKey;
-use simplicityhl::elements::OutPoint;
+use simplicityhl::elements::AssetId;
 use simplicityhl_core::broadcast_tx;
 use std::collections::HashSet;
 use std::fmt::Debug;
@@ -126,4 +128,22 @@ pub fn derive_public_oracle_keypair() -> crate::error::Result<secp256k1::Keypair
 #[inline]
 pub fn derive_oracle_pubkey() -> crate::error::Result<PublicKey> {
     Ok(derive_public_oracle_keypair()?.public_key())
+}
+
+pub fn entropy_to_asset_id(el: impl AsRef<[u8]>) -> crate::error::Result<AssetId> {
+    use simplicity::hashes::sha256;
+    let el = el.as_ref();
+    let mut asset_entropy_bytes =
+        <[u8; 32]>::from_hex(el).map_err(|err| crate::error::CliError::FromHex(err, el.to_hex()))?;
+    asset_entropy_bytes.reverse();
+    let midstate = sha256::Midstate::from_byte_array(asset_entropy_bytes);
+    Ok(AssetId::from_entropy(midstate))
+}
+
+#[test]
+fn test() {
+    let x = derive_oracle_pubkey().unwrap();
+    let hex = x.x_only_public_key().0.to_hex();
+
+    let oracle_bytes = XOnlyPublicKey::from_str(&hex).unwrap().serialize();
 }

@@ -2,14 +2,13 @@ use crate::manager::common::{derive_public_blinder_key, obtain_utxo_value};
 use crate::manager::types::{AssetEntropyBytes, AssetEntropyHex};
 use anyhow::bail;
 use elements::hashes::sha256;
-use simplicity::bitcoin::secp256k1::Keypair;
 use simplicity::elements::confidential::{AssetBlindingFactor, ValueBlindingFactor};
 use simplicity::elements::hex::ToHex;
 use simplicity::elements::pset::{Input, Output, PartiallySignedTransaction};
 use simplicity::elements::{TxOut, TxOutSecrets};
 use simplicityhl::elements;
+use simplicityhl::elements::secp256k1_zkp::Secp256k1;
 use simplicityhl::elements::secp256k1_zkp::rand::thread_rng;
-use simplicityhl::elements::secp256k1_zkp::{Secp256k1, SecretKey};
 use simplicityhl::elements::{AddressParams, AssetId, OutPoint, Transaction};
 use simplicityhl::simplicity::bitcoin::secp256k1;
 use simplicityhl_core::{

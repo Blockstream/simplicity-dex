@@ -1,10 +1,11 @@
 use crate::common::keys::derive_secret_key_from_index;
 use crate::common::settings::Settings;
 use crate::common::store::Store;
-use crate::common::{broadcast_tx_inner, decode_hex};
+use crate::common::{broadcast_tx_inner, decode_hex, entropy_to_asset_id};
 use dcd_manager::manager::init::{DcdInitParams, DcdManager};
 use dcd_manager::manager::types::{
-    AssetEntropyHex, FillerTokenEntropyHex, GrantorCollateralAssetEntropyHex, GrantorSettlementAssetEntropyHex,
+    AssetEntropyHex, AssetIdHex, FillerTokenEntropyHex, GrantorCollateralAssetEntropyHex,
+    GrantorSettlementAssetEntropyHex,
 };
 use elements::bitcoin::hex::DisplayHex;
 use elements::bitcoin::secp256k1;
@@ -12,6 +13,7 @@ use simplicity::elements::OutPoint;
 use simplicity::elements::pset::serialize::Serialize;
 use simplicityhl::elements::{AddressParams, Txid};
 use simplicityhl_core::{LIQUID_TESTNET_BITCOIN_ASSET, LIQUID_TESTNET_GENESIS, TaprootPubkeyGen};
+use tracing::instrument;
 
 #[derive(Debug)]
 pub struct InnerDcdInitParams {
@@ -24,8 +26,8 @@ pub struct InnerDcdInitParams {
     pub incentive_basis_points: u64,
     pub filler_per_principal_collateral: u64,
     pub strike_price: u64,
-    pub collateral_asset_id: AssetEntropyHex,
-    pub settlement_asset_id: AssetEntropyHex,
+    pub collateral_asset_id: AssetIdHex,
+    pub settlement_asset_entropy: AssetEntropyHex,
     pub oracle_public_key: secp256k1::PublicKey,
 }
 
@@ -56,13 +58,14 @@ impl TryInto<DcdInitParams> for InnerDcdInitParams {
             incentive_basis_points: self.incentive_basis_points,
             filler_per_principal_collateral: self.filler_per_principal_collateral,
             strike_price: self.strike_price,
-            collateral_asset_id: decode_hex(self.collateral_asset_id)?,
-            settlement_asset_id: decode_hex(self.settlement_asset_id)?,
+            collateral_asset_id: self.collateral_asset_id,
+            settlement_asset_id: entropy_to_asset_id(self.settlement_asset_entropy)?.to_string(),
             oracle_public_key: self.oracle_public_key,
         })
     }
 }
 
+#[instrument(level = "debug", skip_all, err)]
 pub fn process_args(account_index: u32, dcd_init_params: InnerDcdInitParams) -> crate::error::Result<ProcessedArgs> {
     let store = Store::load()?;
 
@@ -82,6 +85,7 @@ pub fn process_args(account_index: u32, dcd_init_params: InnerDcdInitParams) -> 
     })
 }
 
+#[instrument(level = "debug", skip_all, err)]
 pub fn handle(
     ProcessedArgs {
         keypair,
@@ -121,6 +125,7 @@ pub fn handle(
     Ok((transaction.txid(), args_to_save))
 }
 
+#[instrument(level = "debug", skip_all, err)]
 pub fn save_args_to_cache(
     ArgsToSave {
         filler_token_entropy,

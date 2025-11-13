@@ -1,5 +1,5 @@
 use crate::manager::types::{
-    AssetEntropyBytes, AssetEntropyHex, FillerTokenEntropyHex, GrantorCollateralAssetEntropyHex,
+    AssetEntropyBytes, AssetEntropyHex, AssetIdHex, FillerTokenEntropyHex, GrantorCollateralAssetEntropyHex,
     GrantorSettlementAssetEntropyHex,
 };
 use anyhow::anyhow;
@@ -22,8 +22,8 @@ pub struct DcdInitParams {
     pub incentive_basis_points: u64,
     pub filler_per_principal_collateral: u64,
     pub strike_price: u64,
-    pub collateral_asset_id: Vec<u8>,
-    pub settlement_asset_id: Vec<u8>,
+    pub collateral_asset_id: AssetIdHex,
+    pub settlement_asset_id: AssetIdHex,
     pub oracle_public_key: secp256k1::PublicKey,
 }
 
@@ -93,7 +93,7 @@ impl DcdManager {
         crate::manager::handlers::maker_init::handle(
             keypair,
             input_utxos,
-            dcd_init_params.try_into()?,
+            dcd_init_params,
             fee_amount,
             address_params,
             change_asset,

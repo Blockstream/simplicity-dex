@@ -29,4 +29,5 @@ clippy_all_features:
 ## Build release binary and move
 build_dev:
 	cargo build -r
-	mv ./target/release/simplicity-dex ./simplicity-dex
+	cp ./target/release/simplicity-dex ./simplicity-dex
+	mv ./target/release/simplicity-dex ./taker/simplicity-dex

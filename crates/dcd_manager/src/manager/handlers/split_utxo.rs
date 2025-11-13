@@ -1,9 +1,8 @@
-use anyhow::anyhow;
 use simplicityhl::elements;
 use simplicityhl::elements::bitcoin::secp256k1;
 use simplicityhl::elements::hex::ToHex;
 use simplicityhl::elements::pset::{Input, Output, PartiallySignedTransaction};
-use simplicityhl::elements::{AddressParams, AssetId, OutPoint, Script, Transaction, TxOut};
+use simplicityhl::elements::{AddressParams, AssetId, OutPoint, Script, Transaction};
 
 use crate::manager::common::obtain_utxo_value;
 use simplicityhl_core::{fetch_utxo, finalize_p2pk_transaction, get_p2pk_address};

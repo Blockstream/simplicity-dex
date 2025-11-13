@@ -14,6 +14,7 @@ pub type UtxoList = [OutPoint; 3];
 pub type AssetEntropyList = [String; 3];
 pub type AssetEntropyBytes = [u8; 32];
 pub type AssetEntropyHex = String;
+pub type AssetIdHex = String;
 pub type FillerTokenEntropyHex = AssetEntropyHex;
 pub type FillerTokenEntropyBytes = AssetEntropyBytes;
 pub type GrantorCollateralAssetEntropyHex = AssetEntropyHex;

@@ -5,7 +5,6 @@ use elements::bitcoin::secp256k1;
 use elements::schnorr::Keypair;
 use simplicity::elements::{AssetId, BlockHash, TxOut};
 use simplicity_contracts::{DCDArguments, DcdBranch, MergeBranch, TokenBranch, build_dcd_witness, get_dcd_program};
-use simplicityhl::elements::pset::serialize::Serialize;
 use simplicityhl::elements::secp256k1_zkp::Secp256k1;
 use simplicityhl::elements::secp256k1_zkp::rand::thread_rng;
 use simplicityhl::elements::{OutPoint, Transaction};
@@ -20,7 +19,9 @@ use simplicityhl_core::{
 use crate::manager::types::{COLLATERAL_ASSET_ID, FillerTokenEntropyBytes};
 use simplicityhl::simplicity::elements::pset::{Input, Output, PartiallySignedTransaction};
 use simplicityhl::simplicity::elements::{AddressParams, Script};
+use tracing::instrument;
 
+#[instrument(level = "debug", skip_all, err)]
 pub fn handle(
     keypair: secp256k1::Keypair,
     filler_token_info: (OutPoint, FillerTokenEntropyBytes),
@@ -35,6 +36,17 @@ pub fn handle(
     change_asset: AssetId,
     genesis_block_hash: simplicity::elements::BlockHash,
 ) -> anyhow::Result<Transaction> {
+    tracing::debug!(
+        filler_token_info =? filler_token_info,
+        grantor_collateral_token_info =? grantor_collateral_token_info,
+        grantor_settlement_token_info =? grantor_settlement_token_info,
+        settlement_asset_info =? settlement_asset_info,
+        fee_utxo =? fee_utxo,
+        dcd_taproot_pubkey_gen =? dcd_taproot_pubkey_gen,
+        fee_amount = fee_amount,
+        "Executing maker fund with params"
+    );
+
     let blinding_key = derive_public_blinder_key()?;
 
     let (filler_token_utxo, filler_token_utxo_tx_out) = (filler_token_info.0, fetch_utxo(filler_token_info.0)?);
@@ -67,15 +79,15 @@ pub fn handle(
 
     let blinding_sk = blinding_key.secret_key();
 
-    let filler_token_unblinded = filler_token_utxo_tx_out.unblind(&Secp256k1::new(), blinding_sk)?;
-    let grantor_collateral_token_unblinded =
+    let filler_tx_out_unblinded = filler_token_utxo_tx_out.unblind(&Secp256k1::new(), blinding_sk)?;
+    let grantor_collateral_tx_out_unblinded =
         grantor_collateral_token_utxo_tx_out.unblind(&Secp256k1::new(), blinding_sk)?;
-    let grantor_settlement_token_unblinded =
+    let grantor_settlement_tx_out_unblinded =
         grantor_settlement_token_utxo_tx_out.unblind(&Secp256k1::new(), blinding_sk)?;
 
-    let filler_token_abf = filler_token_unblinded.asset_bf;
-    let grantor_collateral_token_abf = grantor_collateral_token_unblinded.asset_bf;
-    let grantor_settlement_token_abf = grantor_settlement_token_unblinded.asset_bf;
+    let filler_token_abf = filler_tx_out_unblinded.asset_bf;
+    let grantor_collateral_token_abf = grantor_collateral_tx_out_unblinded.asset_bf;
+    let grantor_settlement_token_abf = grantor_settlement_tx_out_unblinded.asset_bf;
 
     let filler_asset_id = AssetId::from_entropy(filler_token_asset_entropy);
     let grantor_collateral_asset_id = AssetId::from_entropy(grantor_collateral_token_asset_entropy);
@@ -122,7 +134,7 @@ pub fn handle(
         filler_reissuance_tx.blinded_issuance = Some(0x00);
         filler_reissuance_tx.issuance_blinding_nonce = Some(filler_token_abf.into_inner());
         pst.add_input(filler_reissuance_tx);
-        inp_tx_out_sec.insert(0, filler_token_unblinded);
+        inp_tx_out_sec.insert(0, filler_tx_out_unblinded);
     }
     {
         let mut grantor_collateral_reissuance_tx = Input::from_prevout(grantor_collateral_token_utxo);
@@ -136,7 +148,7 @@ pub fn handle(
         grantor_collateral_reissuance_tx.blinded_issuance = Some(0x00);
         grantor_collateral_reissuance_tx.issuance_blinding_nonce = Some(grantor_collateral_token_abf.into_inner());
         pst.add_input(grantor_collateral_reissuance_tx);
-        inp_tx_out_sec.insert(1, grantor_collateral_token_unblinded);
+        inp_tx_out_sec.insert(1, grantor_collateral_tx_out_unblinded);
     }
     {
         let mut grantor_settlement_reissuance_tx = Input::from_prevout(grantor_settlement_token_utxo);
@@ -150,8 +162,9 @@ pub fn handle(
         grantor_settlement_reissuance_tx.blinded_issuance = Some(0x00);
         grantor_settlement_reissuance_tx.issuance_blinding_nonce = Some(grantor_settlement_token_abf.into_inner());
         pst.add_input(grantor_settlement_reissuance_tx);
-        inp_tx_out_sec.insert(2, grantor_settlement_token_unblinded);
+        inp_tx_out_sec.insert(2, grantor_settlement_tx_out_unblinded);
     }
+
     {
         let mut asset_settlement_tx = Input::from_prevout(settlement_utxo);
         asset_settlement_tx.witness_utxo = Some(settlement_utxo_tx_out.clone());
@@ -228,9 +241,10 @@ pub fn handle(
     ));
 
     // Collateral change
+    let collateral_change_amount = total_input_fee - fee_amount - dcd_arguments.ratio_args.interest_collateral_amount;
     pst.add_output(Output::new_explicit(
         change_recipient.script_pubkey(),
-        total_input_fee - fee_amount - dcd_arguments.ratio_args.interest_collateral_amount,
+        collateral_change_amount,
         AssetId::from_str(&dcd_arguments.collateral_asset_id_hex_le)?,
         None,
     ));
