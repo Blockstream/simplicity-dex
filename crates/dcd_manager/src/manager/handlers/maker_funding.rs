@@ -24,9 +24,9 @@ use tracing::instrument;
 #[instrument(level = "debug", skip_all, err)]
 pub fn handle(
     keypair: secp256k1::Keypair,
-    filler_token_info: (OutPoint, FillerTokenEntropyBytes),
-    grantor_collateral_token_info: (OutPoint, FillerTokenEntropyBytes),
-    grantor_settlement_token_info: (OutPoint, FillerTokenEntropyBytes),
+    filler_reissue_token_info: (OutPoint, FillerTokenEntropyBytes),
+    grantor_collateral_reissue_token_info: (OutPoint, FillerTokenEntropyBytes),
+    grantor_settlement_reissue_token_info: (OutPoint, FillerTokenEntropyBytes),
     settlement_asset_info: (OutPoint, FillerTokenEntropyBytes),
     fee_utxo: OutPoint,
     fee_amount: u64,
@@ -37,9 +37,9 @@ pub fn handle(
     genesis_block_hash: simplicity::elements::BlockHash,
 ) -> anyhow::Result<Transaction> {
     tracing::debug!(
-        filler_token_info =? filler_token_info,
-        grantor_collateral_token_info =? grantor_collateral_token_info,
-        grantor_settlement_token_info =? grantor_settlement_token_info,
+        filler_token_info =? filler_reissue_token_info,
+        grantor_collateral_token_info =? grantor_collateral_reissue_token_info,
+        grantor_settlement_token_info =? grantor_settlement_reissue_token_info,
         settlement_asset_info =? settlement_asset_info,
         fee_utxo =? fee_utxo,
         dcd_taproot_pubkey_gen =? dcd_taproot_pubkey_gen,
@@ -49,14 +49,15 @@ pub fn handle(
 
     let blinding_key = derive_public_blinder_key()?;
 
-    let (filler_token_utxo, filler_token_utxo_tx_out) = (filler_token_info.0, fetch_utxo(filler_token_info.0)?);
+    let (filler_token_utxo, filler_token_utxo_tx_out) =
+        (filler_reissue_token_info.0, fetch_utxo(filler_reissue_token_info.0)?);
     let (grantor_collateral_token_utxo, grantor_collateral_token_utxo_tx_out) = (
-        grantor_collateral_token_info.0,
-        fetch_utxo(grantor_collateral_token_info.0)?,
+        grantor_collateral_reissue_token_info.0,
+        fetch_utxo(grantor_collateral_reissue_token_info.0)?,
     );
     let (grantor_settlement_token_utxo, grantor_settlement_token_utxo_tx_out) = (
-        grantor_settlement_token_info.0,
-        fetch_utxo(grantor_settlement_token_info.0)?,
+        grantor_settlement_reissue_token_info.0,
+        fetch_utxo(grantor_settlement_reissue_token_info.0)?,
     );
     let (settlement_utxo, settlement_utxo_tx_out) = (settlement_asset_info.0, fetch_utxo(settlement_asset_info.0)?);
     let fee_utxo_tx_out = fetch_utxo(fee_utxo)?;
@@ -67,15 +68,15 @@ pub fn handle(
     let AssetEntropyProcessed {
         entropy: filler_token_asset_entropy,
         reversed_bytes: _filler_reversed_bytes,
-    } = raw_asset_entropy_bytes_to_midstate(filler_token_info.1);
+    } = raw_asset_entropy_bytes_to_midstate(filler_reissue_token_info.1);
     let AssetEntropyProcessed {
         entropy: grantor_collateral_token_asset_entropy,
         reversed_bytes: _grantor_collateral_reversed_bytes,
-    } = raw_asset_entropy_bytes_to_midstate(grantor_collateral_token_info.1);
+    } = raw_asset_entropy_bytes_to_midstate(grantor_collateral_reissue_token_info.1);
     let AssetEntropyProcessed {
         entropy: grantor_settlement_token_asset_entropy,
         reversed_bytes: _grantor_settlement_reversed_bytes,
-    } = raw_asset_entropy_bytes_to_midstate(grantor_settlement_token_info.1);
+    } = raw_asset_entropy_bytes_to_midstate(grantor_settlement_reissue_token_info.1);
 
     let blinding_sk = blinding_key.secret_key();
 

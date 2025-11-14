@@ -150,42 +150,48 @@ impl DcdManager {
         address_params: &'static AddressParams,
         genesis_block_hash: elements::BlockHash,
     ) -> anyhow::Result<()> {
-        crate::manager::handlers::taker_funding::handle()?;
+        //todo!()
+        // crate::manager::handlers::taker_funding::handle()?;
         Ok(())
     }
     pub fn taker_early_termination(
         address_params: &'static AddressParams,
         genesis_block_hash: elements::BlockHash,
     ) -> anyhow::Result<()> {
-        crate::manager::handlers::taker_termination_early::handle()?;
+        //todo!()
+        // crate::manager::handlers::taker_termination_early::handle()?;
         Ok(())
     }
     pub fn maker_collateral_termination(
         address_params: &'static AddressParams,
         genesis_block_hash: elements::BlockHash,
     ) -> anyhow::Result<()> {
-        crate::manager::handlers::maker_termination_collateral::handle()?;
+        //todo!()
+        // crate::manager::handlers::maker_termination_collateral::handle()?;
         Ok(())
     }
     pub fn maker_settlement_termination(
         address_params: &'static AddressParams,
         genesis_block_hash: elements::BlockHash,
     ) -> anyhow::Result<()> {
-        crate::manager::handlers::maker_termination_settlement::handle()?;
+        //todo!()
+        // crate::manager::handlers::maker_termination_settlement::handle()?;
         Ok(())
     }
     pub fn maker_settlement(
         address_params: &'static AddressParams,
         genesis_block_hash: elements::BlockHash,
     ) -> anyhow::Result<()> {
-        crate::manager::handlers::maker_settlement::handle()?;
+        //todo!()
+        // crate::manager::handlers::maker_settlement::handle()?;
         Ok(())
     }
     pub fn taker_settlement(
         address_params: &'static AddressParams,
         genesis_block_hash: elements::BlockHash,
     ) -> anyhow::Result<()> {
-        crate::manager::handlers::taker_settlement::handle()?;
+        //todo!()
+        // crate::manager::handlers::taker_settlement::handle()?;
         Ok(())
     }
     pub fn split_utxo_native(
