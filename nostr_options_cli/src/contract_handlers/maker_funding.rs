@@ -2,15 +2,17 @@ use crate::common::keys::derive_secret_key_from_index;
 use crate::common::settings::Settings;
 use crate::common::store::Store;
 use crate::common::{DCDCliArguments, broadcast_tx_inner, decode_hex, entropy_to_asset_id, vec_to_arr};
+use dcd_manager::manager::common::{AssetEntropyProcessed, convert_asset_entropy, raw_asset_entropy_bytes_to_midstate};
 use dcd_manager::manager::init::DcdManager;
 use dcd_manager::manager::types::{AssetEntropyHex, COLLATERAL_ASSET_ID};
 use elements::bitcoin::hex::DisplayHex;
 use elements::bitcoin::secp256k1;
 use elements::hex::ToHex;
+use nostr_relay_processor::relay_processor::OrderPlaceEventTags;
 use simplicity::elements::OutPoint;
 use simplicity::elements::pset::serialize::Serialize;
 use simplicity_contracts::{DCDArguments, DCDRatioArguments};
-use simplicityhl::elements::{AddressParams, Txid};
+use simplicityhl::elements::{AddressParams, AssetId, Txid};
 use simplicityhl_core::{LIQUID_TESTNET_BITCOIN_ASSET, LIQUID_TESTNET_GENESIS};
 use tracing::instrument;
 
@@ -24,6 +26,37 @@ pub struct ProcessedArgs {
     grantor_settlement_token_info: (OutPoint, AssetEntropyHex),
     settlement_asset_info: (OutPoint, AssetEntropyHex),
     fee_utxo: OutPoint,
+}
+
+impl ProcessedArgs {
+    pub fn extract_event(&self) -> OrderPlaceEventTags {
+        let convert_entropy_to_asset_id = |x: &str| {
+            let x = hex::decode(x).unwrap();
+            let token_entropy = convert_asset_entropy(x).unwrap();
+            let AssetEntropyProcessed {
+                entropy: filler_token_asset_entropy,
+                reversed_bytes: _filler_reversed_bytes,
+            } = raw_asset_entropy_bytes_to_midstate(token_entropy);
+            let asset_id = AssetId::from_entropy(filler_token_asset_entropy);
+            asset_id
+        };
+
+        let filler_asset_id = convert_entropy_to_asset_id(&self.filler_token_info.1);
+        let grantor_collateral_asset_id = convert_entropy_to_asset_id(&self.grantor_collateral_token_info.1);
+        let grantor_settlement_asset_id = convert_entropy_to_asset_id(&self.grantor_settlement_token_info.1);
+        let settlement_asset_id = convert_entropy_to_asset_id(&self.settlement_asset_info.1);
+        let collateral_asset_id = COLLATERAL_ASSET_ID;
+
+        OrderPlaceEventTags {
+            dcd_arguments: self.dcd_arguments.clone(),
+            dcd_taproot_pubkey_gen: self.dcd_taproot_pubkey_gen.clone(),
+            filler_asset_id,
+            grantor_collateral_asset_id,
+            grantor_settlement_asset_id,
+            settlement_asset_id,
+            collateral_asset_id,
+        }
+    }
 }
 
 #[instrument(level = "debug", skip_all, err)]

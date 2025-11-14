@@ -15,4 +15,9 @@ pub enum DexCommands {
         #[arg(short = 'i', long)]
         event_id: EventId,
     },
+    #[command(about = "Get order by its ID [no authentication required]")]
+    GetOrderById {
+        #[arg(short = 'i', long)]
+        event_id: EventId,
+    },
 }

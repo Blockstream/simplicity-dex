@@ -5,7 +5,9 @@ mod tests {
     use nostr::{EventId, Keys, ToBech32};
     use nostr_relay_connector::relay_client::ClientConfig;
     use nostr_relay_processor::relay_processor::{OrderPlaceEventTags, OrderReplyEventTags, RelayProcessor};
-    use nostr_relay_processor::types::{CustomKind, MakerOrderKind, TakerOrderKind};
+    use nostr_relay_processor::types::{CustomKind, MakerOrderKind, MakerOrderSummary, TakerOrderKind};
+    use simplicity::elements::Txid;
+    use std::str::FromStr;
     use std::time::Duration;
     use tracing::{info, instrument};
 
@@ -29,10 +31,13 @@ mod tests {
         .await?;
 
         let placed_order_event_id = relay_processor_maker
-            .place_order(OrderPlaceEventTags::default())
+            .place_order(
+                OrderPlaceEventTags::default(),
+                Txid::from_str("87a4c9b2060ff698d9072d5f95b3dde01efe0994f95c3cd6dd7348cb3a4e4e40").unwrap(),
+            )
             .await?;
         info!("=== placed order event id: {}", placed_order_event_id);
-        let order = relay_processor_maker.get_events_by_id(placed_order_event_id).await?;
+        let order = relay_processor_maker.get_event_by_id(placed_order_event_id).await?;
         info!("=== placed order: {:#?}", order);
         assert_eq!(order.len(), 1);
         assert_eq!(order.first().unwrap().kind, MakerOrderKind::get_kind());
@@ -78,8 +83,8 @@ mod tests {
         assert!(
             orders_listed
                 .iter()
-                .map(|x| x.id)
-                .collect::<Vec<EventId>>()
+                .map(|x| x.event_id)
+                .collect::<Vec<_>>()
                 .contains(&placed_order_event_id)
         );
 

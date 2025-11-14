@@ -18,6 +18,7 @@ anyhow = { version = "1.0.100" }
 bincode = { version = "2.0.1" }
 clap = { version = "4.5.49", features = ["derive"] }
 config = { version = "0.15.18" }
+chrono = { version = "0.4.42"}
 dcd_manager = { path = "crates/dcd_manager" }
 dirs = { version = "6.0.0" }
 dotenvy = { version = "0.15.7" }

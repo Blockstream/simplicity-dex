@@ -1,3 +1,4 @@
+use crate::manager::common::convert_asset_entropy;
 use crate::manager::types::{
     AssetEntropyBytes, AssetEntropyHex, AssetIdHex, FillerTokenEntropyHex, GrantorCollateralAssetEntropyHex,
     GrantorSettlementAssetEntropyHex,
@@ -206,16 +207,4 @@ impl DcdManager {
             genesis_block_hash,
         )
     }
-}
-
-fn convert_asset_entropy(val: impl AsRef<[u8]>) -> anyhow::Result<AssetEntropyBytes> {
-    let asset_entropy_vec = val.as_ref().to_vec();
-    let asset_entropy: AssetEntropyBytes = asset_entropy_vec.try_into().map_err(|x: Vec<u8>| {
-        anyhow!(
-            "Failed to parse asset entropy, got len: {}, has to be: {}",
-            x.len(),
-            AssetEntropyBytes::default().len()
-        )
-    })?;
-    Ok(asset_entropy)
 }

@@ -1,21 +1,25 @@
 use crate::handlers;
+use crate::types::{MakerOrderEvent, MakerOrderSummary};
 use nostr::prelude::IntoNostrSigner;
 use nostr::{EventId, PublicKey, TryIntoUrl};
 use nostr_relay_connector::relay_client::{ClientConfig, RelayClient};
 use nostr_sdk::prelude::Events;
+use simplicity_contracts::DCDArguments;
+use simplicityhl::elements::{AssetId, Txid};
 
 pub struct RelayProcessor {
     relay_client: RelayClient,
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct OrderPlaceEventTags {
-    pub asset_to_sell: String,
-    pub asset_to_buy: String,
-    pub price: u64,
-    pub expiry: u64,
-    pub compiler_name: String,
-    pub compiler_build_hash: String,
+    pub dcd_arguments: DCDArguments,
+    pub dcd_taproot_pubkey_gen: String,
+    pub filler_asset_id: AssetId,
+    pub grantor_collateral_asset_id: AssetId,
+    pub grantor_settlement_asset_id: AssetId,
+    pub settlement_asset_id: AssetId,
+    pub collateral_asset_id: AssetId,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -34,12 +38,12 @@ impl RelayProcessor {
         })
     }
 
-    pub async fn place_order(&self, tags: OrderPlaceEventTags) -> crate::error::Result<EventId> {
-        let event_id = handlers::place_order::handle(&self.relay_client, tags).await?;
+    pub async fn place_order(&self, tags: OrderPlaceEventTags, tx_id: Txid) -> crate::error::Result<EventId> {
+        let event_id = handlers::place_order::handle(&self.relay_client, tags, tx_id).await?;
         Ok(event_id)
     }
 
-    pub async fn list_orders(&self) -> crate::error::Result<Events> {
+    pub async fn list_orders(&self) -> crate::error::Result<Vec<MakerOrderSummary>> {
         let events = handlers::list_orders::handle(&self.relay_client).await?;
         Ok(events)
     }
@@ -59,7 +63,12 @@ impl RelayProcessor {
         Ok(events)
     }
 
-    pub async fn get_events_by_id(&self, event_id: EventId) -> crate::error::Result<Events> {
+    pub async fn get_order_by_id(&self, event_id: EventId) -> crate::error::Result<Vec<MakerOrderEvent>> {
+        let events = handlers::get_events::order::handle(&self.relay_client, event_id).await?;
+        Ok(events)
+    }
+
+    pub async fn get_event_by_id(&self, event_id: EventId) -> crate::error::Result<Events> {
         let events = handlers::get_events::ids::handle(&self.relay_client, event_id).await?;
         Ok(events)
     }

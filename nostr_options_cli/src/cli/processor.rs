@@ -12,8 +12,10 @@ use nostr::{EventId, PublicKey};
 use nostr_relay_connector::relay_client::ClientConfig;
 use nostr_relay_processor::relay_processor::{OrderPlaceEventTags, OrderReplyEventTags, RelayProcessor};
 use simplicityhl::elements::OutPoint;
+use simplicityhl::elements::Txid;
 use simplicityhl::elements::bitcoin::secp256k1;
 use std::path::PathBuf;
+use std::str::FromStr;
 use std::time::Duration;
 use tracing::instrument;
 
@@ -123,19 +125,17 @@ impl Cli {
                             fee_utxos,
                             token_entropies,
                         )?;
-                        let tx_res = contract_handlers::maker_funding::handle(processed_args, fee_amount, broadcast)?;
+                        let event_to_publish = processed_args.extract_event();
+                        let tx_id = contract_handlers::maker_funding::handle(processed_args, fee_amount, broadcast)?;
                         // contract_handlers::maker_init::save_args_to_cache(args_to_save)?;
                         let res = relay_processor
-                            .place_order(OrderPlaceEventTags {
-                                asset_to_sell,
-                                asset_to_buy,
-                                price,
-                                expiry,
-                                compiler_name,
-                                compiler_build_hash,
-                            })
+                            .place_order(
+                                event_to_publish,
+                                Txid::from_str("87a4c9b2060ff698d9072d5f95b3dde01efe0994f95c3cd6dd7348cb3a4e4e40")
+                                    .unwrap(),
+                            )
                             .await?;
-                        format!("[Maker] Creating order result: {res:#?}")
+                        format!("[Maker] Creating order, tx_id: {tx_id}, event_id: {res:#?}")
                     }
                     MakerCommands::TerminationCollateral => {
                         let tx_res = contract_handlers::maker_termination_collateral::handle()?;
@@ -245,11 +245,17 @@ impl Cli {
                     }
                     DexCommands::ListOrders => {
                         let res = relay_processor.list_orders().await?;
-                        format!("List of available orders: {res:#?}")
+                        let body = format_items(&res, |e| e.to_string());
+                        format!("List of available orders:\n{body}")
                     }
                     DexCommands::GetEventsById { event_id } => {
-                        let res = relay_processor.get_events_by_id(event_id).await?;
+                        let res = relay_processor.get_event_by_id(event_id).await?;
                         format!("List of available events: {res:#?}")
+                    }
+                    DexCommands::GetOrderById { event_id } => {
+                        let res = relay_processor.get_order_by_id(event_id).await?;
+                        let body = format_items(&res, |e| e.to_string());
+                        format!("Order {event_id}: {body}")
                     }
                 },
             }
@@ -257,4 +263,11 @@ impl Cli {
         write_into_stdout(msg)?;
         Ok(())
     }
+}
+
+fn format_items<T, F>(items: &[T], map: F) -> String
+where
+    F: Fn(&T) -> String,
+{
+    items.iter().map(map).collect::<Vec<_>>().join("\n")
 }

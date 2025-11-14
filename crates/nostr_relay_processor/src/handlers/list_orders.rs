@@ -1,10 +1,11 @@
-use crate::types::{CustomKind, MakerOrderKind};
+use crate::handlers::common::filter_events;
+use crate::types::{CustomKind, MakerOrderEvent, MakerOrderKind, MakerOrderSummary};
 use nostr::{Filter, Timestamp};
 use nostr_relay_connector::relay_client::RelayClient;
 use nostr_sdk::prelude::Events;
 use std::collections::{BTreeMap, BTreeSet};
 
-pub async fn handle(client: &RelayClient) -> crate::error::Result<Events> {
+pub async fn handle(client: &RelayClient) -> crate::error::Result<Vec<MakerOrderSummary>> {
     let events = client
         .req_and_wait(Filter {
             ids: None,
@@ -18,6 +19,8 @@ pub async fn handle(client: &RelayClient) -> crate::error::Result<Events> {
         })
         .await?;
     let events = filter_expired_events(events);
+    let events = filter_events(events);
+    let events = events.iter().map(MakerOrderEvent::summary).collect();
     Ok(events)
 }
 
