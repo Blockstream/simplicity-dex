@@ -1,10 +1,13 @@
 # Simplicity DEX
 
-A distributed exchange built on the NOSTR protocol, leveraging Simplicity smart contracts and the PACT (PACT for Auditable Contract Transactions) messaging protocol.
+A distributed exchange built on the NOSTR protocol, leveraging Simplicity smart contracts and the PACT (PACT for
+Auditable Contract Transactions) messaging protocol.
 
 ## Overview
 
-Simplicity DEX is a decentralized exchange that combines the power of Simplicity smart contracts with the distributed messaging capabilities of NOSTR. By utilizing the PACT protocol, we enable secure, auditable, and transparent trading of digital assets without relying on centralized intermediaries.
+Simplicity DEX is a decentralized exchange that combines the power of Simplicity smart contracts with the distributed
+messaging capabilities of NOSTR. By utilizing the PACT protocol, we enable secure, auditable, and transparent trading of
+digital assets without relying on centralized intermediaries.
 
 ## Key Features
 
@@ -16,11 +19,13 @@ Simplicity DEX is a decentralized exchange that combines the power of Simplicity
 
 ## DEX Messaging Protocol
 
-The core of our DEX is the **PACT (PACT for Auditable Contract Transactions)** protocol, which defines the format of trading offers. This protocol is fully adapted to be compatible with the NOSTR event structure.
+The core of our DEX is the **PACT (PACT for Auditable Contract Transactions)** protocol, which defines the format of
+trading offers. This protocol is fully adapted to be compatible with the NOSTR event structure.
 
 ### Offer Structure
 
-A PACT offer is implemented as a standard NOSTR event with kind `30078` (non-standard, ephemeral event kind for DEX offers). The event structure maps to PACT requirements as follows:
+A PACT offer is implemented as a standard NOSTR event with kind `30078` (non-standard, ephemeral event kind for DEX
+offers). The event structure maps to PACT requirements as follows:
 
 | NOSTR Field   | PACT Field    | Data Type             | Required | Description                                                                                                       |
 |---------------|---------------|-----------------------|----------|-------------------------------------------------------------------------------------------------------------------|
@@ -39,11 +44,28 @@ The `tags` field contains structured metadata as key-value pairs:
 
 ```json
 [
-  ["asset_to_sell", "<liquid_asset_id>"],
-  ["asset_to_buy", "<liquid_asset_id>"],
-  ["price", "1000000", "sats_per_contract"],
-  ["expiry", "1735689600"],
-  ["compiler", "simplicity-v1.2.3", "deterministic_build_hash"]
+  [
+    "asset_to_sell",
+    "<liquid_asset_id>"
+  ],
+  [
+    "asset_to_buy",
+    "<liquid_asset_id>"
+  ],
+  [
+    "price",
+    "1000000",
+    "sats_per_contract"
+  ],
+  [
+    "expiry",
+    "1735689600"
+  ],
+  [
+    "compiler",
+    "simplicity-v1.2.3",
+    "deterministic_build_hash"
+  ]
 ]
 ```
 
@@ -99,4 +121,5 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## Disclaimer
 
-This software is experimental and should be used with caution. Always verify contract code and understand the risks before trading.
+This software is experimental and should be used with caution. Always verify contract code and understand the risks
+before trading.
