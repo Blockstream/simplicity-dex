@@ -1,0 +1,16 @@
+[package]
+name = "dex-nostr-relay"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+readme.workspace = true
+
+[dependencies]
+anyhow = { workspace = true }
+tokio = { workspace = true }
+global-utils = { workspace = true }
+nostr-sdk = { workspace = true }
+nostr = { workspace = true }
+tracing = { workspace = true }
+thiserror = { workspace = true }

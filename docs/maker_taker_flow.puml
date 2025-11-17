@@ -1,0 +1,21 @@
+@startuml
+'https://plantuml.com/sequence-diagram
+
+autonumber
+
+== Order matching ==
+
+Maker -> LiquidNetwork: Create Option
+Maker -> NostrRelay: Place order
+Taker --> NostrRelay: Sync data
+Taker --> Taker: Check available Option
+Taker -> LiquidNetwork: Make transaction to fund Maker's order
+Taker -> NostrRelay: Place own respond ack on the Maker's order
+
+== After 30 days ==
+
+Taker <--> PriceOracle: Obtain information \n about current token price
+Taker -> LiquidNetwork: Execute Option
+Maker <--> PriceOracle: Obtain information \n about current token price
+Maker -> LiquidNetwork: Execute Option
+@enduml
