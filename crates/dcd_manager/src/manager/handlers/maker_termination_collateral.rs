@@ -1,7 +1,7 @@
 use elements::bitcoin::secp256k1;
 use simplicity::elements::{AssetId, TxOut};
 use simplicity_contracts::{DCDArguments, DcdBranch, MergeBranch, TokenBranch, build_dcd_witness, get_dcd_program};
-use simplicityhl::elements::OutPoint;
+use simplicityhl::elements::{OutPoint, Transaction};
 use simplicityhl::simplicity::ToXOnlyPubkey;
 use std::str::FromStr;
 
@@ -25,7 +25,7 @@ pub fn handle(
     address_params: &'static AddressParams,
     change_asset: AssetId,
     genesis_block_hash: simplicity::elements::BlockHash,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<Transaction> {
     // Fetch UTXOs
     let collateral_txout = fetch_utxo(collateral_token_utxo)?; // DCD input 0
     let grantor_coll_txout = fetch_utxo(grantor_collateral_token_utxo)?; // P2PK input 1
@@ -154,5 +154,5 @@ pub fn handle(
 
     tx.verify_tx_amt_proofs(secp256k1::SECP256K1, &utxos)?;
 
-    Ok(())
+    Ok(tx)
 }

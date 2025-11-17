@@ -1,17 +1,15 @@
+use crate::manager::types::COLLATERAL_ASSET_ID;
 use anyhow::anyhow;
 use elements::bitcoin::secp256k1;
 use simplicity::elements::{AssetId, OutPoint, TxOut};
 use simplicity_contracts::{DCDArguments, DcdBranch, MergeBranch, TokenBranch, build_dcd_witness, get_dcd_program};
+use simplicityhl::elements::Transaction;
 use simplicityhl::simplicity::ToXOnlyPubkey;
+use simplicityhl::simplicity::elements::AddressParams;
+use simplicityhl::simplicity::elements::pset::{Input, Output, PartiallySignedTransaction};
 use simplicityhl_core::{
     TaprootPubkeyGen, fetch_utxo, finalize_p2pk_transaction, finalize_transaction, get_p2pk_address,
 };
-use std::str::FromStr;
-
-use crate::manager::types::COLLATERAL_ASSET_ID;
-use simplicityhl::simplicity::elements::AddressParams;
-use simplicityhl::simplicity::elements::LockTime;
-use simplicityhl::simplicity::elements::pset::{Input, Output, PartiallySignedTransaction};
 
 pub fn handle(
     keypair: secp256k1::Keypair,
@@ -25,7 +23,7 @@ pub fn handle(
     address_params: &'static AddressParams,
     change_asset: AssetId,
     genesis_block_hash: simplicity::elements::BlockHash,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<Transaction> {
     let collateral_tx_out = fetch_utxo(collateral_token_utxo)?; // DCD input index 0
     let filler_tx_out = fetch_utxo(filler_token_utxo)?; // P2PK input index 1
     let fee_tx_out = fetch_utxo(fee_utxo)?; // P2PK input index 2
@@ -156,5 +154,5 @@ pub fn handle(
 
     tx.verify_tx_amt_proofs(secp256k1::SECP256K1, &utxos)?;
 
-    Ok(())
+    Ok(tx)
 }

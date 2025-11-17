@@ -1,9 +1,8 @@
 use crate::manager::common::convert_asset_entropy;
 use crate::manager::types::{
-    AssetEntropyBytes, AssetEntropyHex, AssetIdHex, FillerTokenEntropyHex, GrantorCollateralAssetEntropyHex,
+    AssetEntropyHex, AssetIdHex, FillerTokenEntropyHex, GrantorCollateralAssetEntropyHex,
     GrantorSettlementAssetEntropyHex,
 };
-use anyhow::anyhow;
 use simplicity_contracts::DCDArguments;
 use simplicityhl::elements;
 use simplicityhl::elements::bitcoin::secp256k1;
@@ -147,52 +146,176 @@ impl DcdManager {
         )
     }
     pub fn taker_funding(
+        keypair: secp256k1::Keypair,
+        dcd_arguments: DCDArguments,
+        filler_token_utxo: OutPoint,
+        collateral_token_utxo: OutPoint,
+        fee_utxo: OutPoint,
+        fee_amount: u64,
+        collateral_amount_to_deposit: u64,
+        dcd_taproot_pubkey_gen: TaprootPubkeyGen,
         address_params: &'static AddressParams,
-        genesis_block_hash: elements::BlockHash,
+        change_asset: AssetId,
+        genesis_block_hash: simplicity::elements::BlockHash,
     ) -> anyhow::Result<()> {
-        //todo!()
-        // crate::manager::handlers::taker_funding::handle()?;
-        Ok(())
+        crate::manager::handlers::taker_funding::handle(
+            keypair,
+            dcd_arguments,
+            filler_token_utxo,
+            collateral_token_utxo,
+            fee_utxo,
+            fee_amount,
+            collateral_amount_to_deposit,
+            dcd_taproot_pubkey_gen,
+            address_params,
+            change_asset,
+            genesis_block_hash,
+        )
     }
     pub fn taker_early_termination(
+        keypair: secp256k1::Keypair,
+        dcd_arguments: DCDArguments,
+        filler_token_utxo: OutPoint,
+        collateral_token_utxo: OutPoint,
+        fee_utxo: OutPoint,
+        fee_amount: u64,
+        filler_token_amount_to_return: u64,
+        dcd_taproot_pubkey_gen: TaprootPubkeyGen,
         address_params: &'static AddressParams,
-        genesis_block_hash: elements::BlockHash,
-    ) -> anyhow::Result<()> {
-        //todo!()
-        // crate::manager::handlers::taker_termination_early::handle()?;
-        Ok(())
+        change_asset: AssetId,
+        genesis_block_hash: simplicity::elements::BlockHash,
+    ) -> anyhow::Result<Transaction> {
+        crate::manager::handlers::taker_termination_early::handle(
+            keypair,
+            dcd_arguments,
+            filler_token_utxo,
+            collateral_token_utxo,
+            fee_utxo,
+            fee_amount,
+            filler_token_amount_to_return,
+            dcd_taproot_pubkey_gen,
+            address_params,
+            change_asset,
+            genesis_block_hash,
+        )
     }
     pub fn maker_collateral_termination(
+        keypair: secp256k1::Keypair,
+        collateral_token_utxo: OutPoint,
+        grantor_collateral_token_utxo: OutPoint,
+        fee_utxo: OutPoint,
+        fee_amount: u64,
+        grantor_collateral_amount_to_burn: u64,
+        dcd_arguments: DCDArguments,
+        dcd_taproot_pubkey_gen: TaprootPubkeyGen,
         address_params: &'static AddressParams,
-        genesis_block_hash: elements::BlockHash,
-    ) -> anyhow::Result<()> {
-        //todo!()
-        // crate::manager::handlers::maker_termination_collateral::handle()?;
-        Ok(())
+        change_asset: AssetId,
+        genesis_block_hash: simplicity::elements::BlockHash,
+    ) -> anyhow::Result<Transaction> {
+        crate::manager::handlers::maker_termination_collateral::handle(
+            keypair,
+            collateral_token_utxo,
+            grantor_collateral_token_utxo,
+            fee_utxo,
+            fee_amount,
+            grantor_collateral_amount_to_burn,
+            dcd_arguments,
+            dcd_taproot_pubkey_gen,
+            address_params,
+            change_asset,
+            genesis_block_hash,
+        )
     }
     pub fn maker_settlement_termination(
+        keypair: secp256k1::Keypair,
+        settlement_asset_utxo: OutPoint,
+        grantor_settlement_token_utxo: OutPoint,
+        fee_utxo: OutPoint,
+        fee_amount: u64,
+        grantor_settlement_amount_to_burn: u64,
+        dcd_arguments: DCDArguments,
+        dcd_taproot_pubkey_gen: TaprootPubkeyGen,
         address_params: &'static AddressParams,
-        genesis_block_hash: elements::BlockHash,
+        change_asset: AssetId,
+        genesis_block_hash: simplicity::elements::BlockHash,
     ) -> anyhow::Result<()> {
-        //todo!()
-        // crate::manager::handlers::maker_termination_settlement::handle()?;
-        Ok(())
+        crate::manager::handlers::maker_termination_settlement::handle(
+            keypair,
+            settlement_asset_utxo,
+            grantor_settlement_token_utxo,
+            fee_utxo,
+            fee_amount,
+            grantor_settlement_amount_to_burn,
+            dcd_arguments,
+            dcd_taproot_pubkey_gen,
+            address_params,
+            change_asset,
+            genesis_block_hash,
+        )
     }
     pub fn maker_settlement(
+        keypair: secp256k1::Keypair,
+        dcd_arguments: DCDArguments,
+        asset_utxo: OutPoint,
+        grantor_collateral_token_utxo: OutPoint,
+        grantor_settlement_token_utxo: OutPoint,
+        fee_utxo: OutPoint,
+        fee_amount: u64,
+        price_at_current_block_height: u64,
+        oracle_signature: String,
+        grantor_amount_to_burn: u64,
+        dcd_taproot_pubkey_gen: TaprootPubkeyGen,
         address_params: &'static AddressParams,
-        genesis_block_hash: elements::BlockHash,
-    ) -> anyhow::Result<()> {
-        //todo!()
-        // crate::manager::handlers::maker_settlement::handle()?;
-        Ok(())
+        change_asset: AssetId,
+        genesis_block_hash: simplicity::elements::BlockHash,
+    ) -> anyhow::Result<Transaction> {
+        crate::manager::handlers::maker_settlement::handle(
+            keypair,
+            dcd_arguments,
+            asset_utxo,
+            grantor_collateral_token_utxo,
+            grantor_settlement_token_utxo,
+            fee_utxo,
+            fee_amount,
+            price_at_current_block_height,
+            oracle_signature,
+            grantor_amount_to_burn,
+            dcd_taproot_pubkey_gen,
+            address_params,
+            change_asset,
+            genesis_block_hash,
+        )
     }
     pub fn taker_settlement(
+        keypair: secp256k1::Keypair,
+        asset_utxo: OutPoint,
+        filler_token_utxo: OutPoint,
+        fee_utxo: OutPoint,
+        fee_amount: u64,
+        price_at_current_block_height: u64,
+        filler_amount_to_burn: u64,
+        oracle_signature: String,
+        dcd_arguments: DCDArguments,
+        dcd_taproot_pubkey_gen: TaprootPubkeyGen,
         address_params: &'static AddressParams,
-        genesis_block_hash: elements::BlockHash,
+        change_asset: AssetId,
+        genesis_block_hash: simplicity::elements::BlockHash,
     ) -> anyhow::Result<()> {
-        //todo!()
-        // crate::manager::handlers::taker_settlement::handle()?;
-        Ok(())
+        crate::manager::handlers::taker_settlement::handle(
+            keypair,
+            asset_utxo,
+            filler_token_utxo,
+            fee_utxo,
+            fee_amount,
+            price_at_current_block_height,
+            filler_amount_to_burn,
+            oracle_signature,
+            dcd_arguments,
+            dcd_taproot_pubkey_gen,
+            address_params,
+            change_asset,
+            genesis_block_hash,
+        )
     }
     pub fn split_utxo_native(
         keypair: secp256k1::Keypair,

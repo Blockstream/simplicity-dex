@@ -111,12 +111,6 @@ impl Cli {
                         dcd_arguments,
                         account_index,
                         broadcast,
-                        asset_to_sell,
-                        asset_to_buy,
-                        price,
-                        expiry,
-                        compiler_name,
-                        compiler_build_hash,
                     } => {
                         let processed_args = contract_handlers::maker_funding::process_args(
                             account_index,
@@ -146,8 +140,10 @@ impl Cli {
                         format!("[Maker] Termination settlement tx result: {tx_res:?}")
                     }
                     MakerCommands::Settlement => {
-                        let tx_res = contract_handlers::maker_settlement::handle()?;
-                        format!("[Maker] Final settlement tx result: {tx_res:?}")
+                        todo!();
+                        // let tx_res = contract_handlers::maker_settlement::handle()?;
+                        // format!("[Maker] Final settlement tx result: {tx_res:?}")
+                        "".to_string()
                     }
                 },
                 Command::Taker { action } => match action {

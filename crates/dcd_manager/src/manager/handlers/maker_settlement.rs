@@ -1,15 +1,15 @@
+use crate::manager::types::COLLATERAL_ASSET_ID;
 use elements::bitcoin::secp256k1;
 use simplicity::elements::{AssetId, OutPoint, TxOut};
 use simplicity_contracts::{DCDArguments, DcdBranch, MergeBranch, TokenBranch, build_dcd_witness, get_dcd_program};
+use simplicityhl::elements::Transaction;
 use simplicityhl::simplicity::ToXOnlyPubkey;
+use simplicityhl::simplicity::elements::pset::{Input, Output, PartiallySignedTransaction};
+use simplicityhl::simplicity::elements::{AddressParams, LockTime, Script, Sequence};
 use simplicityhl_core::{
     TaprootPubkeyGen, fetch_utxo, finalize_p2pk_transaction, finalize_transaction, get_p2pk_address,
 };
 use std::str::FromStr;
-
-use crate::manager::types::COLLATERAL_ASSET_ID;
-use simplicityhl::simplicity::elements::pset::{Input, Output, PartiallySignedTransaction};
-use simplicityhl::simplicity::elements::{AddressParams, LockTime, Script, Sequence};
 
 pub fn handle(
     keypair: secp256k1::Keypair,
@@ -26,7 +26,7 @@ pub fn handle(
     address_params: &'static AddressParams,
     change_asset: AssetId,
     genesis_block_hash: simplicity::elements::BlockHash,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<Transaction> {
     // Fetch UTXOs
     let asset_txout = fetch_utxo(asset_utxo)?; // DCD input 0
     let grantor_coll_txout = fetch_utxo(grantor_collateral_token_utxo)?; // P2PK input 1
@@ -89,7 +89,7 @@ pub fn handle(
         simplicityhl::simplicity::bitcoin::secp256k1::schnorr::Signature::from_slice(&hex::decode(oracle_signature)?)?;
 
     // Maker gets ALT when price <= strike
-    if price <= dcd_arguments.strike_price {
+    let tx = if price <= dcd_arguments.strike_price {
         // amount_to_get = burn * GRANTOR_PER_SETTLEMENT_ASSET
         let per_settlement_asset =
             dcd_arguments.ratio_args.total_asset_amount / dcd_arguments.ratio_args.grantor_collateral_token_amount;
@@ -192,6 +192,7 @@ pub fn handle(
         let tx = finalize_p2pk_transaction(tx, &utxos, &keypair, 3, address_params, genesis_block_hash)?;
 
         tx.verify_tx_amt_proofs(secp256k1::SECP256K1, &utxos)?;
+        tx
     } else {
         // Maker gets LBTC (price > strike)
         let per_settlement_collateral =
@@ -315,7 +316,8 @@ pub fn handle(
         )?;
 
         tx.verify_tx_amt_proofs(secp256k1::SECP256K1, &utxos)?;
-    }
+        tx
+    };
 
-    Ok(())
+    Ok(tx)
 }

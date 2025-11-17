@@ -3,8 +3,9 @@ use simplicityhl::elements::AddressParams;
 use simplicityhl_core::LIQUID_TESTNET_GENESIS;
 
 pub fn handle() -> crate::error::Result<()> {
-    DcdManager::taker_funding(&AddressParams::LIQUID_TESTNET, *LIQUID_TESTNET_GENESIS)
-        .map_err(|err| crate::error::CliError::DcdManager(err.to_string()))?;
+    todo!();
+    // DcdManager::taker_funding(&AddressParams::LIQUID_TESTNET, *LIQUID_TESTNET_GENESIS)
+    //     .map_err(|err| crate::error::CliError::DcdManager(err.to_string()))?;
 
     Ok(())
 }

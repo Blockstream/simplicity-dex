@@ -51,19 +51,6 @@ pub enum MakerCommands {
         /// Account index to use for change address
         #[arg(long = "account-index", default_value_t = 0)]
         account_index: u32,
-        //TODO: review params
-        #[arg(short = 's', long, default_value = "")]
-        asset_to_sell: String,
-        #[arg(short = 'b', long, default_value = "")]
-        asset_to_buy: String,
-        #[arg(short = 'p', long, default_value_t = 0)]
-        price: u64,
-        #[arg(short = 'e', long, default_value_t = 0)]
-        expiry: u64,
-        #[arg(short = 'c', long, default_value = "")]
-        compiler_name: String,
-        #[arg(short = 's', long, default_value = "")]
-        compiler_build_hash: String,
         /// When set, broadcast the built transaction via Esplora and print txid
         #[arg(long = "broadcast", default_value_t = true)]
         broadcast: bool,
