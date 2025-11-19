@@ -2,7 +2,7 @@ use clap::Parser;
 
 use global_utils::logger::init_logger;
 
-use simplicity_dex::cli::Cli;
+use dex_cli::cli::Cli;
 
 #[tokio::main]
 #[tracing::instrument]
