@@ -15,10 +15,10 @@ readme = "Readme.md"
 [workspace.dependencies]
 anyhow = { version = "1.0.100" }
 bincode = { version = "2.0.1" }
-chrono = { version = "0.4.42"}
+chrono = { version = "0.4.42" }
 clap = { version = "4.5.49", features = ["derive"] }
 config = { version = "0.15.18" }
-dex-nostr-relay = { path = "./crates/dex-nostr-relay"}
+dex-nostr-relay = { path = "./crates/dex-nostr-relay" }
 dirs = { version = "6.0.0" }
 dotenvy = { version = "0.15.7" }
 elements = { version = "0.26.1" }
@@ -28,11 +28,11 @@ hex = { version = "0.4.3" }
 nostr = { version = "0.43.1", features = ["std"] }
 nostr-sdk = { version = "0.43.0" }
 serde_json = { version = "1.0.145" }
-simplicity-contracts-adapter = { git = "https://github.com/ikripaka/simplicity-contracts.git", branch = "feature/contracts-extraction", package = "contracts-adapter" }
-simplicity-contracts = { git = "https://github.com/ikripaka/simplicity-contracts.git", branch = "feature/contracts-extraction", package = "contracts" }
+simplicity-contracts-adapter = { git = "https://github.com/BlockstreamResearch/simplicity-contracts.git", rev = "69e1f71", package = "contracts-adapter" }
+simplicity-contracts = { git = "https://github.com/BlockstreamResearch/simplicity-contracts.git", rev = "69e1f71", package = "contracts" }
 simplicity-lang = { version = "0.6.0" }
 simplicityhl = { version = "0.2.0" }
-simplicityhl-core = { git = "https://github.com/ikripaka/simplicity-contracts.git", branch = "feature/contracts-extraction", package = "simplicityhl-core", features = ["encoding"]}
+simplicityhl-core = { git = "https://github.com/BlockstreamResearch/simplicity-contracts.git", rev = "69e1f71", package = "simplicityhl-core", features = ["encoding"] }
 sled = { version = "0.34.7" }
 thiserror = { version = "2.0.17" }
 tokio = { version = "1.48.0", features = ["macros", "test-util", "rt", "rt-multi-thread"] }
