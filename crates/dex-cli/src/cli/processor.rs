@@ -65,7 +65,7 @@ impl Cli {
         let relays_list = self.relays_list.clone();
         let nostr_config_path = self.nostr_config_path.clone();
         AggregatedConfig::new(CliConfigArgs {
-            nostr_key: nostr_key.map(|x| KeysWrapper(x)),
+            nostr_key: nostr_key.map(KeysWrapper),
             relays_list,
             nostr_config_path,
         })
@@ -296,7 +296,7 @@ impl Cli {
                         account_index,
                         broadcast,
                     } => {
-                        let tx_res = contract_handlers::faucet::create_asset(
+                        contract_handlers::faucet::create_asset(
                             account_index,
                             asset_name,
                             fee_utxo_outpoint,
@@ -304,7 +304,7 @@ impl Cli {
                             issue_amount,
                             broadcast,
                         )?;
-                        format!("Faucet tx result: {tx_res:?}")
+                        "Asset creation -- done".to_string()
                     }
                     HelperCommands::MintTokens {
                         reissue_asset_outpoint,
@@ -315,7 +315,7 @@ impl Cli {
                         account_index,
                         broadcast,
                     } => {
-                        let tx_res = contract_handlers::faucet::mint_asset(
+                        contract_handlers::faucet::mint_asset(
                             account_index,
                             asset_name,
                             reissue_asset_outpoint,
@@ -324,7 +324,7 @@ impl Cli {
                             fee_amount,
                             broadcast,
                         )?;
-                        format!("Faucet tx result: {tx_res:?}")
+                        "Asset minting -- done".to_string()
                     }
                     HelperCommands::SplitNativeThree {
                         split_amount,

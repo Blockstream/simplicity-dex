@@ -33,9 +33,9 @@ impl<'de> Deserialize<'de> for KeysWrapper {
     }
 }
 
-impl Into<ValueKind> for KeysWrapper {
-    fn into(self) -> ValueKind {
-        ValueKind::String(self.0.secret_key().to_secret_hex())
+impl From<KeysWrapper> for ValueKind {
+    fn from(val: KeysWrapper) -> Self {
+        ValueKind::String(val.0.secret_key().to_secret_hex())
     }
 }
 
@@ -45,8 +45,8 @@ impl AggregatedConfig {
     pub fn new(cli_args: CliConfigArgs) -> crate::error::Result<Self> {
         const NOSTR_KEYPAIR_CONFIG_FIELD_NAME: &str = "nostr_keypair";
         const RELAYS_CONFIG_FIELD_NAME: &str = "relays";
-        const ENV_VARIABLE_SEPARATOR: &'static str = ",";
-        const DEFAULT_CONFIG_PATH: &'static str = ".simplicity-dex.config.toml";
+        const ENV_VARIABLE_SEPARATOR: &str = ",";
+        const DEFAULT_CONFIG_PATH: &str = ".simplicity-dex.config.toml";
 
         #[derive(Deserialize, Debug)]
         pub struct AggregatedConfigInner {

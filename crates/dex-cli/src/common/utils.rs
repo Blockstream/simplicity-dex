@@ -60,7 +60,7 @@ pub fn broadcast_tx_inner(tx: &simplicityhl::elements::Transaction) -> crate::er
 
 pub fn decode_hex(str: impl AsRef<[u8]>) -> crate::error::Result<Vec<u8>> {
     let str_to_convert = str.as_ref();
-    Ok(hex::decode(str_to_convert).map_err(|err| crate::error::CliError::FromHex(err, str_to_convert.to_hex()))?)
+    hex::decode(str_to_convert).map_err(|err| crate::error::CliError::FromHex(err, str_to_convert.to_hex()))
 }
 
 #[instrument(err)]

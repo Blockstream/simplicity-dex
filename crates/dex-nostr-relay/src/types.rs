@@ -353,7 +353,7 @@ impl MakerOrderEvent {
             total_collateral,
             interest_asset,
             total_asset,
-            time: self.time.clone(),
+            time: self.time,
             maker_fund_tx_id: self.maker_fund_tx_id.to_string(),
             event_id: self.event_id,
         }

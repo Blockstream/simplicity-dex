@@ -45,8 +45,8 @@ impl ProcessedArgs {
                 entropy: filler_token_asset_entropy,
                 reversed_bytes: _filler_reversed_bytes,
             } = raw_asset_entropy_bytes_to_midstate(token_entropy);
-            let asset_id = AssetId::from_entropy(filler_token_asset_entropy);
-            asset_id
+
+            AssetId::from_entropy(filler_token_asset_entropy)
         };
 
         let filler_asset_id = convert_entropy_to_asset_id(&self.filler_token_info.1);

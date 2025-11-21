@@ -26,7 +26,7 @@ impl Settings {
                     .convert_case(Case::ScreamingSnake),
             )
             .build()
-            .map_err(|err| crate::error::CliError::Config(err))?;
+            .map_err(crate::error::CliError::Config)?;
 
         let seed_hex = cfg
             .get_string(SeedHex::ENV_NAME)
