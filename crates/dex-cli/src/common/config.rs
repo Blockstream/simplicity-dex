@@ -18,12 +18,6 @@ pub struct AggregatedConfig {
     pub relays: Vec<RelayUrl>,
 }
 
-pub struct CliConfigArgs {
-    pub nostr_key: Option<KeysWrapper>,
-    pub relays_list: Vec<RelayUrl>,
-    pub nostr_config_path: PathBuf,
-}
-
 #[derive(Debug, Clone)]
 pub struct KeysWrapper(pub Keys);
 
