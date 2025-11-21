@@ -1,5 +1,6 @@
 use crate::common::DCDCliArguments;
 use clap::Subcommand;
+use nostr::EventId;
 use simplicity::elements::OutPoint;
 
 #[derive(Debug, Subcommand)]
@@ -28,12 +29,9 @@ pub enum TakerCommands {
         /// When true, broadcast the built transaction via Esplora; otherwise only print it
         #[arg(long = "broadcast", default_value_t = true)]
         broadcast: bool,
-        // #[arg(short = 'i', long)]
-        // maker_event_id: EventId,
-        // #[arg(short = 'p', long, help = " Pubkey in bech32 or hex format")]
-        // maker_pubkey: PublicKey,
-        // #[arg(short = 't', long, help = "Txid from funding transaction step", required = false)]
-        // tx_id: String,
+        /// EventId of the Maker\'s original order event on Nostr
+        #[arg(short = 'i', long)]
+        maker_order_event_id: EventId,
     },
     #[command(
         about = "Exit the DCD contract early as Taker by returning filler tokens in exchange for your collateral"
@@ -59,6 +57,9 @@ pub enum TakerCommands {
         /// When true, broadcast the built transaction via Esplora; otherwise only print it
         #[arg(long = "broadcast", default_value_t = true)]
         broadcast: bool,
+        /// EventId of the Maker\'s original order event on Nostr
+        #[arg(short = 'i', long)]
+        maker_order_event_id: EventId,
     },
     #[command(
         about = "Settle the Taker side of the DCD at maturity using an oracle price to choose collateral or settlement asset"
@@ -90,5 +91,8 @@ pub enum TakerCommands {
         /// When true, broadcast the built transaction via Esplora; otherwise only print it
         #[arg(long = "broadcast", default_value_t = true)]
         broadcast: bool,
+        /// EventId of the Maker\'s original order event on Nostr
+        #[arg(short = 'i', long)]
+        maker_order_event_id: EventId,
     },
 }

@@ -9,6 +9,7 @@ use nostr::{Keys, RelayUrl};
 
 use serde::{Deserialize, Deserializer};
 
+use crate::error::CliError;
 use tracing::instrument;
 
 #[derive(Debug)]
@@ -101,5 +102,12 @@ impl AggregatedConfig {
         tracing::debug!("Config gathered: '{:?}'", aggregated_config);
 
         Ok(aggregated_config)
+    }
+
+    pub fn check_nostr_keypair_existence(&self) -> crate::error::Result<()> {
+        if self.nostr_keypair.is_none() {
+            return Err(CliError::NoNostrKeypairListed);
+        }
+        Ok(())
     }
 }

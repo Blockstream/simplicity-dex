@@ -1,5 +1,6 @@
 use crate::common::{DCDCliArguments, DCDCliMakerFundArguments, InitOrderArgs};
 use clap::Subcommand;
+use nostr::EventId;
 use simplicity::elements::OutPoint;
 
 #[derive(Debug, Subcommand)]
@@ -73,6 +74,9 @@ pub enum MakerCommands {
         /// When true, broadcast the built transaction via Esplora; otherwise only print it
         #[arg(long = "broadcast", default_value_t = true)]
         broadcast: bool,
+        /// EventId of the Maker\'s original order event on Nostr
+        #[arg(short = 'i', long)]
+        maker_order_event_id: EventId,
     },
     #[command(
         about = "Withdraw Maker settlement asset early by burning grantor settlement tokens (DCD early termination leg)"
@@ -98,6 +102,9 @@ pub enum MakerCommands {
         /// When true, broadcast the built transaction via Esplora; otherwise only print it
         #[arg(long = "broadcast", default_value_t = true)]
         broadcast: bool,
+        /// EventId of the Maker\'s original order event on Nostr
+        #[arg(short = 'i', long)]
+        maker_order_event_id: EventId,
     },
     #[command(
         about = "Settle the Maker side of the DCD at maturity using an oracle price to decide between collateral or settlement asset"
@@ -129,5 +136,8 @@ pub enum MakerCommands {
         /// When true, broadcast the built transaction via Esplora; otherwise only print it
         #[arg(long = "broadcast", default_value_t = true)]
         broadcast: bool,
+        /// EventId of the Maker\'s original order event on Nostr
+        #[arg(short = 'i', long)]
+        maker_order_event_id: EventId,
     },
 }

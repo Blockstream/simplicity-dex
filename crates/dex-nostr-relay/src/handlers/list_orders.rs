@@ -1,25 +1,17 @@
-use crate::handlers::common::filter_events;
+use crate::handlers::common::filter_maker_order_events;
 use crate::relay_client::RelayClient;
-use crate::types::{CustomKind, MakerOrderEvent, MakerOrderKind, MakerOrderSummary};
-use nostr::{Filter, Timestamp};
+use crate::relay_processor::ListOrdersEventFilter;
+use crate::types::{MakerOrderEvent, MakerOrderSummary};
+use nostr::Timestamp;
 use nostr_sdk::prelude::Events;
-use std::collections::{BTreeMap, BTreeSet};
 
-pub async fn handle(client: &RelayClient) -> crate::error::Result<Vec<MakerOrderSummary>> {
-    let events = client
-        .req_and_wait(Filter {
-            ids: None,
-            authors: None,
-            kinds: Some(BTreeSet::from([MakerOrderKind::get_kind()])),
-            search: None,
-            since: None,
-            until: None,
-            limit: None,
-            generic_tags: BTreeMap::default(),
-        })
-        .await?;
+pub async fn handle(
+    client: &RelayClient,
+    filter: ListOrdersEventFilter,
+) -> crate::error::Result<Vec<MakerOrderSummary>> {
+    let events = client.req_and_wait(filter.to_filter()).await?;
     let events = filter_expired_events(events);
-    let events = filter_events(events);
+    let events = filter_maker_order_events(events);
     let events = events.iter().map(MakerOrderEvent::summary).collect();
     Ok(events)
 }

@@ -28,6 +28,7 @@ hex = { version = "0.4.3" }
 nostr = { version = "0.43.1", features = ["std"] }
 nostr-sdk = { version = "0.43.0" }
 serde_json = { version = "1.0.145" }
+serde = { version = "1.0.228" }
 simplicity-contracts-adapter = { git = "https://github.com/BlockstreamResearch/simplicity-contracts.git", rev = "69e1f71", package = "contracts-adapter" }
 simplicity-contracts = { git = "https://github.com/BlockstreamResearch/simplicity-contracts.git", rev = "69e1f71", package = "contracts" }
 simplicity-lang = { version = "0.6.0" }

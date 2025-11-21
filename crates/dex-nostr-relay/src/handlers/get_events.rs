@@ -22,7 +22,7 @@ pub mod ids {
 }
 
 pub mod order {
-    use crate::handlers::common::filter_events;
+    use crate::handlers::common::filter_maker_order_events;
     use crate::relay_client::RelayClient;
     use crate::types::MakerOrderEvent;
     use nostr::{EventId, Filter};
@@ -41,7 +41,7 @@ pub mod order {
                 generic_tags: BTreeMap::default(),
             })
             .await?;
-        let events = filter_events(events);
+        let events = filter_maker_order_events(events);
         Ok(events)
     }
 }

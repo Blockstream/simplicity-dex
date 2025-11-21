@@ -25,3 +25,6 @@ simplicityhl-core = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
+
+[dev-dependencies]
+dotenvy = { workspace = true }

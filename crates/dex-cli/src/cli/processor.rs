@@ -5,8 +5,9 @@ use crate::common::{DEFAULT_CLIENT_TIMEOUT_SECS, write_into_stdout};
 use crate::contract_handlers;
 use clap::{Parser, Subcommand};
 use dex_nostr_relay::relay_client::ClientConfig;
-use dex_nostr_relay::relay_processor::RelayProcessor;
-use nostr::{Keys, RelayUrl};
+use dex_nostr_relay::relay_processor::{ListOrdersEventFilter, RelayProcessor};
+use dex_nostr_relay::types::ReplyOption;
+use nostr::{Keys, RelayUrl, Timestamp};
 use simplicityhl::elements::Txid;
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -119,6 +120,7 @@ impl Cli {
                         account_index,
                         broadcast,
                     } => {
+                        agg_config.check_nostr_keypair_existence()?;
                         let processed_args = contract_handlers::maker_funding::process_args(
                             account_index,
                             dcd_arguments,
@@ -146,7 +148,9 @@ impl Cli {
                         dcd_arguments,
                         account_index,
                         broadcast,
+                        maker_order_event_id,
                     } => {
+                        agg_config.check_nostr_keypair_existence()?;
                         let processed_args = contract_handlers::maker_termination_collateral::process_args(
                             account_index,
                             dcd_arguments,
@@ -160,7 +164,10 @@ impl Cli {
                             broadcast,
                         )?;
                         contract_handlers::maker_termination_collateral::save_args_to_cache(&args_to_save)?;
-                        format!("[Maker] Termination collateral tx result: {tx_id:?}")
+                        let reply_event_id = relay_processor
+                            .reply_order(maker_order_event_id, ReplyOption::MakerTerminationCollateral { tx_id })
+                            .await?;
+                        format!("[Maker] Termination collateral tx result: {tx_id:?}, reply event id: {reply_event_id}")
                     }
                     MakerCommands::TerminationSettlement {
                         fee_utxos,
@@ -170,7 +177,9 @@ impl Cli {
                         dcd_arguments,
                         account_index,
                         broadcast,
+                        maker_order_event_id,
                     } => {
+                        agg_config.check_nostr_keypair_existence()?;
                         let processed_args = contract_handlers::maker_termination_settlement::process_args(
                             account_index,
                             dcd_arguments,
@@ -184,7 +193,12 @@ impl Cli {
                             broadcast,
                         )?;
                         contract_handlers::maker_termination_settlement::save_args_to_cache(&args_to_save)?;
-                        format!("[Maker] Termination settlement tx result: {tx_id:?}")
+                        let reply_event_id = relay_processor
+                            .reply_order(maker_order_event_id, ReplyOption::MakerTerminationSettlement { tx_id })
+                            .await?;
+                        format!(
+                            "[Maker] Termination settlement tx result: {tx_id:?},  reply event id: {reply_event_id}"
+                        )
                     }
                     MakerCommands::Settlement {
                         fee_utxos,
@@ -196,7 +210,9 @@ impl Cli {
                         dcd_arguments,
                         account_index,
                         broadcast,
+                        maker_order_event_id,
                     } => {
+                        agg_config.check_nostr_keypair_existence()?;
                         let processed_args = contract_handlers::maker_settlement::process_args(
                             account_index,
                             dcd_arguments,
@@ -209,7 +225,10 @@ impl Cli {
                         let (tx_id, args_to_save) =
                             contract_handlers::maker_settlement::handle(processed_args, fee_amount, broadcast)?;
                         contract_handlers::maker_settlement::save_args_to_cache(&args_to_save)?;
-                        format!("[Maker] Final settlement tx result: {tx_id:?}")
+                        let reply_event_id = relay_processor
+                            .reply_order(maker_order_event_id, ReplyOption::MakerSettlement { tx_id })
+                            .await?;
+                        format!("[Maker] Final settlement tx result: {tx_id:?}, reply event id: {reply_event_id}")
                     }
                 },
                 Command::Taker { action } => match action {
@@ -221,8 +240,9 @@ impl Cli {
                         dcd_arguments,
                         account_index,
                         broadcast,
+                        maker_order_event_id: maker_event_id,
                     } => {
-                        //todo: add reply logic
+                        agg_config.check_nostr_keypair_existence()?;
                         let processed_args = contract_handlers::taker_funding::process_args(
                             account_index,
                             dcd_arguments,
@@ -232,8 +252,11 @@ impl Cli {
                         )?;
                         let (tx_id, args_to_save) =
                             contract_handlers::taker_funding::handle(processed_args, fee_amount, broadcast)?;
+                        let reply_event_id = relay_processor
+                            .reply_order(maker_event_id, ReplyOption::TakerFund { tx_id })
+                            .await?;
                         contract_handlers::taker_funding::save_args_to_cache(&args_to_save)?;
-                        format!("[Taker] Tx fund sending result: {tx_id:?}")
+                        format!("[Taker] Tx fund sending result: {tx_id:?}, reply event id: {reply_event_id}")
                     }
                     TakerCommands::TerminationEarly {
                         fee_utxos,
@@ -243,7 +266,9 @@ impl Cli {
                         dcd_arguments,
                         account_index,
                         broadcast,
+                        maker_order_event_id,
                     } => {
+                        agg_config.check_nostr_keypair_existence()?;
                         let processed_args = contract_handlers::taker_early_termination::process_args(
                             account_index,
                             dcd_arguments,
@@ -253,8 +278,11 @@ impl Cli {
                         )?;
                         let (tx_id, args_to_save) =
                             contract_handlers::taker_early_termination::handle(processed_args, fee_amount, broadcast)?;
+                        let reply_event_id = relay_processor
+                            .reply_order(maker_order_event_id, ReplyOption::TakerTerminationEarly { tx_id })
+                            .await?;
                         contract_handlers::taker_early_termination::save_args_to_cache(&args_to_save)?;
-                        format!("[Taker] Early termination tx result: {tx_id:?}")
+                        format!("[Taker] Early termination tx result: {tx_id:?}, reply event id: {reply_event_id}")
                     }
                     TakerCommands::Settlement {
                         fee_utxos,
@@ -266,7 +294,9 @@ impl Cli {
                         dcd_arguments,
                         account_index,
                         broadcast,
+                        maker_order_event_id,
                     } => {
+                        agg_config.check_nostr_keypair_existence()?;
                         let processed_args = contract_handlers::taker_settlement::process_args(
                             account_index,
                             dcd_arguments,
@@ -279,7 +309,10 @@ impl Cli {
                         let (tx_id, args_to_save) =
                             contract_handlers::taker_settlement::handle(processed_args, fee_amount, broadcast)?;
                         contract_handlers::taker_settlement::save_args_to_cache(&args_to_save)?;
-                        format!("[Taker] Final settlement tx result: {tx_id:?}")
+                        let reply_event_id = relay_processor
+                            .reply_order(maker_order_event_id, ReplyOption::TakerSettlement { tx_id })
+                            .await?;
+                        format!("[Taker] Final settlement tx result: {tx_id:?}, reply event id: {reply_event_id}")
                     }
                 },
                 Command::Helpers(x) => match x {
@@ -347,8 +380,25 @@ impl Cli {
                         let res = relay_processor.get_order_replies(event_id).await?;
                         format!("Order '{event_id}' replies: {res:#?}")
                     }
-                    DexCommands::ListOrders => {
-                        let res = relay_processor.list_orders().await?;
+                    DexCommands::ListOrders {
+                        authors,
+                        time_to_filter,
+                        limit,
+                    } => {
+                        let (since, until) = if let Some(time_filter) = time_to_filter {
+                            (time_filter.compute_since(), time_filter.compute_until())
+                        } else {
+                            (None, None)
+                        };
+
+                        let filter = ListOrdersEventFilter {
+                            authors,
+                            since: since.map(Timestamp::from),
+                            until: until.map(Timestamp::from),
+                            limit,
+                        };
+
+                        let res = relay_processor.list_orders(filter).await?;
                         let body = format_items(&res, std::string::ToString::to_string);
                         format!("List of available orders:\n{body}")
                     }
@@ -358,8 +408,16 @@ impl Cli {
                     }
                     DexCommands::GetOrderById { event_id } => {
                         let res = relay_processor.get_order_by_id(event_id).await?;
-                        let body = format_items(&res, std::string::ToString::to_string);
+                        let body = format_items(&[res], std::string::ToString::to_string);
                         format!("Order {event_id}: {body}")
+                    }
+                    DexCommands::ImportParams { event_id } => {
+                        let res = relay_processor.get_order_by_id(event_id).await?;
+                        crate::common::store::store_utils::save_dcd_args(
+                            &res.dcd_taproot_pubkey_gen,
+                            &res.dcd_arguments,
+                        )?;
+                        format!("Order {event_id}: {res}")
                     }
                 },
             }

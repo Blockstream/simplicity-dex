@@ -7,8 +7,8 @@ mod tests {
     use std::time::Duration;
 
     use dex_nostr_relay::relay_client::ClientConfig;
-    use dex_nostr_relay::relay_processor::{OrderPlaceEventTags, OrderReplyEventTags, RelayProcessor};
-    use dex_nostr_relay::types::{CustomKind, MakerOrderKind, TakerOrderKind};
+    use dex_nostr_relay::relay_processor::{ListOrdersEventFilter, OrderPlaceEventTags, RelayProcessor};
+    use dex_nostr_relay::types::{CustomKind, MakerOrderKind, ReplyOption, TakerOrderKind};
     use nostr::{EventId, Keys, ToBech32};
     use simplicityhl::elements::Txid;
 
@@ -17,6 +17,7 @@ mod tests {
     #[instrument]
     #[tokio::test]
     async fn test_wss_metadata() -> anyhow::Result<()> {
+        let _ = dotenvy::dotenv();
         let _guard = &*TEST_LOGGER;
         let key_maker = Keys::generate();
         info!(
@@ -62,8 +63,9 @@ mod tests {
         let reply_event_id = relay_processor_taker
             .reply_order(
                 placed_order_event_id,
-                key_maker.public_key,
-                OrderReplyEventTags::default(),
+                ReplyOption::TakerFund {
+                    tx_id: Txid::from_str("87a4c9b2060ff698d9072d5f95b3dde01efe0994f95c3cd6dd7348cb3a4e4e40").unwrap(),
+                },
             )
             .await?;
         info!("=== order reply event id: {}", reply_event_id);
@@ -75,9 +77,16 @@ mod tests {
             order_replies
         );
         assert_eq!(order_replies.len(), 1);
-        assert_eq!(order_replies.first().unwrap().kind, TakerOrderKind::get_kind());
+        assert_eq!(order_replies.first().unwrap().event_kind, TakerOrderKind::get_kind());
 
-        let orders_listed = relay_processor_maker.list_orders().await?;
+        let orders_listed = relay_processor_maker
+            .list_orders(ListOrdersEventFilter {
+                authors: None,
+                since: None,
+                until: None,
+                limit: None,
+            })
+            .await?;
         info!(
             "=== orders listed, amount: {}, orders: {:#?}",
             orders_listed.len(),

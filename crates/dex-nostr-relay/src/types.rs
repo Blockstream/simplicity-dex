@@ -1,8 +1,9 @@
 use chrono::TimeZone;
-use nostr::{Event, EventId, Kind};
+use nostr::{Event, EventId, Kind, PublicKey, Tag, TagKind, Tags};
 use simplicity::elements::AssetId;
 use simplicity_contracts::DCDArguments;
 use simplicityhl::elements::Txid;
+use std::borrow::Cow;
 use std::fmt;
 use std::str::FromStr;
 
@@ -60,9 +61,28 @@ pub struct MakerOrderEvent {
     pub maker_fund_tx_id: Txid,
 }
 
+#[derive(Debug)]
+pub enum ReplyOption {
+    TakerFund { tx_id: Txid },
+    MakerTerminationCollateral { tx_id: Txid },
+    MakerTerminationSettlement { tx_id: Txid },
+    MakerSettlement { tx_id: Txid },
+    TakerTerminationEarly { tx_id: Txid },
+    TakerSettlement { tx_id: Txid },
+}
+
+#[derive(Debug)]
+pub struct OrderReplyEvent {
+    pub event_id: EventId,
+    pub event_kind: Kind,
+    pub time: chrono::DateTime<chrono::Utc>,
+    pub reply_option: ReplyOption,
+}
+
 // New: brief display-ready summary of a maker order.
 #[derive(Debug, Clone)]
 pub struct MakerOrderSummary {
+    pub taproot_key_gen: String,
     pub strike_price: u64,
     pub principal: String,
     pub incentive_basis_points: u64,
@@ -87,8 +107,6 @@ pub struct MakerOrderSummary {
 
 impl fmt::Display for MakerOrderSummary {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // create a compact (first 8 chars) event id and oracle display
-        let event_full = self.event_id.to_string();
         let oracle_full = &self.oracle_short;
         let oracle_short = if oracle_full.is_empty() {
             "n/a"
@@ -105,31 +123,39 @@ impl fmt::Display for MakerOrderSummary {
             (None, Some(e)) => format!("n/a..({})", e.to_rfc3339()),
         };
 
-        write!(
+        write!(f, "[Maker Order - Summary]",)?;
+        writeln!(f, "\t\t event_id:\t{}", self.event_id)?;
+        writeln!(f, "\t\t time:\t{}", self.time)?;
+        writeln!(
             f,
-            "[Maker Order] event_id={} time={} \n\ttaker_fund_[start..end]={} \n\tstrike={} \n\tprincipal={} \n\tincentive={}bps \n\theight={} \n\toracle={} \n\tcollateral={} \n\tsettlement={} \n\tinterest_collateral={} \n\ttotal_collateral={} \n\tinterest_asset={} \n\ttotal_asset={} \n\tmaker_fund_tx_id={}",
-            event_full,
-            self.time.to_rfc3339(),
-            taker_range,
-            self.strike_price,
-            self.principal,
-            self.incentive_basis_points,
-            self.settlement_height,
-            oracle_short,
-            self.collateral_asset_id,
-            self.settlement_asset_id,
-            self.interest_collateral,
-            self.total_collateral,
-            self.interest_asset,
-            self.total_asset,
-            self.maker_fund_tx_id,
-        )
+            "\t\t taker_fund_[start..end]:\t({:?})..({:?})",
+            self.taker_fund_start_time, self.taker_fund_end_time
+        )?;
+        writeln!(f, "\t\t taproot_pubkey_gen:\t{}", self.taproot_key_gen)?;
+        writeln!(f, "\torder_params:")?;
+        writeln!(f, "\t\t strike_price:\t{}", self.strike_price)?;
+        writeln!(f, "\t\t principal:\t{}", self.principal)?;
+        writeln!(f, "\t\t incentive_bps:\t{}", self.incentive_basis_points)?;
+        writeln!(f, "\t\t settlement_height:\t{}", self.settlement_height)?;
+        writeln!(f, "\t\t taker_funding:\t{}", taker_range)?;
+        writeln!(f, "\t\t settlement_height:\t{}", self.settlement_height)?;
+        writeln!(f, "\t\t oracle_pubkey:\t{}", oracle_short)?;
+        writeln!(f, "\t assets:")?;
+        writeln!(f, "\t\t interest_collateral:\t{}", self.interest_collateral)?;
+        writeln!(f, "\t\t total_collateral:\t{}", self.total_collateral)?;
+        writeln!(f, "\t\t interest_asset:\t{}", self.interest_asset)?;
+        writeln!(f, "\t\t total_asset:\t{}", self.total_asset)?;
+        writeln!(f, "\t\t collateral_asset_id:\t{}", self.collateral_asset_id)?;
+        writeln!(f, "\t\t settlement_asset_id:\t{}", self.settlement_asset_id)?;
+
+        writeln!(f, "\t maker_fund_tx_id:\t{}", self.maker_fund_tx_id)?;
+
+        Ok(())
     }
 }
 
 impl fmt::Display for MakerOrderEvent {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // compact event id
         let event_full = self.event_id.to_string();
         let event_short = if event_full.len() > 8 {
             &event_full[..8]
@@ -137,10 +163,8 @@ impl fmt::Display for MakerOrderEvent {
             &event_full[..]
         };
 
-        // time
         let time_str = self.time.to_rfc3339();
 
-        // oracle (full shown here, mark n/a if empty)
         let oracle_full = &self.dcd_arguments.oracle_public_key;
         let oracle_display = if oracle_full.is_empty() {
             "n/a".to_string()
@@ -148,7 +172,6 @@ impl fmt::Display for MakerOrderEvent {
             oracle_full.clone()
         };
 
-        // taker funding window handling (zero => missing)
         let taker_start = {
             let ts = self.dcd_arguments.taker_funding_start_time;
             if ts == 0 {
@@ -200,7 +223,6 @@ impl fmt::Display for MakerOrderEvent {
             "n/a".to_string()
         };
 
-        // assets and ids
         let filler = format!("{}", self.filler_asset_id);
         let grantor_collateral = format!("{}", self.grantor_collateral_asset_id);
         let grantor_settlement = format!("{}", self.grantor_settlement_asset_id);
@@ -208,31 +230,32 @@ impl fmt::Display for MakerOrderEvent {
         let collateral = format!("{}", self.collateral_asset_id);
         let maker_tx = self.maker_fund_tx_id.to_string();
 
-        // write a detailed multi-line, tab-separated view
-        writeln!(f, "[Maker Order - Detail]\n\tevent_id={event_short}\ttime={time_str}")?;
+        writeln!(
+            f,
+            "[Maker Order - Detail]\n\tevent_id={}\ttime={}",
+            event_short, time_str
+        )?;
+        writeln!(f, "\t dcd_taproot_pubkey_gen:\t{}", self.dcd_taproot_pubkey_gen)?;
+        writeln!(f, "\t maker_fund_tx_id:\t{}", maker_tx)?;
         writeln!(f, "\tdcd_arguments:")?;
-        writeln!(f, "\t\tstrike_price:\t{}", self.dcd_arguments.strike_price)?;
-        writeln!(f, "\t\tincentive_bps:\t{}", self.dcd_arguments.incentive_basis_points)?;
-        writeln!(f, "\t\ttaker_funding:\t{taker_range}")?;
-        writeln!(f, "\t\tsettlement_height:\t{}", self.dcd_arguments.settlement_height)?;
-        writeln!(f, "\t\toracle_pubkey:\t{oracle_display}")?;
-        writeln!(f, "\t\tratio.principal_collateral:\t{principal}")?;
-        writeln!(f, "\t\tratio.interest_collateral:\t{interest_collateral}")?;
-        writeln!(f, "\t\tratio.total_collateral:\t{total_collateral}")?;
-        writeln!(f, "\t\tratio.interest_asset:\t{interest_asset}")?;
-        writeln!(f, "\t\tratio.total_asset:\t{total_asset}")?;
+        writeln!(f, "\t\t strike_price:\t{}", self.dcd_arguments.strike_price)?;
+        writeln!(f, "\t\t incentive_bps:\t{}", self.dcd_arguments.incentive_basis_points)?;
+        writeln!(f, "\t\t taker_funding:\t{}", taker_range)?;
+        writeln!(f, "\t\t settlement_height:\t{}", self.dcd_arguments.settlement_height)?;
+        writeln!(f, "\t\t oracle_pubkey:\t{}", oracle_display)?;
+        writeln!(f, "\t\t ratio.principal_collateral:\t{}", principal)?;
+        writeln!(f, "\t\t ratio.interest_collateral:\t{}", interest_collateral)?;
+        writeln!(f, "\t\t ratio.total_collateral:\t{}", total_collateral)?;
+        writeln!(f, "\t\t ratio.interest_asset:\t{}", interest_asset)?;
+        writeln!(f, "\t\t ratio.total_asset:\t{}", total_asset)?;
 
         writeln!(f, "\tassets:")?;
-        writeln!(f, "\t\tfiller_asset_id:\t{filler}")?;
-        writeln!(f, "\t\tgrantor_collateral_asset_id:\t{grantor_collateral}")?;
-        writeln!(f, "\t\tgrantor_settlement_asset_id:\t{grantor_settlement}")?;
-        writeln!(f, "\t\tsettlement_asset_id:\t{settlement}")?;
-        writeln!(f, "\t\tcollateral_asset_id:\t{collateral}")?;
+        writeln!(f, "\t\t filler_asset_id:\t{}", filler)?;
+        writeln!(f, "\t\t grantor_collateral_asset_id:\t{}", grantor_collateral)?;
+        writeln!(f, "\t\t grantor_settlement_asset_id:\t{}", grantor_settlement)?;
+        writeln!(f, "\t\t settlement_asset_id:\t{}", settlement)?;
+        writeln!(f, "\t\t collateral_asset_id:\t{}", collateral)?;
 
-        writeln!(f, "\tdcd_taproot_pubkey_gen:\t{}", self.dcd_taproot_pubkey_gen)?;
-        writeln!(f, "\tmaker_fund_tx_id:\t{maker_tx}")?;
-
-        // append a Debug dump of the full DCDArguments for completeness (if Debug is implemented)
         writeln!(
             f,
             "\n\tfull_dcd_arguments_debug:\n\t{}",
@@ -325,6 +348,7 @@ impl MakerOrderEvent {
         let settlement_id = format!("{}", self.settlement_asset_id);
 
         MakerOrderSummary {
+            taproot_key_gen: self.dcd_taproot_pubkey_gen.clone(),
             strike_price: self.dcd_arguments.strike_price,
             principal,
             incentive_basis_points: self.dcd_arguments.incentive_basis_points,
@@ -355,6 +379,107 @@ impl MakerOrderEvent {
             time: self.time,
             maker_fund_tx_id: self.maker_fund_tx_id.to_string(),
             event_id: self.event_id,
+        }
+    }
+}
+
+impl OrderReplyEvent {
+    pub fn parse_event(event: Event) -> Option<Self> {
+        tracing::debug!("filtering event: {:?}", event);
+        event.verify().ok()?;
+        let time = chrono::Utc.timestamp_opt(event.created_at.as_u64() as i64, 0).unwrap();
+        Some(OrderReplyEvent {
+            event_id: event.id,
+            event_kind: event.kind,
+            time,
+            reply_option: ReplyOption::parse_tags(&event.tags)?,
+        })
+    }
+}
+
+impl ReplyOption {
+    pub fn parse_tags(tags: &Tags) -> Option<Self> {
+        // Extract tx_id from custom tag
+        let tx_id = tags
+            .iter()
+            .find(|tag| matches!(tag.kind(), TagKind::Custom(s) if s.as_ref() == "tx_id"))
+            .and_then(|tag| tag.content())
+            .and_then(|s| Txid::from_str(s).ok())?;
+
+        // Extract reply_type from custom tag
+        let reply_type = tags
+            .iter()
+            .find(|tag| matches!(tag.kind(), TagKind::Custom(s) if s.as_ref() == "reply_type"))
+            .and_then(|tag| tag.content())?;
+
+        // Match reply_type to construct the appropriate variant
+        match reply_type {
+            "taker_fund" => Some(ReplyOption::TakerFund { tx_id }),
+            "maker_termination_collateral" => Some(ReplyOption::MakerTerminationCollateral { tx_id }),
+            "maker_termination_settlement" => Some(ReplyOption::MakerTerminationSettlement { tx_id }),
+            "maker_settlement" => Some(ReplyOption::MakerSettlement { tx_id }),
+            "taker_termination_early" => Some(ReplyOption::TakerTerminationEarly { tx_id }),
+            "taker_settlement" => Some(ReplyOption::TakerSettlement { tx_id }),
+            _ => None,
+        }
+    }
+
+    pub fn form_tags(&self, source_event_id: EventId, client_pubkey: PublicKey) -> Vec<Tag> {
+        match self {
+            ReplyOption::TakerFund { tx_id } => {
+                vec![
+                    Tag::public_key(client_pubkey),
+                    Tag::event(source_event_id),
+                    Tag::custom(TagKind::Custom(Cow::from("tx_id")), [tx_id.to_string()]),
+                    Tag::custom(TagKind::Custom(Cow::from("reply_type")), ["taker_fund"]),
+                ]
+            }
+            ReplyOption::MakerTerminationCollateral { tx_id } => {
+                vec![
+                    Tag::public_key(client_pubkey),
+                    Tag::event(source_event_id),
+                    Tag::custom(TagKind::Custom(Cow::from("tx_id")), [tx_id.to_string()]),
+                    Tag::custom(
+                        TagKind::Custom(Cow::from("reply_type")),
+                        ["maker_termination_collateral"],
+                    ),
+                ]
+            }
+            ReplyOption::MakerTerminationSettlement { tx_id } => {
+                vec![
+                    Tag::public_key(client_pubkey),
+                    Tag::event(source_event_id),
+                    Tag::custom(TagKind::Custom(Cow::from("tx_id")), [tx_id.to_string()]),
+                    Tag::custom(
+                        TagKind::Custom(Cow::from("reply_type")),
+                        ["maker_termination_settlement"],
+                    ),
+                ]
+            }
+            ReplyOption::MakerSettlement { tx_id } => {
+                vec![
+                    Tag::public_key(client_pubkey),
+                    Tag::event(source_event_id),
+                    Tag::custom(TagKind::Custom(Cow::from("tx_id")), [tx_id.to_string()]),
+                    Tag::custom(TagKind::Custom(Cow::from("reply_type")), ["maker_settlement"]),
+                ]
+            }
+            ReplyOption::TakerTerminationEarly { tx_id } => {
+                vec![
+                    Tag::public_key(client_pubkey),
+                    Tag::event(source_event_id),
+                    Tag::custom(TagKind::Custom(Cow::from("tx_id")), [tx_id.to_string()]),
+                    Tag::custom(TagKind::Custom(Cow::from("reply_type")), ["taker_termination_early"]),
+                ]
+            }
+            ReplyOption::TakerSettlement { tx_id } => {
+                vec![
+                    Tag::public_key(client_pubkey),
+                    Tag::event(source_event_id),
+                    Tag::custom(TagKind::Custom(Cow::from("tx_id")), [tx_id.to_string()]),
+                    Tag::custom(TagKind::Custom(Cow::from("reply_type")), ["taker_settlement"]),
+                ]
+            }
         }
     }
 }

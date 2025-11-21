@@ -46,6 +46,8 @@ pub enum CliError {
     DcdRatioArgs(String),
     #[error("Failed to obtain/save value from cache, msg: '{0}'")]
     Cache(String),
+    #[error("Nostr keypair is required for the action, but it's absent")]
+    NoNostrKeypairListed,
     #[error("Occurred error with msg: '{0}'")]
     Custom(String),
 }
