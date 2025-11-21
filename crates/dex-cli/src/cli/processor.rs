@@ -21,15 +21,13 @@ pub struct Cli {
     #[arg(
         short = 'k',
         long,
-        help = "Specify private key for posting authorized events on Nostr Relay",
-        value_parser = check_file_existence
+        help = "Specify private key for posting authorized events on Nostr Relay"
     )]
-    nostr_key: Option<KeysWrapper>,
+    nostr_key: Option<Keys>,
     #[arg(
         short = 'r',
         long,
-        help = "Specify private key for posting authorized events on Nostr Relay",
-        value_parser = check_file_existence
+        help = "Specify private key for posting authorized events on Nostr Relay"
     )]
     relays_list: Option<Vec<RelayUrl>>,
     #[arg(
@@ -74,7 +72,7 @@ impl Cli {
         let relays_list = self.relays_list.clone();
         let nostr_config_path = self.nostr_config_path.clone();
         AggregatedConfig::new(CliConfigArgs {
-            nostr_key,
+            nostr_key: nostr_key.map(|x|KeysWrapper(x)),
             relays_list,
             nostr_config_path,
         })

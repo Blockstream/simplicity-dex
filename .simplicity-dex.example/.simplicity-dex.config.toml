@@ -1,8 +1,5 @@
-[config]
-keypair = "nsec..."
-
-[[config.relays]]
-relay = "wss://relay.damus.io"
-
-[[config.relays]]
-relay = "wss://nostr.wine/"
+nostr_keypair = "nsec..."
+relays = [
+    "wss://relay.damus.io",
+    "wss://nostr.wine/",
+]
