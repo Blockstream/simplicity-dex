@@ -24,6 +24,12 @@ pub struct ProcessedArgs {
     collateral_amount_to_deposit: u64,
 }
 
+#[derive(Debug)]
+pub struct ArgsToSave {
+    taproot_pubkey_gen: TaprootPubkeyGen,
+    dcd_arguments: DCDArguments,
+}
+
 #[instrument(level = "debug", skip_all, err)]
 pub fn process_args(
     account_index: u32,
@@ -44,18 +50,17 @@ pub fn process_args(
     );
 
     let fee_utxos = vec_to_arr::<FEE_UTXOS_NEEDED, OutPoint>(fee_utxos)?;
+    let taproot_pubkey_gen = dcd_taproot_pubkey_gen.as_ref().to_string();
 
     let dcd_arguments: DCDArguments = match dcd_init_params {
-        None => {
-            todo!()
-        }
+        None => crate::common::store::store_utils::get_dcd_args(&taproot_pubkey_gen)?,
         Some(x) => x.convert_to_dcd_arguments()?,
     };
 
     Ok(ProcessedArgs {
         keypair,
         dcd_arguments,
-        dcd_taproot_pubkey_gen: dcd_taproot_pubkey_gen.as_ref().to_string(),
+        dcd_taproot_pubkey_gen: taproot_pubkey_gen,
         filler_token_utxo: fee_utxos[0],
         collateral_token_utxo: fee_utxos[1],
         collateral_amount_to_deposit,
@@ -74,7 +79,7 @@ pub fn handle(
     }: ProcessedArgs,
     fee_amount: u64,
     broadcast: bool,
-) -> crate::error::Result<Txid> {
+) -> crate::error::Result<(Txid, ArgsToSave)> {
     tracing::debug!("=== dcd arguments: {:?}", dcd_arguments);
     let base_contract_context = BaseContractContext {
         address_params: &AddressParams::LIQUID_TESTNET,
@@ -98,8 +103,8 @@ pub fn handle(
             collateral_amount_to_deposit,
         },
         &DcdContractContext {
-            dcd_taproot_pubkey_gen,
-            dcd_arguments,
+            dcd_taproot_pubkey_gen: dcd_taproot_pubkey_gen.clone(),
+            dcd_arguments: dcd_arguments.clone(),
             base_contract_context,
         },
     )
@@ -110,11 +115,21 @@ pub fn handle(
         false => println!("{}", transaction.serialize().to_lower_hex_string()),
     }
 
-    Ok(transaction.txid())
+    Ok((
+        transaction.txid(),
+        ArgsToSave {
+            taproot_pubkey_gen: dcd_taproot_pubkey_gen,
+            dcd_arguments,
+        },
+    ))
 }
 
-pub fn _save_args_to_cache() -> crate::error::Result<()> {
-    let _store = Store::load()?;
-    //todo: move store to cli function
+pub fn save_args_to_cache(
+    ArgsToSave {
+        taproot_pubkey_gen,
+        dcd_arguments,
+    }: &ArgsToSave,
+) -> crate::error::Result<()> {
+    crate::common::store::store_utils::save_dcd_args(taproot_pubkey_gen, dcd_arguments)?;
     Ok(())
 }

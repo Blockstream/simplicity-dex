@@ -6,6 +6,7 @@ use elements::bitcoin::hex::DisplayHex;
 use elements::bitcoin::secp256k1;
 use simplicity::elements::OutPoint;
 use simplicity::elements::pset::serialize::Serialize;
+use simplicity_contracts::DCDArguments;
 use simplicity_contracts_adapter::dcd::{
     BaseContractContext, CreationContext, DcdInitParams, DcdInitResponse, DcdManager, FillerTokenEntropyHex,
     GrantorCollateralAssetEntropyHex, GrantorSettlementAssetEntropyHex, MakerInitContext,
@@ -42,9 +43,10 @@ pub struct ProcessedArgs {
 
 pub struct ArgsToSave {
     pub filler_token_entropy: FillerTokenEntropyHex,
-    pub grantor_collateral_entropy: GrantorCollateralAssetEntropyHex,
-    pub grantor_settlement: GrantorSettlementAssetEntropyHex,
+    pub grantor_collateral_token_entropy: GrantorCollateralAssetEntropyHex,
+    pub grantor_settlement_token_entropy: GrantorSettlementAssetEntropyHex,
     pub taproot_pubkey: TaprootPubkeyGen,
+    pub dcd_args: DCDArguments,
 }
 
 impl TryInto<DcdInitParams> for InnerDcdInitParams {
@@ -143,9 +145,10 @@ pub fn handle(
     }
     let args_to_save = ArgsToSave {
         filler_token_entropy,
-        grantor_collateral_entropy: grantor_collateral_token_entropy,
-        grantor_settlement: grantor_settlement_token_entropy,
+        grantor_collateral_token_entropy,
+        grantor_settlement_token_entropy,
         taproot_pubkey: taproot_pubkey_gen,
+        dcd_args,
     };
     Ok((tx.txid(), args_to_save))
 }
@@ -154,12 +157,21 @@ pub fn handle(
 pub fn save_args_to_cache(
     ArgsToSave {
         filler_token_entropy,
-        grantor_collateral_entropy,
-        grantor_settlement,
+        grantor_collateral_token_entropy,
+        grantor_settlement_token_entropy,
         taproot_pubkey,
-    }: ArgsToSave,
+        dcd_args,
+    }: &ArgsToSave,
 ) -> crate::error::Result<()> {
-    let _store = Store::load()?;
-
+    crate::common::store::store_utils::save_filler_token_entropy(taproot_pubkey, filler_token_entropy)?;
+    crate::common::store::store_utils::save_grantor_collateral_token_entropy(
+        taproot_pubkey,
+        grantor_collateral_token_entropy,
+    )?;
+    crate::common::store::store_utils::save_grantor_settlement_token_entropy(
+        taproot_pubkey,
+        grantor_settlement_token_entropy,
+    )?;
+    crate::common::store::store_utils::save_dcd_args(taproot_pubkey, dcd_args)?;
     Ok(())
 }

@@ -49,6 +49,7 @@ impl Store {
         Ok(self.store.get(key)?)
     }
 
+    #[allow(unused)]
     pub fn import_arguments<A>(
         &self,
         taproot_pubkey_gen: &str,
@@ -70,6 +71,7 @@ impl Store {
         Ok(())
     }
 
+    #[allow(unused)]
     pub fn export_arguments(&self, taproot_pubkey_gen: &str) -> Result<String> {
         if let Some(value) = self.store.get(taproot_pubkey_gen)? {
             return Ok(hex::encode(value));
@@ -86,6 +88,124 @@ impl Store {
             return Encodable::decode(&value).map_err(|err| SledError::Encode(err.to_string()));
         }
         Err(SledError::ArgumentNotFound)
+    }
+    pub fn get_arguments_raw(&self, taproot_pubkey_gen: &str) -> Result<IVec> {
+        self.store
+            .get(taproot_pubkey_gen)?
+            .ok_or_else(|| SledError::ArgumentNotFound)
+    }
+}
+
+pub mod store_utils {
+    use crate::common::store::Store;
+    use simplicity_contracts::DCDArguments;
+    use simplicityhl_core::{AssetEntropyHex, Encodable};
+
+    const FILLER_TOKEN_ENTROPY_STORE_NAME: &str = "filler_token_entropy";
+    const GRANTOR_COLLATERAL_TOKEN_ENTROPY_STORE_NAME: &str = "grantor_collateral_token_entropy";
+    const GRANTOR_SETTLEMENT_TOKEN_ENTROPY_STORE_NAME: &str = "grantor_settlement_token_entropy";
+
+    pub fn save_dcd_args(taproot_pubkey: impl ToString, dcd_args: &DCDArguments) -> crate::error::Result<()> {
+        let store = Store::load()?;
+        store.insert_value(taproot_pubkey.to_string(), dcd_args.encode().unwrap())?;
+        Ok(())
+    }
+
+    pub fn get_dcd_args(taproot_pubkey: impl ToString) -> crate::error::Result<DCDArguments> {
+        let store = Store::load()?;
+        let dcd_args: DCDArguments = store.get_arguments(&taproot_pubkey.to_string())?;
+        Ok(dcd_args)
+    }
+
+    fn get_filler_entropy_key(taproot_pubkey: impl ToString) -> String {
+        format!("{}-{FILLER_TOKEN_ENTROPY_STORE_NAME}", taproot_pubkey.to_string())
+    }
+
+    pub fn save_filler_token_entropy(
+        taproot_pubkey: impl ToString,
+        asset_entropy: &AssetEntropyHex,
+    ) -> crate::error::Result<()> {
+        let store = Store::load()?;
+        store.insert_value(get_filler_entropy_key(taproot_pubkey), asset_entropy.as_bytes())?;
+        Ok(())
+    }
+
+    pub fn get_filler_token_entropy(taproot_pubkey: impl ToString) -> crate::error::Result<AssetEntropyHex> {
+        let store = Store::load()?;
+        let bytes = store.get_arguments_raw(&get_filler_entropy_key(taproot_pubkey))?;
+        let x = String::from_utf8(bytes.to_vec()).map_err(|err| {
+            crate::error::CliError::Cache(format!(
+                "Failed to obtain cached value for 'filler_token_entropy', err: {}",
+                err
+            ))
+        })?;
+        Ok(x)
+    }
+
+    fn get_grantor_collateral_token_entropy_key(taproot_pubkey: impl ToString) -> String {
+        format!(
+            "{}-{GRANTOR_COLLATERAL_TOKEN_ENTROPY_STORE_NAME}",
+            taproot_pubkey.to_string()
+        )
+    }
+
+    pub fn save_grantor_collateral_token_entropy(
+        taproot_pubkey: impl ToString,
+        asset_entropy: &AssetEntropyHex,
+    ) -> crate::error::Result<()> {
+        let store = Store::load()?;
+        store.insert_value(
+            get_grantor_collateral_token_entropy_key(taproot_pubkey),
+            asset_entropy.as_bytes(),
+        )?;
+        Ok(())
+    }
+
+    pub fn get_grantor_collateral_token_entropy(
+        taproot_pubkey: impl ToString,
+    ) -> crate::error::Result<AssetEntropyHex> {
+        let store = Store::load()?;
+        let bytes = store.get_arguments_raw(&get_grantor_collateral_token_entropy_key(taproot_pubkey))?;
+        let x = String::from_utf8(bytes.to_vec()).map_err(|err| {
+            crate::error::CliError::Cache(format!(
+                "Failed to obtain cached value for 'filler_token_entropy', err: {}",
+                err
+            ))
+        })?;
+        Ok(x)
+    }
+
+    fn get_grantor_settlement_token_entropy_key(taproot_pubkey: impl ToString) -> String {
+        format!(
+            "{}-{GRANTOR_SETTLEMENT_TOKEN_ENTROPY_STORE_NAME}",
+            taproot_pubkey.to_string()
+        )
+    }
+
+    pub fn save_grantor_settlement_token_entropy(
+        taproot_pubkey: impl ToString,
+        asset_entropy: &AssetEntropyHex,
+    ) -> crate::error::Result<()> {
+        let store = Store::load()?;
+        store.insert_value(
+            get_grantor_settlement_token_entropy_key(taproot_pubkey),
+            asset_entropy.as_bytes(),
+        )?;
+        Ok(())
+    }
+
+    pub fn get_grantor_settlement_token_entropy(
+        taproot_pubkey: impl ToString,
+    ) -> crate::error::Result<AssetEntropyHex> {
+        let store = Store::load()?;
+        let bytes = store.get_arguments_raw(&get_grantor_settlement_token_entropy_key(taproot_pubkey))?;
+        let x = String::from_utf8(bytes.to_vec()).map_err(|err| {
+            crate::error::CliError::Cache(format!(
+                "Failed to obtain cached value for 'filler_token_entropy', err: {}",
+                err
+            ))
+        })?;
+        Ok(x)
     }
 }
 

@@ -44,6 +44,8 @@ pub enum CliError {
     EcCurve(#[from] secp256k1::Error),
     #[error("Failed to create DcdRatioArgs, msg: '{0}'")]
     DcdRatioArgs(String),
+    #[error("Failed to obtain/save value from cache, msg: '{0}'")]
+    Cache(String),
     #[error("Occurred error with msg: '{0}'")]
     Custom(String),
 }

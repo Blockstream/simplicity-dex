@@ -5,7 +5,6 @@ use crate::common::{DCDCliMakerFundArguments, broadcast_tx_inner, decode_hex, ve
 use dex_nostr_relay::relay_processor::OrderPlaceEventTags;
 use elements::bitcoin::hex::DisplayHex;
 use elements::bitcoin::secp256k1;
-use elements::hex::ToHex;
 use simplicity::elements::OutPoint;
 use simplicity::elements::pset::serialize::Serialize;
 use simplicity_contracts::DCDArguments;
@@ -29,6 +28,12 @@ pub struct ProcessedArgs {
     grantor_settlement_token_info: (OutPoint, AssetEntropyHex),
     settlement_asset_utxo: OutPoint,
     fee_utxo: OutPoint,
+}
+
+#[derive(Debug)]
+pub struct ArgsToSave {
+    taproot_pubkey_gen: TaprootPubkeyGen,
+    dcd_arguments: DCDArguments,
 }
 
 impl ProcessedArgs {
@@ -81,25 +86,43 @@ pub fn process_args(
     );
 
     let fee_utxos = vec_to_arr::<FEE_UTXOS_NEEDED, OutPoint>(fee_utxos)?;
+    let taproot_pubkey_gen = dcd_taproot_pubkey_gen.as_ref().to_string();
 
-    let dcd_init_params = match dcd_init_params {
+    let args = match dcd_init_params {
         None => {
-            todo!()
-        }
-        Some(x) => x,
-    };
-    let dcd_arguments: DCDArguments = dcd_init_params.convert_to_dcd_arguments()?;
+            let dcd_args = crate::common::store::store_utils::get_dcd_args(&taproot_pubkey_gen)?;
+            let filler_token_info = crate::common::store::store_utils::get_filler_token_entropy(&taproot_pubkey_gen)?;
+            let grantor_collateral_token_info =
+                crate::common::store::store_utils::get_grantor_collateral_token_entropy(&taproot_pubkey_gen)?;
+            let grantor_settlement_token_info =
+                crate::common::store::store_utils::get_grantor_settlement_token_entropy(&taproot_pubkey_gen)?;
 
-    Ok(ProcessedArgs {
-        keypair,
-        dcd_arguments,
-        dcd_taproot_pubkey_gen: dcd_taproot_pubkey_gen.as_ref().to_string(),
-        filler_token_info: (fee_utxos[0], dcd_init_params.filler_asset_entropy.clone()),
-        grantor_collateral_token_info: (fee_utxos[1], dcd_init_params.grantor_collateral_asset_entropy.clone()),
-        grantor_settlement_token_info: (fee_utxos[2], dcd_init_params.grantor_settlement_asset_entropy.clone()),
-        settlement_asset_utxo: fee_utxos[3],
-        fee_utxo: fee_utxos[4],
-    })
+            ProcessedArgs {
+                keypair,
+                dcd_arguments: dcd_args,
+                dcd_taproot_pubkey_gen: taproot_pubkey_gen,
+                filler_token_info: (fee_utxos[0], filler_token_info),
+                grantor_collateral_token_info: (fee_utxos[1], grantor_collateral_token_info),
+                grantor_settlement_token_info: (fee_utxos[2], grantor_settlement_token_info),
+                settlement_asset_utxo: fee_utxos[3],
+                fee_utxo: fee_utxos[4],
+            }
+        }
+        Some(x) => {
+            let dcd_args = x.convert_to_dcd_arguments()?;
+            ProcessedArgs {
+                keypair,
+                dcd_arguments: dcd_args,
+                dcd_taproot_pubkey_gen: taproot_pubkey_gen,
+                filler_token_info: (fee_utxos[0], x.filler_asset_entropy.clone()),
+                grantor_collateral_token_info: (fee_utxos[1], x.grantor_collateral_asset_entropy.clone()),
+                grantor_settlement_token_info: (fee_utxos[2], x.grantor_settlement_asset_entropy.clone()),
+                settlement_asset_utxo: fee_utxos[3],
+                fee_utxo: fee_utxos[4],
+            }
+        }
+    };
+    Ok(args)
 }
 
 #[instrument(level = "debug", skip_all, err)]
@@ -116,7 +139,7 @@ pub fn handle(
     }: ProcessedArgs,
     fee_amount: u64,
     broadcast: bool,
-) -> crate::error::Result<Txid> {
+) -> crate::error::Result<(Txid, ArgsToSave)> {
     let filler_token_info = (filler_token_info.0, decode_hex(filler_token_info.1)?);
     let grantor_collateral_token_info = (
         grantor_collateral_token_info.0,
@@ -155,8 +178,8 @@ pub fn handle(
             fee_amount,
         },
         &DcdContractContext {
-            dcd_taproot_pubkey_gen,
-            dcd_arguments,
+            dcd_taproot_pubkey_gen: dcd_taproot_pubkey_gen.clone(),
+            dcd_arguments: dcd_arguments.clone(),
             base_contract_context,
         },
     )
@@ -167,11 +190,21 @@ pub fn handle(
         false => println!("{}", transaction.serialize().to_lower_hex_string()),
     }
 
-    Ok(transaction.txid())
+    Ok((
+        transaction.txid(),
+        ArgsToSave {
+            taproot_pubkey_gen: dcd_taproot_pubkey_gen,
+            dcd_arguments,
+        },
+    ))
 }
 
-pub fn _save_args_to_cache() -> crate::error::Result<()> {
-    let _store = Store::load()?;
-    //todo: move store to cli function
+pub fn save_args_to_cache(
+    ArgsToSave {
+        taproot_pubkey_gen,
+        dcd_arguments,
+    }: &ArgsToSave,
+) -> crate::error::Result<()> {
+    crate::common::store::store_utils::save_dcd_args(taproot_pubkey_gen, dcd_arguments)?;
     Ok(())
 }

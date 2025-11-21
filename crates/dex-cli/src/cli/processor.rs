@@ -113,7 +113,7 @@ impl Cli {
                         )?;
                         let (tx_res, args_to_save) =
                             contract_handlers::maker_init::handle(processed_args, fee_amount, broadcast)?;
-                        contract_handlers::maker_init::save_args_to_cache(args_to_save)?;
+                        contract_handlers::maker_init::save_args_to_cache(&args_to_save)?;
                         format!("[Maker] Init order tx result: {tx_res:?}")
                     }
                     MakerCommands::Fund {
@@ -131,8 +131,8 @@ impl Cli {
                             fee_utxos,
                         )?;
                         let event_to_publish = processed_args.extract_event();
-                        let tx_id = contract_handlers::maker_funding::handle(processed_args, fee_amount, broadcast)?;
-                        // contract_handlers::maker_init::save_args_to_cache(args_to_save)?;
+                        let (tx_id, args_to_save) =
+                            contract_handlers::maker_funding::handle(processed_args, fee_amount, broadcast)?;
                         let res = relay_processor
                             .place_order(
                                 event_to_publish,
@@ -140,6 +140,7 @@ impl Cli {
                                     .unwrap(),
                             )
                             .await?;
+                        contract_handlers::maker_funding::save_args_to_cache(&args_to_save)?;
                         format!("[Maker] Creating order, tx_id: {tx_id}, event_id: {res:#?}")
                     }
                     MakerCommands::TerminationCollateral {
@@ -158,12 +159,12 @@ impl Cli {
                             fee_utxos,
                             grantor_collateral_amount_to_burn,
                         )?;
-                        let tx_id = contract_handlers::maker_termination_collateral::handle(
+                        let (tx_id, args_to_save) = contract_handlers::maker_termination_collateral::handle(
                             processed_args,
                             fee_amount,
                             broadcast,
                         )?;
-
+                        contract_handlers::maker_termination_collateral::save_args_to_cache(&args_to_save)?;
                         format!("[Maker] Termination collateral tx result: {tx_id:?}")
                     }
                     MakerCommands::TerminationSettlement {
@@ -182,12 +183,12 @@ impl Cli {
                             fee_utxos,
                             grantor_settlement_amount_to_burn,
                         )?;
-                        let tx_id = contract_handlers::maker_termination_settlement::handle(
+                        let (tx_id, args_to_save) = contract_handlers::maker_termination_settlement::handle(
                             processed_args,
                             fee_amount,
                             broadcast,
                         )?;
-
+                        contract_handlers::maker_termination_settlement::save_args_to_cache(&args_to_save)?;
                         format!("[Maker] Termination settlement tx result: {tx_id:?}")
                     }
                     MakerCommands::Settlement {
@@ -210,8 +211,9 @@ impl Cli {
                             oracle_signature,
                             grantor_amount_to_burn,
                         )?;
-                        let tx_id = contract_handlers::maker_settlement::handle(processed_args, fee_amount, broadcast)?;
-
+                        let (tx_id, args_to_save) =
+                            contract_handlers::maker_settlement::handle(processed_args, fee_amount, broadcast)?;
+                        contract_handlers::maker_settlement::save_args_to_cache(&args_to_save)?;
                         format!("[Maker] Final settlement tx result: {tx_id:?}")
                     }
                 },
@@ -233,8 +235,9 @@ impl Cli {
                             fee_utxos,
                             collateral_amount_to_deposit,
                         )?;
-                        let tx_id = contract_handlers::taker_funding::handle(processed_args, fee_amount, broadcast)?;
-
+                        let (tx_id, args_to_save) =
+                            contract_handlers::taker_funding::handle(processed_args, fee_amount, broadcast)?;
+                        contract_handlers::taker_funding::save_args_to_cache(&args_to_save)?;
                         format!("[Taker] Tx fund sending result: {tx_id:?}")
                     }
                     TakerCommands::TerminationEarly {
@@ -253,9 +256,9 @@ impl Cli {
                             fee_utxos,
                             filler_token_amount_to_return,
                         )?;
-                        let tx_id =
+                        let (tx_id, args_to_save) =
                             contract_handlers::taker_early_termination::handle(processed_args, fee_amount, broadcast)?;
-
+                        contract_handlers::taker_early_termination::save_args_to_cache(&args_to_save)?;
                         format!("[Taker] Early termination tx result: {tx_id:?}")
                     }
                     TakerCommands::Settlement {
@@ -278,8 +281,9 @@ impl Cli {
                             filler_amount_to_burn,
                             oracle_signature,
                         )?;
-                        let tx_id = contract_handlers::taker_settlement::handle(processed_args, fee_amount, broadcast)?;
-
+                        let (tx_id, args_to_save) =
+                            contract_handlers::taker_settlement::handle(processed_args, fee_amount, broadcast)?;
+                        contract_handlers::taker_settlement::save_args_to_cache(&args_to_save)?;
                         format!("[Taker] Final settlement tx result: {tx_id:?}")
                     }
                 },

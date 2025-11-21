@@ -71,6 +71,11 @@ pub fn process_args(
         grantor_amount_to_burn,
     })
 }
+#[derive(Debug)]
+pub struct ArgsToSave {
+    taproot_pubkey_gen: TaprootPubkeyGen,
+    dcd_arguments: DCDArguments,
+}
 
 #[instrument(level = "debug", skip_all, err)]
 pub fn handle(
@@ -88,7 +93,7 @@ pub fn handle(
     }: ProcessedArgs,
     fee_amount: u64,
     broadcast: bool,
-) -> crate::error::Result<Txid> {
+) -> crate::error::Result<(Txid, ArgsToSave)> {
     tracing::debug!("=== dcd arguments: {:?}", dcd_arguments);
     let base_contract_context = BaseContractContext {
         address_params: &AddressParams::LIQUID_TESTNET,
@@ -116,8 +121,8 @@ pub fn handle(
             grantor_amount_to_burn,
         },
         &DcdContractContext {
-            dcd_taproot_pubkey_gen,
-            dcd_arguments,
+            dcd_taproot_pubkey_gen: dcd_taproot_pubkey_gen.clone(),
+            dcd_arguments: dcd_arguments.clone(),
             base_contract_context,
         },
     )
@@ -128,11 +133,21 @@ pub fn handle(
         false => println!("{}", transaction.serialize().to_lower_hex_string()),
     }
 
-    Ok(transaction.txid())
+    Ok((
+        transaction.txid(),
+        ArgsToSave {
+            taproot_pubkey_gen: dcd_taproot_pubkey_gen,
+            dcd_arguments,
+        },
+    ))
 }
 
-pub fn _save_args_to_cache() -> crate::error::Result<()> {
-    let _store = Store::load()?;
-    //todo: move store to cli function
+pub fn save_args_to_cache(
+    ArgsToSave {
+        taproot_pubkey_gen,
+        dcd_arguments,
+    }: &ArgsToSave,
+) -> crate::error::Result<()> {
+    crate::common::store::store_utils::save_dcd_args(taproot_pubkey_gen, dcd_arguments)?;
     Ok(())
 }
