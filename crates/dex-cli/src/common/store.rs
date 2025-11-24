@@ -49,6 +49,7 @@ impl Store {
         Ok(self.store.get(key)?)
     }
 
+    #[allow(unused)]
     pub fn import_arguments<A>(
         &self,
         taproot_pubkey_gen: &str,
@@ -70,6 +71,7 @@ impl Store {
         Ok(())
     }
 
+    #[allow(unused)]
     pub fn export_arguments(&self, taproot_pubkey_gen: &str) -> Result<String> {
         if let Some(value) = self.store.get(taproot_pubkey_gen)? {
             return Ok(hex::encode(value));
@@ -103,24 +105,24 @@ pub mod store_utils {
     const GRANTOR_COLLATERAL_TOKEN_ENTROPY_STORE_NAME: &str = "grantor_collateral_token_entropy";
     const GRANTOR_SETTLEMENT_TOKEN_ENTROPY_STORE_NAME: &str = "grantor_settlement_token_entropy";
 
-    pub fn save_dcd_args(taproot_pubkey: impl ToString, dcd_args: &DCDArguments) -> crate::error::Result<()> {
+    pub fn save_dcd_args(taproot_pubkey: &impl ToString, dcd_args: &DCDArguments) -> crate::error::Result<()> {
         let store = Store::load()?;
         store.insert_value(taproot_pubkey.to_string(), dcd_args.encode().unwrap())?;
         Ok(())
     }
 
-    pub fn get_dcd_args(taproot_pubkey: impl ToString) -> crate::error::Result<DCDArguments> {
+    pub fn get_dcd_args(taproot_pubkey: &impl ToString) -> crate::error::Result<DCDArguments> {
         let store = Store::load()?;
         let dcd_args: DCDArguments = store.get_arguments(&taproot_pubkey.to_string())?;
         Ok(dcd_args)
     }
 
-    fn get_filler_entropy_key(taproot_pubkey: impl ToString) -> String {
+    fn get_filler_entropy_key(taproot_pubkey: &impl ToString) -> String {
         format!("{}-{FILLER_TOKEN_ENTROPY_STORE_NAME}", taproot_pubkey.to_string())
     }
 
     pub fn save_filler_token_entropy(
-        taproot_pubkey: impl ToString,
+        taproot_pubkey: &impl ToString,
         asset_entropy: &AssetEntropyHex,
     ) -> crate::error::Result<()> {
         let store = Store::load()?;
@@ -128,7 +130,7 @@ pub mod store_utils {
         Ok(())
     }
 
-    pub fn get_filler_token_entropy(taproot_pubkey: impl ToString) -> crate::error::Result<AssetEntropyHex> {
+    pub fn get_filler_token_entropy(taproot_pubkey: &impl ToString) -> crate::error::Result<AssetEntropyHex> {
         let store = Store::load()?;
         let bytes = store.get_arguments_raw(&get_filler_entropy_key(taproot_pubkey))?;
         let x = String::from_utf8(bytes.to_vec()).map_err(|err| {
@@ -139,7 +141,7 @@ pub mod store_utils {
         Ok(x)
     }
 
-    fn get_grantor_collateral_token_entropy_key(taproot_pubkey: impl ToString) -> String {
+    fn get_grantor_collateral_token_entropy_key(taproot_pubkey: &impl ToString) -> String {
         format!(
             "{}-{GRANTOR_COLLATERAL_TOKEN_ENTROPY_STORE_NAME}",
             taproot_pubkey.to_string()
@@ -147,7 +149,7 @@ pub mod store_utils {
     }
 
     pub fn save_grantor_collateral_token_entropy(
-        taproot_pubkey: impl ToString,
+        taproot_pubkey: &impl ToString,
         asset_entropy: &AssetEntropyHex,
     ) -> crate::error::Result<()> {
         let store = Store::load()?;
@@ -159,7 +161,7 @@ pub mod store_utils {
     }
 
     pub fn get_grantor_collateral_token_entropy(
-        taproot_pubkey: impl ToString,
+        taproot_pubkey: &impl ToString,
     ) -> crate::error::Result<AssetEntropyHex> {
         let store = Store::load()?;
         let bytes = store.get_arguments_raw(&get_grantor_collateral_token_entropy_key(taproot_pubkey))?;
@@ -171,7 +173,7 @@ pub mod store_utils {
         Ok(x)
     }
 
-    fn get_grantor_settlement_token_entropy_key(taproot_pubkey: impl ToString) -> String {
+    fn get_grantor_settlement_token_entropy_key(taproot_pubkey: &impl ToString) -> String {
         format!(
             "{}-{GRANTOR_SETTLEMENT_TOKEN_ENTROPY_STORE_NAME}",
             taproot_pubkey.to_string()
@@ -179,7 +181,7 @@ pub mod store_utils {
     }
 
     pub fn save_grantor_settlement_token_entropy(
-        taproot_pubkey: impl ToString,
+        taproot_pubkey: &impl ToString,
         asset_entropy: &AssetEntropyHex,
     ) -> crate::error::Result<()> {
         let store = Store::load()?;
@@ -191,7 +193,7 @@ pub mod store_utils {
     }
 
     pub fn get_grantor_settlement_token_entropy(
-        taproot_pubkey: impl ToString,
+        taproot_pubkey: &impl ToString,
     ) -> crate::error::Result<AssetEntropyHex> {
         let store = Store::load()?;
         let bytes = store.get_arguments_raw(&get_grantor_settlement_token_entropy_key(taproot_pubkey))?;
@@ -210,11 +212,6 @@ mod tests {
     use simplicityhl::simplicity::elements;
     use simplicityhl_core::{Encodable, TaprootPubkeyGen};
     use simplicityhl_core::{LIQUID_TESTNET_TEST_ASSET_ID_STR, create_p2tr_address};
-    use std::collections::HashMap;
-
-    use hex::FromHex;
-    use simplicityhl::num::U256;
-    use simplicityhl::{Arguments, str::WitnessName, value::UIntValue};
 
     use super::*;
 
@@ -245,52 +242,7 @@ mod tests {
         }
     }
 
-    impl OptionsArguments {
-        pub fn build_option_arguments(&self) -> Arguments {
-            Arguments::from(HashMap::from([
-                (
-                    WitnessName::from_str_unchecked("START_TIME"),
-                    simplicityhl::Value::from(UIntValue::U32(self.start_time)),
-                ),
-                (
-                    WitnessName::from_str_unchecked("EXPIRY_TIME"),
-                    simplicityhl::Value::from(UIntValue::U32(self.expiry_time)),
-                ),
-                (
-                    WitnessName::from_str_unchecked("COLLATERAL_PER_CONTRACT"),
-                    simplicityhl::Value::from(UIntValue::U64(self.collateral_per_contract)),
-                ),
-                (
-                    WitnessName::from_str_unchecked("SETTLEMENT_PER_CONTRACT"),
-                    simplicityhl::Value::from(UIntValue::U64(self.settlement_per_contract)),
-                ),
-                (
-                    WitnessName::from_str_unchecked("COLLATERAL_ASSET_ID"),
-                    simplicityhl::Value::from(UIntValue::U256(u256_from_le_hex(&self.collateral_asset_id_hex_le))),
-                ),
-                (
-                    WitnessName::from_str_unchecked("SETTLEMENT_ASSET_ID"),
-                    simplicityhl::Value::from(UIntValue::U256(u256_from_le_hex(&self.settlement_asset_id_hex_le))),
-                ),
-                (
-                    WitnessName::from_str_unchecked("OPTION_TOKEN_ASSET"),
-                    simplicityhl::Value::from(UIntValue::U256(u256_from_le_hex(&self.option_token_asset_id_hex_le))),
-                ),
-                (
-                    WitnessName::from_str_unchecked("GRANTOR_TOKEN_ASSET"),
-                    simplicityhl::Value::from(UIntValue::U256(u256_from_le_hex(&self.grantor_token_asset_id_hex_le))),
-                ),
-            ]))
-        }
-    }
-
     impl simplicityhl_core::Encodable for OptionsArguments {}
-
-    fn u256_from_le_hex(hex_le: &str) -> U256 {
-        let mut bytes = <[u8; 32]>::from_hex(hex_le).expect("expected 32 bytes hex");
-        bytes.reverse();
-        U256::from_byte_array(bytes)
-    }
 
     fn load_mock() -> Store {
         Store {

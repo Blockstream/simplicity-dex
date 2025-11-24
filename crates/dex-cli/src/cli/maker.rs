@@ -74,7 +74,7 @@ pub enum MakerCommands {
         /// When true, broadcast the built transaction via Esplora; otherwise only print it
         #[arg(long = "broadcast", default_value_t = true)]
         broadcast: bool,
-        /// EventId of the Maker\'s original order event on Nostr
+        /// `EventId` of the Maker\'s original order event on Nostr
         #[arg(short = 'i', long)]
         maker_order_event_id: EventId,
     },
@@ -102,7 +102,7 @@ pub enum MakerCommands {
         /// When true, broadcast the built transaction via Esplora; otherwise only print it
         #[arg(long = "broadcast", default_value_t = true)]
         broadcast: bool,
-        /// EventId of the Maker\'s original order event on Nostr
+        /// `EventId` of the Maker\'s original order event on Nostr
         #[arg(short = 'i', long)]
         maker_order_event_id: EventId,
     },
@@ -136,7 +136,7 @@ pub enum MakerCommands {
         /// When true, broadcast the built transaction via Esplora; otherwise only print it
         #[arg(long = "broadcast", default_value_t = true)]
         broadcast: bool,
-        /// EventId of the Maker\'s original order event on Nostr
+        /// `EventId` of the Maker\'s original order event on Nostr
         #[arg(short = 'i', long)]
         maker_order_event_id: EventId,
     },

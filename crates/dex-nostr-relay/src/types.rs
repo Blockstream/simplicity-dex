@@ -1,3 +1,4 @@
+use crate::handlers::common::timestamp_to_chrono_utc;
 use chrono::TimeZone;
 use nostr::{Event, EventId, Kind, PublicKey, Tag, TagKind, Tags};
 use simplicity::elements::AssetId;
@@ -137,9 +138,9 @@ impl fmt::Display for MakerOrderSummary {
         writeln!(f, "\t\t principal:\t{}", self.principal)?;
         writeln!(f, "\t\t incentive_bps:\t{}", self.incentive_basis_points)?;
         writeln!(f, "\t\t settlement_height:\t{}", self.settlement_height)?;
-        writeln!(f, "\t\t taker_funding:\t{}", taker_range)?;
+        writeln!(f, "\t\t taker_funding:\t{taker_range}")?;
         writeln!(f, "\t\t settlement_height:\t{}", self.settlement_height)?;
-        writeln!(f, "\t\t oracle_pubkey:\t{}", oracle_short)?;
+        writeln!(f, "\t\t oracle_pubkey:\t{oracle_short}")?;
         writeln!(f, "\t assets:")?;
         writeln!(f, "\t\t interest_collateral:\t{}", self.interest_collateral)?;
         writeln!(f, "\t\t total_collateral:\t{}", self.total_collateral)?;
@@ -230,31 +231,27 @@ impl fmt::Display for MakerOrderEvent {
         let collateral = format!("{}", self.collateral_asset_id);
         let maker_tx = self.maker_fund_tx_id.to_string();
 
-        writeln!(
-            f,
-            "[Maker Order - Detail]\n\tevent_id={}\ttime={}",
-            event_short, time_str
-        )?;
+        writeln!(f, "[Maker Order - Detail]\n\tevent_id={event_short}\ttime={time_str}",)?;
         writeln!(f, "\t dcd_taproot_pubkey_gen:\t{}", self.dcd_taproot_pubkey_gen)?;
-        writeln!(f, "\t maker_fund_tx_id:\t{}", maker_tx)?;
+        writeln!(f, "\t maker_fund_tx_id:\t{maker_tx}",)?;
         writeln!(f, "\tdcd_arguments:")?;
         writeln!(f, "\t\t strike_price:\t{}", self.dcd_arguments.strike_price)?;
         writeln!(f, "\t\t incentive_bps:\t{}", self.dcd_arguments.incentive_basis_points)?;
-        writeln!(f, "\t\t taker_funding:\t{}", taker_range)?;
+        writeln!(f, "\t\t taker_funding:\t{taker_range}",)?;
         writeln!(f, "\t\t settlement_height:\t{}", self.dcd_arguments.settlement_height)?;
-        writeln!(f, "\t\t oracle_pubkey:\t{}", oracle_display)?;
-        writeln!(f, "\t\t ratio.principal_collateral:\t{}", principal)?;
-        writeln!(f, "\t\t ratio.interest_collateral:\t{}", interest_collateral)?;
-        writeln!(f, "\t\t ratio.total_collateral:\t{}", total_collateral)?;
-        writeln!(f, "\t\t ratio.interest_asset:\t{}", interest_asset)?;
-        writeln!(f, "\t\t ratio.total_asset:\t{}", total_asset)?;
+        writeln!(f, "\t\t oracle_pubkey:\t{oracle_display}",)?;
+        writeln!(f, "\t\t ratio.principal_collateral:\t{principal}",)?;
+        writeln!(f, "\t\t ratio.interest_collateral:\t{interest_collateral}",)?;
+        writeln!(f, "\t\t ratio.total_collateral:\t{total_collateral}",)?;
+        writeln!(f, "\t\t ratio.interest_asset:\t{interest_asset}",)?;
+        writeln!(f, "\t\t ratio.total_asset:\t{total_asset}",)?;
 
         writeln!(f, "\tassets:")?;
-        writeln!(f, "\t\t filler_asset_id:\t{}", filler)?;
-        writeln!(f, "\t\t grantor_collateral_asset_id:\t{}", grantor_collateral)?;
-        writeln!(f, "\t\t grantor_settlement_asset_id:\t{}", grantor_settlement)?;
-        writeln!(f, "\t\t settlement_asset_id:\t{}", settlement)?;
-        writeln!(f, "\t\t collateral_asset_id:\t{}", collateral)?;
+        writeln!(f, "\t\t filler_asset_id:\t{filler}")?;
+        writeln!(f, "\t\t grantor_collateral_asset_id:\t{grantor_collateral}")?;
+        writeln!(f, "\t\t grantor_settlement_asset_id:\t{grantor_settlement}")?;
+        writeln!(f, "\t\t settlement_asset_id:\t{settlement}")?;
+        writeln!(f, "\t\t collateral_asset_id:\t{collateral}")?;
 
         writeln!(
             f,
@@ -267,13 +264,13 @@ impl fmt::Display for MakerOrderEvent {
 }
 
 impl MakerOrderEvent {
-    pub fn parse_event(event: Event) -> Option<Self> {
+    pub fn parse_event(event: &Event) -> Option<Self> {
         event.verify().ok()?;
         if event.kind != MakerOrderKind::get_kind() {
             return None;
         }
 
-        let time = chrono::Utc.timestamp_opt(event.created_at.as_u64() as i64, 0).unwrap();
+        let time = timestamp_to_chrono_utc(event.created_at)?;
         let dcd_taproot_pubkey_gen = event.tags.get(2)?.content()?.to_string();
         let dcd_arguments = {
             let bytes = hex::decode(event.tags.get(1)?.content()?).ok()?;
@@ -384,10 +381,10 @@ impl MakerOrderEvent {
 }
 
 impl OrderReplyEvent {
-    pub fn parse_event(event: Event) -> Option<Self> {
+    pub fn parse_event(event: &Event) -> Option<Self> {
         tracing::debug!("filtering event: {:?}", event);
         event.verify().ok()?;
-        let time = chrono::Utc.timestamp_opt(event.created_at.as_u64() as i64, 0).unwrap();
+        let time = timestamp_to_chrono_utc(event.created_at)?;
         Some(OrderReplyEvent {
             event_id: event.id,
             event_kind: event.kind,
@@ -424,6 +421,7 @@ impl ReplyOption {
         }
     }
 
+    #[must_use]
     pub fn form_tags(&self, source_event_id: EventId, client_pubkey: PublicKey) -> Vec<Tag> {
         match self {
             ReplyOption::TakerFund { tx_id } => {

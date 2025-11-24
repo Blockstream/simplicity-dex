@@ -41,7 +41,7 @@ pub mod order {
                 generic_tags: BTreeMap::default(),
             })
             .await?;
-        let events = filter_maker_order_events(events);
+        let events = filter_maker_order_events(&events);
         Ok(events)
     }
 }

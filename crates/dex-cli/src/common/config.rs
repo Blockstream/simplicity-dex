@@ -39,6 +39,14 @@ impl From<KeysWrapper> for ValueKind {
 }
 
 impl AggregatedConfig {
+    /// Build aggregated configuration from CLI arguments and optional config file.
+    ///
+    /// # Errors
+    ///
+    /// Returns:
+    /// - `CliError::Config` if the underlying `config` builder or deserialization fails.
+    /// - `CliError::ConfigExtended` if the aggregated configuration cannot be
+    ///   constructed (e.g., missing or empty `relays` list).
     #[instrument(level = "debug", skip(cli))]
     pub fn new(cli: &Cli) -> crate::error::Result<Self> {
         #[derive(Deserialize, Debug)]
@@ -106,6 +114,11 @@ impl AggregatedConfig {
         Ok(aggregated_config)
     }
 
+    /// Ensure that a Nostr keypair is present in the aggregated configuration.
+    ///
+    /// # Errors
+    ///
+    /// Returns `CliError::NoNostrKeypairListed` if `nostr_keypair` is `None`.
     pub fn check_nostr_keypair_existence(&self) -> crate::error::Result<()> {
         if self.nostr_keypair.is_none() {
             return Err(CliError::NoNostrKeypairListed);

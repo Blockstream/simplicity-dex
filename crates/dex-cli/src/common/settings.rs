@@ -17,6 +17,14 @@ pub struct Settings {
 }
 
 impl Settings {
+    /// Load CLI settings from environment variables.
+    ///
+    /// # Errors
+    ///
+    /// Returns:
+    /// - `CliError::Config` if building the configuration from the environment fails.
+    /// - `CliError::EnvNotSet` if the [`SeedHex::ENV_NAME`] environment variable is not set
+    ///   or cannot be read as a UTF-8 string.
     #[instrument(level = "debug", ret)]
     pub fn load() -> crate::error::Result<Self> {
         let cfg = Config::builder()

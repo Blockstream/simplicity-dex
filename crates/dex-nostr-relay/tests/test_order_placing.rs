@@ -9,7 +9,7 @@ mod tests {
     use dex_nostr_relay::relay_client::ClientConfig;
     use dex_nostr_relay::relay_processor::{ListOrdersEventFilter, OrderPlaceEventTags, RelayProcessor};
     use dex_nostr_relay::types::{CustomKind, MakerOrderKind, ReplyOption, TakerOrderKind};
-    use nostr::{EventId, Keys, ToBech32};
+    use nostr::{Keys, ToBech32};
     use simplicityhl::elements::Txid;
 
     use tracing::{info, instrument};

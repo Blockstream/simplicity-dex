@@ -57,6 +57,7 @@ pub enum TimeOptionArgs {
 }
 
 impl TimeOptionArgs {
+    #[must_use]
     pub fn compute_since(&self) -> Option<u64> {
         match self {
             TimeOptionArgs::Duration { value } => {
@@ -67,6 +68,7 @@ impl TimeOptionArgs {
         }
     }
 
+    #[must_use]
     pub fn compute_until(&self) -> Option<u64> {
         match self {
             TimeOptionArgs::Duration { .. } => None,

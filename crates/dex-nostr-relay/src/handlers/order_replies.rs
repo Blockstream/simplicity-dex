@@ -19,6 +19,6 @@ pub async fn handle(client: &RelayClient, event_id: EventId) -> crate::error::Re
             generic_tags: BTreeMap::from([(SingleLetterTag::from_char('e')?, BTreeSet::from([event_id.to_string()]))]),
         })
         .await?;
-    let events = filter_order_reply_events(events);
+    let events = filter_order_reply_events(&events);
     Ok(events)
 }
