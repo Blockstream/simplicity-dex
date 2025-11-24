@@ -1,6 +1,6 @@
 use crate::common::keys::derive_secret_key_from_index;
 use crate::common::settings::Settings;
-use crate::common::store::{SledError, Store};
+use crate::common::store::SledError;
 use crate::common::{DCDCliArguments, broadcast_tx_inner, vec_to_arr};
 use elements::bitcoin::hex::DisplayHex;
 use elements::bitcoin::secp256k1;
@@ -44,7 +44,6 @@ pub fn process_args(
     oracle_signature: String,
 ) -> crate::error::Result<ProcessedArgs> {
     const FEE_UTXOS_NEEDED: usize = 3;
-    let _store = Store::load()?;
 
     let settings = Settings::load().map_err(|err| crate::error::CliError::EnvNotSet(err.to_string()))?;
 

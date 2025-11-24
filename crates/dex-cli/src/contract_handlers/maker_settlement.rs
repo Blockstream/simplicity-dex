@@ -1,6 +1,6 @@
 use crate::common::keys::derive_secret_key_from_index;
 use crate::common::settings::Settings;
-use crate::common::store::{SledError, Store};
+use crate::common::store::SledError;
 use crate::common::{DCDCliArguments, broadcast_tx_inner, vec_to_arr};
 use elements::bitcoin::hex::DisplayHex;
 use elements::bitcoin::secp256k1;
@@ -40,7 +40,7 @@ pub fn process_args(
 ) -> crate::error::Result<ProcessedArgs> {
     const FEE_UTXOS_NEEDED: usize = 4;
 
-    let _store = Store::load()?;
+    let taproot_pubkey_gen = dcd_taproot_pubkey_gen.as_ref();
 
     let settings = Settings::load().map_err(|err| crate::error::CliError::EnvNotSet(err.to_string()))?;
 
@@ -52,9 +52,7 @@ pub fn process_args(
     let fee_utxos = vec_to_arr::<FEE_UTXOS_NEEDED, OutPoint>(fee_utxos)?;
 
     let dcd_arguments: DCDArguments = match dcd_init_params {
-        None => {
-            todo!()
-        }
+        None => crate::common::store::store_utils::get_dcd_args(&taproot_pubkey_gen)?,
         Some(x) => x.convert_to_dcd_arguments()?,
     };
 

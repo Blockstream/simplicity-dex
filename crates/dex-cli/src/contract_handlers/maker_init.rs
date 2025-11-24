@@ -1,6 +1,5 @@
 use crate::common::keys::derive_secret_key_from_index;
 use crate::common::settings::Settings;
-use crate::common::store::Store;
 use crate::common::{broadcast_tx_inner, entropy_to_asset_id, vec_to_arr};
 use elements::bitcoin::hex::DisplayHex;
 use elements::bitcoin::secp256k1;
@@ -76,8 +75,6 @@ pub fn process_args(
     dcd_init_params: InnerDcdInitParams,
     fee_utxos: Vec<OutPoint>,
 ) -> crate::error::Result<ProcessedArgs> {
-    let _store = Store::load()?;
-
     const FEE_UTXOS_NEEDED: usize = 3;
 
     let settings = Settings::load().map_err(|err| crate::error::CliError::EnvNotSet(err.to_string()))?;

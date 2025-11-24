@@ -1,6 +1,6 @@
 use crate::common::keys::derive_secret_key_from_index;
 use crate::common::settings::Settings;
-use crate::common::store::{SledError, Store};
+use crate::common::store::SledError;
 use crate::common::{DCDCliMakerFundArguments, broadcast_tx_inner, decode_hex, vec_to_arr};
 use dex_nostr_relay::relay_processor::OrderPlaceEventTags;
 use elements::bitcoin::hex::DisplayHex;
@@ -75,8 +75,6 @@ pub fn process_args(
     fee_utxos: Vec<OutPoint>,
 ) -> crate::error::Result<ProcessedArgs> {
     const FEE_UTXOS_NEEDED: usize = 5;
-
-    let _store = Store::load()?;
 
     let settings = Settings::load().map_err(|err| crate::error::CliError::EnvNotSet(err.to_string()))?;
 
