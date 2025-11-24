@@ -12,10 +12,14 @@ use serde::{Deserialize, Deserializer};
 use crate::error::CliError;
 use tracing::instrument;
 
+/// `MAKER_EXPIRATION_TIME` = 31 days
+pub const MAKER_EXPIRATION_TIME: u64 = 2_678_400;
+
 #[derive(Debug)]
 pub struct AggregatedConfig {
     pub nostr_keypair: Option<Keys>,
     pub relays: Vec<RelayUrl>,
+    pub maker_expiration_time: Option<u64>,
 }
 
 #[derive(Debug, Clone)]
@@ -53,12 +57,14 @@ impl AggregatedConfig {
         pub struct AggregatedConfigInner {
             pub nostr_keypair: Option<KeysWrapper>,
             pub relays: Option<Vec<RelayUrl>>,
+            pub maker_expiration_time: Option<u64>,
         }
 
         let Cli {
             nostr_key,
             relays_list,
             nostr_config_path,
+            maker_expiration_time,
             ..
         } = cli;
 
@@ -86,6 +92,13 @@ impl AggregatedConfig {
                 ),
             )?;
         }
+        
+        if let Some(maker_expiration_time) = maker_expiration_time {
+            tracing::debug!("Adding expiration time from CLI, expiration_time: '{:?}'", maker_expiration_time);
+            config_builder = config_builder.set_override_option(
+                "maker_expiration_time", Some(maker_expiration_time.clone())
+            )?;
+        }
 
         // TODO(Alex): add Liquid private key
 
@@ -107,6 +120,7 @@ impl AggregatedConfig {
         let aggregated_config = AggregatedConfig {
             nostr_keypair: config.nostr_keypair.map(|x| x.0),
             relays,
+            maker_expiration_time: config.maker_expiration_time,
         };
 
         tracing::debug!("Config gathered: '{:?}'", aggregated_config);

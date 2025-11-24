@@ -25,9 +25,6 @@ pub trait CustomKind {
 pub const POW_DIFFICULTY: u8 = 1;
 pub const BLOCKSTREAM_MAKER_CONTENT: &str = "Liquid order [Maker]!";
 pub const BLOCKSTREAM_TAKER_CONTENT: &str = "Liquid order [Taker]!";
-/// `MAKER_EXPIRATION_TIME` = 31 days
-/// TODO: move to the config
-pub const MAKER_EXPIRATION_TIME: u64 = 2_678_400;
 pub const MAKER_DCD_ARG_TAG: &str = "dcd_arguments_(hex&bincode)";
 pub const MAKER_DCD_TAPROOT_TAG: &str = "dcd_taproot_pubkey_gen";
 pub const MAKER_FILLER_ASSET_ID_TAG: &str = "filler_asset_id";

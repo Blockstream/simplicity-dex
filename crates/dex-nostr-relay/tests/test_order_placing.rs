@@ -5,7 +5,7 @@ mod tests {
     use std::str::FromStr;
 
     use std::time::Duration;
-
+    use bincode::error::IntegerType::U64;
     use dex_nostr_relay::relay_client::ClientConfig;
     use dex_nostr_relay::relay_processor::{ListOrdersEventFilter, OrderPlaceEventTags, RelayProcessor};
     use dex_nostr_relay::types::{CustomKind, MakerOrderKind, ReplyOption, TakerOrderKind};
@@ -38,6 +38,7 @@ mod tests {
             .place_order(
                 OrderPlaceEventTags::default(),
                 Txid::from_str("87a4c9b2060ff698d9072d5f95b3dde01efe0994f95c3cd6dd7348cb3a4e4e40").unwrap(),
+                1011,
             )
             .await?;
         info!("=== placed order event id: {}", placed_order_event_id);
