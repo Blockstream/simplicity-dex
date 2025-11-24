@@ -42,9 +42,9 @@ pub struct CommonOrderOptions {
     /// Account index used to derive internal/change addresses from the wallet
     #[arg(long = "account-index", default_value_t = 0)]
     pub account_index: u32,
-    /// When true, broadcast the built transaction via Esplora; otherwise only print it
-    #[arg(long = "broadcast", default_value_t = true)]
-    pub broadcast: bool,
+    /// When set, the transaction would be only printed, otherwise it'd ve broadcasted the built transaction via Esplora
+    #[arg(long = "offline")]
+    pub is_offline: bool,
 }
 
 #[derive(Debug, Subcommand)]
@@ -62,13 +62,18 @@ pub enum Command {
         #[command(subcommand)]
         action: TakerCommands,
     },
-
-    #[command(flatten)]
-    Dex(DexCommands),
-
-    #[command(flatten)]
-    Helpers(HelperCommands),
-
+    /// Dex commands that is related with nostr and interaction with it
+    #[command()]
+    Dex {
+        #[command(subcommand)]
+        action: DexCommands,
+    },
+    /// Helper commands for ease of testing use
+    #[command()]
+    Helpers {
+        #[command(subcommand)]
+        action: HelperCommands,
+    },
     /// Print the aggregated CLI and relay configuration
     #[command()]
     ShowConfig,
@@ -77,12 +82,6 @@ pub enum Command {
 struct CliAppContext {
     agg_config: AggregatedConfig,
     relay_processor: RelayProcessor,
-}
-
-#[derive(Debug, Clone, Copy)]
-struct OptionParams {
-    account_index: u32,
-    broadcast: bool,
 }
 
 struct MakerSettlementCliContext {
@@ -201,8 +200,8 @@ impl Cli {
                 }
                 Command::Maker { action } => Self::process_maker_commands(&cli_app_context, action).await?,
                 Command::Taker { action } => Self::process_taker_commands(&cli_app_context, action).await?,
-                Command::Helpers(x) => Self::process_helper_commands(x)?,
-                Command::Dex(x) => Self::process_dex_commands(&cli_app_context, x).await?,
+                Command::Helpers { action } => Self::process_helper_commands(action)?,
+                Command::Dex { action } => Self::process_dex_commands(&cli_app_context, action).await?,
             }
         };
         write_into_stdout(msg)?;
@@ -230,10 +229,7 @@ impl Cli {
                     init_order_args,
                     fee_amount,
                 },
-                OptionParams {
-                    account_index: common_options.account_index,
-                    broadcast: common_options.broadcast,
-                },
+                common_options,
             )?,
             MakerCommands::Fund {
                 filler_token_utxo,
@@ -258,10 +254,7 @@ impl Cli {
                         dcd_taproot_pubkey_gen,
                         dcd_arguments,
                     },
-                    OptionParams {
-                        account_index: common_options.account_index,
-                        broadcast: common_options.broadcast,
-                    },
+                    common_options,
                 )
                 .await?
             }
@@ -288,10 +281,7 @@ impl Cli {
                         dcd_arguments,
                         maker_order_event_id,
                     },
-                    OptionParams {
-                        account_index: common_options.account_index,
-                        broadcast: common_options.broadcast,
-                    },
+                    common_options,
                 )
                 .await?
             }
@@ -318,10 +308,7 @@ impl Cli {
                         dcd_arguments,
                         maker_order_event_id,
                     },
-                    OptionParams {
-                        account_index: common_options.account_index,
-                        broadcast: common_options.broadcast,
-                    },
+                    common_options,
                 )
                 .await?
             }
@@ -354,10 +341,7 @@ impl Cli {
                         dcd_arguments,
                         maker_order_event_id,
                     },
-                    OptionParams {
-                        account_index: common_options.account_index,
-                        broadcast: common_options.broadcast,
-                    },
+                    common_options,
                 )
                 .await?
             }
@@ -372,10 +356,10 @@ impl Cli {
             init_order_args,
             fee_amount,
         }: MakerInitCliContext,
-        OptionParams {
+        CommonOrderOptions {
             account_index,
-            broadcast,
-        }: OptionParams,
+            is_offline,
+        }: CommonOrderOptions,
     ) -> crate::error::Result<String> {
         use contract_handlers::maker_init::{Utxos, handle, process_args, save_args_to_cache};
 
@@ -388,7 +372,7 @@ impl Cli {
                 third: third_lbtc_utxo,
             },
             fee_amount,
-            broadcast,
+            is_offline,
         )?;
         save_args_to_cache(&args_to_save)?;
         Ok(format!("[Maker] Init order tx result: {tx_res:?}"))
@@ -409,10 +393,10 @@ impl Cli {
             dcd_taproot_pubkey_gen,
             dcd_arguments,
         }: MakerFundCliContext,
-        OptionParams {
+        CommonOrderOptions {
             account_index,
-            broadcast,
-        }: OptionParams,
+            is_offline,
+        }: CommonOrderOptions,
     ) -> crate::error::Result<String> {
         use contract_handlers::maker_funding::{Utxos, handle, process_args, save_args_to_cache};
 
@@ -429,7 +413,7 @@ impl Cli {
                 fee: fee_utxo,
             },
             fee_amount,
-            broadcast,
+            is_offline,
         )?;
         let res = relay_processor.place_order(event_to_publish, tx_id).await?;
         save_args_to_cache(&args_to_save)?;
@@ -451,10 +435,10 @@ impl Cli {
             dcd_arguments,
             maker_order_event_id,
         }: MakerCollateralTerminationCliContext,
-        OptionParams {
+        CommonOrderOptions {
             account_index,
-            broadcast,
-        }: OptionParams,
+            is_offline,
+        }: CommonOrderOptions,
     ) -> crate::error::Result<String> {
         use contract_handlers::maker_termination_collateral::{Utxos, handle, save_args_to_cache};
 
@@ -473,7 +457,7 @@ impl Cli {
                 collateral_token: collateral_token_utxo,
             },
             fee_amount,
-            broadcast,
+            is_offline,
         )?;
         save_args_to_cache(&args_to_save)?;
         let reply_event_id = relay_processor
@@ -499,10 +483,10 @@ impl Cli {
             dcd_arguments,
             maker_order_event_id,
         }: MakerSettlementTerminationCliContext,
-        OptionParams {
+        CommonOrderOptions {
             account_index,
-            broadcast,
-        }: OptionParams,
+            is_offline,
+        }: CommonOrderOptions,
     ) -> crate::error::Result<String> {
         use contract_handlers::maker_termination_settlement::{Utxos, handle, save_args_to_cache};
 
@@ -521,7 +505,7 @@ impl Cli {
                 grantor_settlement_token: grantor_settlement_token_utxo,
             },
             fee_amount,
-            broadcast,
+            is_offline,
         )?;
         save_args_to_cache(&args_to_save)?;
         let reply_event_id = relay_processor
@@ -551,10 +535,10 @@ impl Cli {
             dcd_arguments,
             maker_order_event_id,
         }: MakerSettlementCliContext,
-        OptionParams {
+        CommonOrderOptions {
             account_index,
-            broadcast,
-        }: OptionParams,
+            is_offline,
+        }: CommonOrderOptions,
     ) -> crate::error::Result<String> {
         use contract_handlers::maker_settlement::{Utxos, handle, process_args, save_args_to_cache};
 
@@ -576,7 +560,7 @@ impl Cli {
                 asset: asset_utxo,
             },
             fee_amount,
-            broadcast,
+            is_offline,
         )?;
         save_args_to_cache(&args_to_save)?;
         let reply_event_id = relay_processor
@@ -603,14 +587,14 @@ impl Cli {
                 collateral_amount_to_deposit,
                 dcd_taproot_pubkey_gen,
                 dcd_arguments,
-                common_options: common,
+                common_options,
                 maker_order_event_id: maker_event_id,
             } => {
                 use contract_handlers::taker_funding::{Utxos, handle, process_args, save_args_to_cache};
 
                 agg_config.check_nostr_keypair_existence()?;
                 let processed_args = process_args(
-                    common.account_index,
+                    common_options.account_index,
                     dcd_arguments,
                     dcd_taproot_pubkey_gen,
                     collateral_amount_to_deposit,
@@ -622,7 +606,7 @@ impl Cli {
                         collateral_token_utxo,
                     },
                     fee_amount,
-                    common.broadcast,
+                    common_options.is_offline,
                 )?;
                 let reply_event_id = relay_processor
                     .reply_order(maker_event_id, ReplyOption::TakerFund { tx_id })
@@ -638,14 +622,14 @@ impl Cli {
                 filler_token_amount_to_return,
                 dcd_taproot_pubkey_gen,
                 dcd_arguments,
-                common_options: common,
+                common_options,
                 maker_order_event_id,
             } => {
                 use contract_handlers::taker_early_termination::{Utxos, handle, process_args, save_args_to_cache};
 
                 agg_config.check_nostr_keypair_existence()?;
                 let processed_args = process_args(
-                    common.account_index,
+                    common_options.account_index,
                     dcd_arguments,
                     dcd_taproot_pubkey_gen,
                     filler_token_amount_to_return,
@@ -658,7 +642,7 @@ impl Cli {
                         fee: fee_utxo,
                     },
                     fee_amount,
-                    common.broadcast,
+                    common_options.is_offline,
                 )?;
                 let reply_event_id = relay_processor
                     .reply_order(maker_order_event_id, ReplyOption::TakerTerminationEarly { tx_id })
@@ -676,14 +660,14 @@ impl Cli {
                 oracle_signature,
                 dcd_taproot_pubkey_gen,
                 dcd_arguments,
-                common_options: common,
+                common_options,
                 maker_order_event_id,
             } => {
                 use contract_handlers::taker_settlement::{Utxos, handle, process_args, save_args_to_cache};
 
                 agg_config.check_nostr_keypair_existence()?;
                 let processed_args = process_args(
-                    common.account_index,
+                    common_options.account_index,
                     dcd_arguments,
                     dcd_taproot_pubkey_gen,
                     price_at_current_block_height,
@@ -698,7 +682,7 @@ impl Cli {
                         fee: fee_utxo,
                     },
                     fee_amount,
-                    common.broadcast,
+                    common_options.is_offline,
                 )?;
                 save_args_to_cache(&args_to_save)?;
                 let reply_event_id = relay_processor
@@ -724,7 +708,7 @@ impl Cli {
                     fee_utxo_outpoint,
                     fee_amount,
                     issue_amount,
-                    common_options.broadcast,
+                    common_options.is_offline,
                 )?;
                 "Asset creation -- done".to_string()
             }
@@ -743,7 +727,7 @@ impl Cli {
                     fee_utxo_outpoint,
                     reissue_amount,
                     fee_amount,
-                    common_options.broadcast,
+                    common_options.is_offline,
                 )?;
                 "Asset minting -- done".to_string()
             }
@@ -758,7 +742,7 @@ impl Cli {
                     split_amount,
                     fee_utxo,
                     fee_amount,
-                    common_options.broadcast,
+                    common_options.is_offline,
                 )?;
                 format!("Split utxo result tx_id: {tx_res:?}")
             }

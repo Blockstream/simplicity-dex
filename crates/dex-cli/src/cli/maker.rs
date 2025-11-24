@@ -31,8 +31,7 @@ pub enum MakerCommands {
         common_options: CommonOrderOptions,
     },
     #[command(
-        about = "Fund a DCD offer by locking Maker tokens into the contract and publish the order on relays [authentication required]",
-        alias = "fund"
+        about = "Fund a DCD offer by locking Maker tokens into the contract and publish the order on relays [authentication required]"
     )]
     Fund {
         /// UTXO containing Maker filler tokens to be locked into the DCD contract

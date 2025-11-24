@@ -105,7 +105,7 @@ pub fn handle(
         third: third_lbtc_utxo,
     }: Utxos,
     fee_amount: u64,
-    broadcast: bool,
+    is_offline: bool,
 ) -> crate::error::Result<(Txid, ArgsToSave)> {
     let DcdInitResponse {
         tx,
@@ -137,10 +137,10 @@ pub fn handle(
         filler_token_entropy, grantor_collateral_token_entropy, grantor_settlement_token_entropy, taproot_pubkey_gen
     );
 
-    if broadcast {
-        println!("Broadcasted txid: {}", broadcast_tx_inner(&tx)?);
-    } else {
+    if is_offline {
         println!("{}", tx.serialize().to_lower_hex_string());
+    } else {
+        println!("Broadcasted txid: {}", broadcast_tx_inner(&tx)?);
     }
     let args_to_save = ArgsToSave {
         filler_token_entropy,

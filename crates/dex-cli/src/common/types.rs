@@ -146,7 +146,7 @@ pub struct DCDCliMakerFundArguments {
     #[arg(long = "incentive-basis-points")]
     pub incentive_basis_points: u64,
     /// Fee expressed in basis points (1 bp = 0.01%).
-    #[arg(long = "incentive-basis-points", default_value_t = 0)]
+    #[arg(long = "fee-basis-points", default_value_t = 0)]
     pub fee_basis_points: u64,
 
     // Additional params for DCDRatioArguments
@@ -165,13 +165,13 @@ pub struct DCDCliMakerFundArguments {
 
     // Entropies
     /// Settlement asset entropy as a hex string to be used for this order.
-    #[arg(long = "settlement-asset-entropy")]
+    #[arg(long = "filler-asset-entropy")]
     pub filler_asset_entropy: AssetEntropyHex,
     /// Settlement asset entropy as a hex string to be used for this order.
-    #[arg(long = "settlement-asset-entropy")]
+    #[arg(long = "grantor-collateral-asset-entropy")]
     pub grantor_collateral_asset_entropy: AssetEntropyHex,
     /// Settlement asset entropy as a hex string to be used for this order.
-    #[arg(long = "settlement-asset-entropy")]
+    #[arg(long = "grantor-settlement-asset-entropy")]
     pub grantor_settlement_asset_entropy: AssetEntropyHex,
     /// Settlement asset entropy as a hex string to be used for this order.
     #[arg(long = "settlement-asset-entropy")]

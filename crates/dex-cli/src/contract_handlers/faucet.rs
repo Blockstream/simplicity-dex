@@ -17,7 +17,7 @@ pub fn create_asset(
     fee_utxo: OutPoint,
     fee_amount: u64,
     issue_amount: u64,
-    broadcast: bool,
+    is_offline: bool,
 ) -> crate::error::Result<()> {
     let store = Store::load()?;
 
@@ -52,11 +52,11 @@ pub fn create_asset(
     println!(
         "Test token asset entropy: '{asset_entropy}', asset_id: '{asset_id}', reissue_asset_id: '{reissuance_asset_id}'"
     );
-    if broadcast {
+    if is_offline {
+        println!("{}", tx.serialize().to_lower_hex_string());
+    } else {
         println!("Broadcasted txid: {}", broadcast_tx_inner(&tx)?);
         store.insert_value(asset_name, asset_entropy.as_bytes())?;
-    } else {
-        println!("{}", tx.serialize().to_lower_hex_string());
     }
     Ok(())
 }
@@ -68,7 +68,7 @@ pub fn mint_asset(
     fee_utxo: OutPoint,
     reissue_amount: u64,
     fee_amount: u64,
-    broadcast: bool,
+    is_offline: bool,
 ) -> crate::error::Result<()> {
     let store = Store::load()?;
 
@@ -103,10 +103,10 @@ pub fn mint_asset(
     .map_err(|err| crate::error::CliError::DcdManager(err.to_string()))?;
 
     println!("Minting asset: '{asset_id}', Reissue asset id: '{reissuance_asset_id}'");
-    if broadcast {
-        println!("Broadcasted txid: {}", broadcast_tx_inner(&tx)?);
-    } else {
+    if is_offline {
         println!("{}", tx.serialize().to_lower_hex_string());
+    } else {
+        println!("Broadcasted txid: {}", broadcast_tx_inner(&tx)?);
     }
     Ok(())
 }

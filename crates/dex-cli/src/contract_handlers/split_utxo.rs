@@ -12,7 +12,7 @@ pub fn handle(
     split_amount: u64,
     fee_utxo: OutPoint,
     fee_amount: u64,
-    broadcast: bool,
+    is_offline: bool,
 ) -> crate::error::Result<Txid> {
     let settings = Settings::load().map_err(|err| crate::error::CliError::EnvNotSet(err.to_string()))?;
     let keypair = secp256k1::Keypair::from_secret_key(
@@ -32,10 +32,10 @@ pub fn handle(
     )
     .map_err(|err| crate::error::CliError::DcdManager(err.to_string()))?;
 
-    if broadcast {
-        println!("Broadcasted txid: {}", broadcast_tx_inner(&transaction)?);
-    } else {
+    if is_offline {
         println!("{}", transaction.serialize().to_lower_hex_string());
+    } else {
+        println!("Broadcasted txid: {}", broadcast_tx_inner(&transaction)?);
     }
     Ok(transaction.txid())
 }
