@@ -1,7 +1,7 @@
 use crate::common::keys::derive_secret_key_from_index;
 use crate::common::settings::Settings;
 use crate::common::store::SledError;
-use crate::common::{DCDCliArguments, broadcast_tx_inner, vec_to_arr};
+use crate::common::{DCDCliArguments, broadcast_tx_inner};
 use elements::bitcoin::hex::DisplayHex;
 use elements::bitcoin::secp256k1;
 use simplicity::elements::OutPoint;
@@ -19,8 +19,6 @@ pub struct ProcessedArgs {
     keypair: secp256k1::Keypair,
     dcd_arguments: DCDArguments,
     dcd_taproot_pubkey_gen: String,
-    filler_token_utxo: OutPoint,
-    collateral_token_utxo: OutPoint,
     collateral_amount_to_deposit: u64,
 }
 
@@ -30,16 +28,18 @@ pub struct ArgsToSave {
     dcd_arguments: DCDArguments,
 }
 
+pub struct Utxos {
+    pub filler_token_utxo: OutPoint,
+    pub collateral_token_utxo: OutPoint,
+}
+
 #[instrument(level = "debug", skip_all, err)]
 pub fn process_args(
     account_index: u32,
     dcd_init_params: Option<DCDCliArguments>,
     dcd_taproot_pubkey_gen: impl AsRef<str>,
-    fee_utxos: Vec<OutPoint>,
     collateral_amount_to_deposit: u64,
 ) -> crate::error::Result<ProcessedArgs> {
-    const FEE_UTXOS_NEEDED: usize = 2;
-
     let settings = Settings::load().map_err(|err| crate::error::CliError::EnvNotSet(err.to_string()))?;
 
     let keypair = secp256k1::Keypair::from_secret_key(
@@ -47,7 +47,6 @@ pub fn process_args(
         &derive_secret_key_from_index(account_index, settings.clone()),
     );
 
-    let fee_utxos = vec_to_arr::<FEE_UTXOS_NEEDED, OutPoint>(fee_utxos)?;
     let taproot_pubkey_gen = dcd_taproot_pubkey_gen.as_ref().to_string();
 
     let dcd_arguments: DCDArguments = match dcd_init_params {
@@ -59,8 +58,6 @@ pub fn process_args(
         keypair,
         dcd_arguments,
         dcd_taproot_pubkey_gen: taproot_pubkey_gen,
-        filler_token_utxo: fee_utxos[0],
-        collateral_token_utxo: fee_utxos[1],
         collateral_amount_to_deposit,
     })
 }
@@ -71,10 +68,12 @@ pub fn handle(
         keypair,
         dcd_arguments,
         dcd_taproot_pubkey_gen,
-        filler_token_utxo,
-        collateral_token_utxo,
         collateral_amount_to_deposit,
     }: ProcessedArgs,
+    Utxos {
+        filler_token_utxo,
+        collateral_token_utxo,
+    }: Utxos,
     fee_amount: u64,
     broadcast: bool,
 ) -> crate::error::Result<(Txid, ArgsToSave)> {

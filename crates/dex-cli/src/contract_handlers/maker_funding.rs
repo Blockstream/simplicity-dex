@@ -1,7 +1,7 @@
 use crate::common::keys::derive_secret_key_from_index;
 use crate::common::settings::Settings;
 use crate::common::store::SledError;
-use crate::common::{DCDCliMakerFundArguments, broadcast_tx_inner, decode_hex, vec_to_arr};
+use crate::common::{DCDCliMakerFundArguments, broadcast_tx_inner, decode_hex};
 use dex_nostr_relay::relay_processor::OrderPlaceEventTags;
 use elements::bitcoin::hex::DisplayHex;
 use elements::bitcoin::secp256k1;
@@ -23,17 +23,24 @@ pub struct ProcessedArgs {
     keypair: secp256k1::Keypair,
     dcd_arguments: DCDArguments,
     dcd_taproot_pubkey_gen: String,
-    filler_token_info: (OutPoint, AssetEntropyHex),
-    grantor_collateral_token_info: (OutPoint, AssetEntropyHex),
-    grantor_settlement_token_info: (OutPoint, AssetEntropyHex),
-    settlement_asset_utxo: OutPoint,
-    fee_utxo: OutPoint,
+    filler_token_entropy: AssetEntropyHex,
+    grantor_collateral_token_entropy: AssetEntropyHex,
+    grantor_settlement_token_entropy: AssetEntropyHex,
 }
 
 #[derive(Debug)]
 pub struct ArgsToSave {
     taproot_pubkey_gen: TaprootPubkeyGen,
     dcd_arguments: DCDArguments,
+}
+
+#[derive(Debug)]
+pub struct Utxos {
+    pub filler_token: OutPoint,
+    pub grantor_collateral_token: OutPoint,
+    pub grantor_settlement_token: OutPoint,
+    pub settlement_asset: OutPoint,
+    pub fee: OutPoint,
 }
 
 impl ProcessedArgs {
@@ -49,9 +56,9 @@ impl ProcessedArgs {
             AssetId::from_entropy(filler_token_asset_entropy)
         };
 
-        let filler_asset_id = convert_entropy_to_asset_id(&self.filler_token_info.1);
-        let grantor_collateral_asset_id = convert_entropy_to_asset_id(&self.grantor_collateral_token_info.1);
-        let grantor_settlement_asset_id = convert_entropy_to_asset_id(&self.grantor_settlement_token_info.1);
+        let filler_asset_id = convert_entropy_to_asset_id(&self.filler_token_entropy);
+        let grantor_collateral_asset_id = convert_entropy_to_asset_id(&self.grantor_collateral_token_entropy);
+        let grantor_settlement_asset_id = convert_entropy_to_asset_id(&self.grantor_settlement_token_entropy);
         let settlement_asset_id = convert_entropy_to_asset_id(&self.dcd_arguments.settlement_asset_id_hex_le);
         let collateral_asset_id = COLLATERAL_ASSET_ID;
 
@@ -72,10 +79,7 @@ pub fn process_args(
     account_index: u32,
     dcd_init_params: Option<DCDCliMakerFundArguments>,
     dcd_taproot_pubkey_gen: impl AsRef<str>,
-    fee_utxos: Vec<OutPoint>,
 ) -> crate::error::Result<ProcessedArgs> {
-    const FEE_UTXOS_NEEDED: usize = 5;
-
     let settings = Settings::load().map_err(|err| crate::error::CliError::EnvNotSet(err.to_string()))?;
 
     let keypair = secp256k1::Keypair::from_secret_key(
@@ -83,27 +87,25 @@ pub fn process_args(
         &derive_secret_key_from_index(account_index, settings.clone()),
     );
 
-    let fee_utxos = vec_to_arr::<FEE_UTXOS_NEEDED, OutPoint>(fee_utxos)?;
     let taproot_pubkey_gen = dcd_taproot_pubkey_gen.as_ref().to_string();
 
     let args = match dcd_init_params {
         None => {
             let dcd_args = crate::common::store::store_utils::get_dcd_args(&taproot_pubkey_gen)?;
-            let filler_token_info = crate::common::store::store_utils::get_filler_token_entropy(&taproot_pubkey_gen)?;
-            let grantor_collateral_token_info =
+            let filler_token_entropy =
+                crate::common::store::store_utils::get_filler_token_entropy(&taproot_pubkey_gen)?;
+            let grantor_collateral_token_entropy =
                 crate::common::store::store_utils::get_grantor_collateral_token_entropy(&taproot_pubkey_gen)?;
-            let grantor_settlement_token_info =
+            let grantor_settlement_token_entropy =
                 crate::common::store::store_utils::get_grantor_settlement_token_entropy(&taproot_pubkey_gen)?;
 
             ProcessedArgs {
                 keypair,
                 dcd_arguments: dcd_args,
                 dcd_taproot_pubkey_gen: taproot_pubkey_gen,
-                filler_token_info: (fee_utxos[0], filler_token_info),
-                grantor_collateral_token_info: (fee_utxos[1], grantor_collateral_token_info),
-                grantor_settlement_token_info: (fee_utxos[2], grantor_settlement_token_info),
-                settlement_asset_utxo: fee_utxos[3],
-                fee_utxo: fee_utxos[4],
+                filler_token_entropy,
+                grantor_collateral_token_entropy,
+                grantor_settlement_token_entropy,
             }
         }
         Some(x) => {
@@ -112,11 +114,9 @@ pub fn process_args(
                 keypair,
                 dcd_arguments: dcd_args,
                 dcd_taproot_pubkey_gen: taproot_pubkey_gen,
-                filler_token_info: (fee_utxos[0], x.filler_asset_entropy.clone()),
-                grantor_collateral_token_info: (fee_utxos[1], x.grantor_collateral_asset_entropy.clone()),
-                grantor_settlement_token_info: (fee_utxos[2], x.grantor_settlement_asset_entropy.clone()),
-                settlement_asset_utxo: fee_utxos[3],
-                fee_utxo: fee_utxos[4],
+                filler_token_entropy: x.filler_asset_entropy,
+                grantor_collateral_token_entropy: x.grantor_collateral_asset_entropy,
+                grantor_settlement_token_entropy: x.settlement_asset_entropy,
             }
         }
     };
@@ -129,23 +129,28 @@ pub fn handle(
         keypair,
         dcd_arguments,
         dcd_taproot_pubkey_gen,
-        filler_token_info,
-        grantor_collateral_token_info,
-        grantor_settlement_token_info,
-        settlement_asset_utxo,
-        fee_utxo,
+        filler_token_entropy,
+        grantor_collateral_token_entropy,
+        grantor_settlement_token_entropy,
     }: ProcessedArgs,
+    Utxos {
+        filler_token: filler_token_utxo,
+        grantor_collateral_token: grantor_collateral_token_utxo,
+        grantor_settlement_token: grantor_settlement_token_utxo,
+        settlement_asset: settlement_asset_utxo,
+        fee: fee_utxo,
+    }: Utxos,
     fee_amount: u64,
     broadcast: bool,
 ) -> crate::error::Result<(Txid, ArgsToSave)> {
-    let filler_token_info = (filler_token_info.0, decode_hex(filler_token_info.1)?);
+    let filler_token_info = (filler_token_utxo, decode_hex(filler_token_entropy)?);
     let grantor_collateral_token_info = (
-        grantor_collateral_token_info.0,
-        decode_hex(grantor_collateral_token_info.1)?,
+        grantor_collateral_token_utxo,
+        decode_hex(grantor_collateral_token_entropy)?,
     );
     let grantor_settlement_token_info = (
-        grantor_settlement_token_info.0,
-        decode_hex(grantor_settlement_token_info.1)?,
+        grantor_settlement_token_utxo,
+        decode_hex(grantor_settlement_token_entropy)?,
     );
 
     let base_contract_context = BaseContractContext {

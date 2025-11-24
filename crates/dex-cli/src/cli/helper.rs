@@ -1,3 +1,4 @@
+use crate::cli::CommonOrderOptions;
 use clap::Subcommand;
 use simplicity::elements::OutPoint;
 
@@ -23,12 +24,8 @@ pub enum HelperCommands {
         /// Miner fee in satoshis (LBTC). A separate fee output is added.
         #[arg(long = "fee-sats", default_value_t = 500)]
         fee_amount: u64,
-        /// Account index to use for change address
-        #[arg(long = "account-index", default_value_t = 0)]
-        account_index: u32,
-        /// When set, broadcast the built transaction via Esplora and print txid
-        #[arg(long = "broadcast", default_value_t = true)]
-        broadcast: bool,
+        #[command(flatten)]
+        common_options: CommonOrderOptions,
     },
     #[command(about = "Reissue additional units of an already created test asset [testing only]")]
     MintTokens {
@@ -47,12 +44,8 @@ pub enum HelperCommands {
         /// Miner fee in satoshis (LBTC). A separate fee output is added.
         #[arg(long = "fee-sats", default_value_t = 500)]
         fee_amount: u64,
-        /// Account index to use for change address
-        #[arg(long = "account-index", default_value_t = 0)]
-        account_index: u32,
-        /// When set, broadcast the built transaction via Esplora and print txid
-        #[arg(long = "broadcast", default_value_t = true)]
-        broadcast: bool,
+        #[command(flatten)]
+        common_options: CommonOrderOptions,
     },
     #[command(about = "Split a single LBTC UTXO into three outputs of equal value [testing only]")]
     SplitNativeThree {
@@ -63,11 +56,7 @@ pub enum HelperCommands {
         fee_utxo: OutPoint,
         #[arg(long = "fee-amount", default_value_t = 500)]
         fee_amount: u64,
-        /// Account index to use for change address
-        #[arg(long = "account-index", default_value_t = 0)]
-        account_index: u32,
-        /// When set, broadcast the built transaction via Esplora and print txid
-        #[arg(long = "broadcast", default_value_t = true)]
-        broadcast: bool,
+        #[command(flatten)]
+        common_options: CommonOrderOptions,
     },
 }

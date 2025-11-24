@@ -9,7 +9,6 @@ use simplicityhl::elements::AssetId;
 use simplicityhl_core::broadcast_tx;
 use std::fmt::Debug;
 use std::{io::Write, path::PathBuf};
-use tracing::instrument;
 
 const DEFAULT_RELAYS_FILEPATH: &str = ".simplicity-dex/relays.txt";
 const DEFAULT_KEY_PATH: &str = ".simplicity-dex/keypair.txt";
@@ -56,24 +55,6 @@ pub(crate) fn broadcast_tx_inner(tx: &simplicityhl::elements::Transaction) -> cr
 pub(crate) fn decode_hex(str: impl AsRef<[u8]>) -> crate::error::Result<Vec<u8>> {
     let str_to_convert = str.as_ref();
     hex::decode(str_to_convert).map_err(|err| crate::error::CliError::FromHex(err, str_to_convert.to_hex()))
-}
-
-#[instrument(err)]
-pub(crate) fn vec_to_arr<const N: usize, T: Debug>(vec: Vec<T>) -> crate::error::Result<[T; N]> {
-    if vec.len() < N {
-        return Err(crate::error::CliError::InvalidElementsSize {
-            got: vec.len(),
-            expected: N,
-        });
-    }
-    let arr: [T; N] = vec
-        .into_iter()
-        .take(N)
-        .collect::<Vec<_>>()
-        .try_into()
-        .map_err(|e| crate::error::CliError::Custom(format!("Failed to remove elements from '{e:?}'")))?;
-
-    Ok(arr)
 }
 
 pub const PUBLIC_SECRET_KEY: [u8; 32] = [2; 32];

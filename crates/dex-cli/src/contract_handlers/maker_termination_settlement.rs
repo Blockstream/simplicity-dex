@@ -1,7 +1,7 @@
 use crate::common::keys::derive_secret_key_from_index;
 use crate::common::settings::Settings;
 use crate::common::store::SledError;
-use crate::common::{DCDCliArguments, broadcast_tx_inner, vec_to_arr};
+use crate::common::{DCDCliArguments, broadcast_tx_inner};
 use elements::bitcoin::hex::DisplayHex;
 use elements::bitcoin::secp256k1;
 use simplicity::elements::OutPoint;
@@ -19,9 +19,6 @@ pub struct ProcessedArgs {
     keypair: secp256k1::Keypair,
     dcd_arguments: DCDArguments,
     dcd_taproot_pubkey_gen: String,
-    fee_utxo: OutPoint,
-    settlement_asset_utxo: OutPoint,
-    grantor_settlement_token_utxo: OutPoint,
     grantor_settlement_amount_to_burn: u64,
 }
 
@@ -31,16 +28,20 @@ pub struct ArgsToSave {
     dcd_arguments: DCDArguments,
 }
 
+#[derive(Debug)]
+pub struct Utxos {
+    pub fee: OutPoint,
+    pub settlement_asset: OutPoint,
+    pub grantor_settlement_token: OutPoint,
+}
+
 #[instrument(level = "debug", skip_all, err)]
 pub fn process_args(
     account_index: u32,
     dcd_init_params: Option<DCDCliArguments>,
     dcd_taproot_pubkey_gen: impl AsRef<str>,
-    fee_utxos: Vec<OutPoint>,
     grantor_settlement_amount_to_burn: u64,
 ) -> crate::error::Result<ProcessedArgs> {
-    const FEE_UTXOS_NEEDED: usize = 3;
-
     let settings = Settings::load().map_err(|err| crate::error::CliError::EnvNotSet(err.to_string()))?;
 
     let keypair = secp256k1::Keypair::from_secret_key(
@@ -48,7 +49,6 @@ pub fn process_args(
         &derive_secret_key_from_index(account_index, settings.clone()),
     );
 
-    let fee_utxos = vec_to_arr::<FEE_UTXOS_NEEDED, OutPoint>(fee_utxos)?;
     let taproot_pubkey_gen = dcd_taproot_pubkey_gen.as_ref().to_string();
 
     let dcd_arguments: DCDArguments = match dcd_init_params {
@@ -60,9 +60,6 @@ pub fn process_args(
         keypair,
         dcd_arguments,
         dcd_taproot_pubkey_gen: taproot_pubkey_gen,
-        grantor_settlement_token_utxo: fee_utxos[0],
-        settlement_asset_utxo: fee_utxos[1],
-        fee_utxo: fee_utxos[2],
         grantor_settlement_amount_to_burn,
     })
 }
@@ -73,11 +70,13 @@ pub fn handle(
         keypair,
         dcd_arguments,
         dcd_taproot_pubkey_gen,
-        fee_utxo,
-        settlement_asset_utxo,
-        grantor_settlement_token_utxo,
         grantor_settlement_amount_to_burn,
     }: ProcessedArgs,
+    Utxos {
+        fee: fee_utxo,
+        settlement_asset: settlement_asset_utxo,
+        grantor_settlement_token: grantor_settlement_token_utxo,
+    }: Utxos,
     fee_amount: u64,
     broadcast: bool,
 ) -> crate::error::Result<(Txid, ArgsToSave)> {

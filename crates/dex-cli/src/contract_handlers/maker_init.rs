@@ -1,6 +1,6 @@
 use crate::common::keys::derive_secret_key_from_index;
 use crate::common::settings::Settings;
-use crate::common::{broadcast_tx_inner, entropy_to_asset_id, vec_to_arr};
+use crate::common::{broadcast_tx_inner, entropy_to_asset_id};
 use elements::bitcoin::hex::DisplayHex;
 use elements::bitcoin::secp256k1;
 use simplicity::elements::OutPoint;
@@ -37,7 +37,6 @@ pub struct InnerDcdInitParams {
 pub struct ProcessedArgs {
     keypair: secp256k1::Keypair,
     dcd_init_params: DcdInitParams,
-    input_lbtc_utxos: [OutPoint; 3],
 }
 
 pub struct ArgsToSave {
@@ -46,6 +45,13 @@ pub struct ArgsToSave {
     pub grantor_settlement_token_entropy: GrantorSettlementAssetEntropyHex,
     pub taproot_pubkey: TaprootPubkeyGen,
     pub dcd_args: DCDArguments,
+}
+
+#[derive(Debug)]
+pub struct Utxos {
+    pub first: OutPoint,
+    pub second: OutPoint,
+    pub third: OutPoint,
 }
 
 impl TryInto<DcdInitParams> for InnerDcdInitParams {
@@ -70,16 +76,8 @@ impl TryInto<DcdInitParams> for InnerDcdInitParams {
 }
 
 #[instrument(level = "debug", skip_all, err)]
-pub fn process_args(
-    account_index: u32,
-    dcd_init_params: InnerDcdInitParams,
-    fee_utxos: Vec<OutPoint>,
-) -> crate::error::Result<ProcessedArgs> {
-    const FEE_UTXOS_NEEDED: usize = 3;
-
+pub fn process_args(account_index: u32, dcd_init_params: InnerDcdInitParams) -> crate::error::Result<ProcessedArgs> {
     let settings = Settings::load().map_err(|err| crate::error::CliError::EnvNotSet(err.to_string()))?;
-
-    let fee_utxos = vec_to_arr::<FEE_UTXOS_NEEDED, OutPoint>(fee_utxos)?;
 
     let keypair = secp256k1::Keypair::from_secret_key(
         secp256k1::SECP256K1,
@@ -92,7 +90,6 @@ pub fn process_args(
     Ok(ProcessedArgs {
         keypair,
         dcd_init_params,
-        input_lbtc_utxos: fee_utxos,
     })
 }
 
@@ -101,8 +98,12 @@ pub fn handle(
     ProcessedArgs {
         keypair,
         dcd_init_params,
-        input_lbtc_utxos,
     }: ProcessedArgs,
+    Utxos {
+        first: first_lbtc_utxo,
+        second: second_lbtc_utxo,
+        third: third_lbtc_utxo,
+    }: Utxos,
     fee_amount: u64,
     broadcast: bool,
 ) -> crate::error::Result<(Txid, ArgsToSave)> {
@@ -119,7 +120,7 @@ pub fn handle(
             blinding_key: derive_public_blinder_key(),
         },
         MakerInitContext {
-            input_utxos: input_lbtc_utxos,
+            input_utxos: [first_lbtc_utxo, second_lbtc_utxo, third_lbtc_utxo],
             dcd_init_params,
             fee_amount,
         },

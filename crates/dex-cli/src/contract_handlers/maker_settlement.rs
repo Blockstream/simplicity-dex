@@ -1,7 +1,7 @@
 use crate::common::keys::derive_secret_key_from_index;
 use crate::common::settings::Settings;
 use crate::common::store::SledError;
-use crate::common::{DCDCliArguments, broadcast_tx_inner, vec_to_arr};
+use crate::common::{DCDCliArguments, broadcast_tx_inner};
 use elements::bitcoin::hex::DisplayHex;
 use elements::bitcoin::secp256k1;
 use simplicity::elements::OutPoint;
@@ -19,13 +19,17 @@ pub struct ProcessedArgs {
     keypair: secp256k1::Keypair,
     dcd_arguments: DCDArguments,
     dcd_taproot_pubkey_gen: String,
-    grantor_collateral_token_utxo: OutPoint,
-    grantor_settlement_token_utxo: OutPoint,
-    fee_utxo: OutPoint,
-    asset_utxo: OutPoint,
     price_at_current_block_height: u64,
     oracle_signature: String,
     grantor_amount_to_burn: u64,
+}
+
+#[derive(Debug)]
+pub struct Utxos {
+    pub grantor_collateral_token: OutPoint,
+    pub grantor_settlement_token: OutPoint,
+    pub fee: OutPoint,
+    pub asset: OutPoint,
 }
 
 #[instrument(level = "debug", skip_all, err)]
@@ -33,13 +37,10 @@ pub fn process_args(
     account_index: u32,
     dcd_init_params: Option<DCDCliArguments>,
     dcd_taproot_pubkey_gen: impl AsRef<str>,
-    fee_utxos: Vec<OutPoint>,
     price_at_current_block_height: u64,
     oracle_signature: String,
     grantor_amount_to_burn: u64,
 ) -> crate::error::Result<ProcessedArgs> {
-    const FEE_UTXOS_NEEDED: usize = 4;
-
     let taproot_pubkey_gen = dcd_taproot_pubkey_gen.as_ref();
 
     let settings = Settings::load().map_err(|err| crate::error::CliError::EnvNotSet(err.to_string()))?;
@@ -48,8 +49,6 @@ pub fn process_args(
         secp256k1::SECP256K1,
         &derive_secret_key_from_index(account_index, settings.clone()),
     );
-
-    let fee_utxos = vec_to_arr::<FEE_UTXOS_NEEDED, OutPoint>(fee_utxos)?;
 
     let dcd_arguments: DCDArguments = match dcd_init_params {
         None => crate::common::store::store_utils::get_dcd_args(&taproot_pubkey_gen)?,
@@ -60,10 +59,6 @@ pub fn process_args(
         keypair,
         dcd_arguments,
         dcd_taproot_pubkey_gen: dcd_taproot_pubkey_gen.as_ref().to_string(),
-        grantor_collateral_token_utxo: fee_utxos[0],
-        grantor_settlement_token_utxo: fee_utxos[1],
-        fee_utxo: fee_utxos[2],
-        asset_utxo: fee_utxos[3],
         price_at_current_block_height,
         oracle_signature,
         grantor_amount_to_burn,
@@ -81,14 +76,16 @@ pub fn handle(
         keypair,
         dcd_arguments,
         dcd_taproot_pubkey_gen,
-        grantor_collateral_token_utxo,
-        grantor_settlement_token_utxo,
-        fee_utxo,
-        asset_utxo,
         price_at_current_block_height,
         oracle_signature,
         grantor_amount_to_burn,
     }: ProcessedArgs,
+    Utxos {
+        grantor_collateral_token: grantor_collateral_token_utxo,
+        grantor_settlement_token: grantor_settlement_token_utxo,
+        fee: fee_utxo,
+        asset: asset_utxo,
+    }: Utxos,
     fee_amount: u64,
     broadcast: bool,
 ) -> crate::error::Result<(Txid, ArgsToSave)> {

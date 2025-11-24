@@ -1,3 +1,4 @@
+use crate::cli::processor::CommonOrderOptions;
 use crate::common::DCDCliArguments;
 use clap::Subcommand;
 use nostr::EventId;
@@ -9,9 +10,12 @@ pub enum TakerCommands {
         about = "Fund an existing DCD order as Taker and lock collateral into the contract [authentication required]"
     )]
     FundOrder {
-        /// UTXOs providing filler tokens, collateral, settlement asset, and fees (exactly 5 expected)
-        #[arg(long = "fee-utxos", value_delimiter = ',')]
-        fee_utxos: Vec<OutPoint>,
+        /// UTXO containing filler tokens provided by the Taker to fund the contract
+        #[arg(long = "filler-utxo")]
+        filler_token_utxo: OutPoint,
+        /// UTXO containing collateral asset that the Taker locks into the DCD contract
+        #[arg(long = "coll-utxo")]
+        collateral_token_utxo: OutPoint,
         /// Miner fee in satoshis (LBTC) for the Taker funding transaction
         #[arg(long = "fee-amount", default_value_t = 1500)]
         fee_amount: u64,
@@ -23,23 +27,25 @@ pub enum TakerCommands {
         dcd_taproot_pubkey_gen: String,
         #[command(flatten)]
         dcd_arguments: Option<DCDCliArguments>,
-        /// Account index used to derive internal/change addresses from the wallet
-        #[arg(long = "account-index", default_value_t = 0)]
-        account_index: u32,
-        /// When true, broadcast the built transaction via Esplora; otherwise only print it
-        #[arg(long = "broadcast", default_value_t = true)]
-        broadcast: bool,
         /// `EventId` of the Maker\'s original order event on Nostr
         #[arg(short = 'i', long)]
         maker_order_event_id: EventId,
+        #[command(flatten)]
+        common_options: CommonOrderOptions,
     },
     #[command(
         about = "Exit the DCD contract early as Taker by returning filler tokens in exchange for your collateral"
     )]
     TerminationEarly {
-        /// UTXOs providing filler tokens, collateral, settlement asset, and fees (exactly 5 expected)
-        #[arg(long = "fee-utxos", value_delimiter = ',')]
-        fee_utxos: Vec<OutPoint>,
+        /// UTXO containing filler tokens that the Taker returns to exit the contract early
+        #[arg(long = "filler-utxos")]
+        filler_token_utxo: OutPoint,
+        /// UTXO containing the collateral asset that the Taker will withdraw back
+        #[arg(long = "coll-utxo")]
+        collateral_token_utxo: OutPoint,
+        /// UTXO used to pay miner fees for the early-termination transaction
+        #[arg(long = "fee-utxo")]
+        fee_utxo: OutPoint,
         /// Miner fee in satoshis (LBTC) for the early-termination transaction
         #[arg(long = "fee-amount", default_value_t = 1500)]
         fee_amount: u64,
@@ -51,23 +57,25 @@ pub enum TakerCommands {
         dcd_taproot_pubkey_gen: String,
         #[command(flatten)]
         dcd_arguments: Option<DCDCliArguments>,
-        /// Account index used to derive internal/change addresses from the wallet
-        #[arg(long = "account-index", default_value_t = 0)]
-        account_index: u32,
-        /// When true, broadcast the built transaction via Esplora; otherwise only print it
-        #[arg(long = "broadcast", default_value_t = true)]
-        broadcast: bool,
         /// `EventId` of the Maker\'s original order event on Nostr
         #[arg(short = 'i', long)]
         maker_order_event_id: EventId,
+        #[command(flatten)]
+        common_options: CommonOrderOptions,
     },
     #[command(
         about = "Settle the Taker side of the DCD at maturity using an oracle price to choose collateral or settlement asset"
     )]
     Settlement {
-        /// UTXOs providing filler tokens, collateral, settlement asset, and fees (exactly 5 expected)
-        #[arg(long = "fee-utxos", value_delimiter = ',')]
-        fee_utxos: Vec<OutPoint>,
+        /// UTXO containing filler tokens that the Taker burns during settlement
+        #[arg(long = "filler-utxo")]
+        filler_token_utxo: OutPoint,
+        /// UTXO providing the asset (collateral or settlement) that the Taker receives at maturity
+        #[arg(long = "asset-utxo")]
+        asset_utxo: OutPoint,
+        /// UTXO used to pay miner fees for the final Taker settlement transaction
+        #[arg(long = "fee-utxo")]
+        fee_utxo: OutPoint,
         /// Miner fee in satoshis (LBTC) for the final Taker settlement transaction
         #[arg(long = "fee-amount", default_value_t = 1500)]
         fee_amount: u64,
@@ -85,14 +93,10 @@ pub enum TakerCommands {
         dcd_taproot_pubkey_gen: String,
         #[command(flatten)]
         dcd_arguments: Option<DCDCliArguments>,
-        /// Account index used to derive internal/change addresses from the wallet
-        #[arg(long = "account-index", default_value_t = 0)]
-        account_index: u32,
-        /// When true, broadcast the built transaction via Esplora; otherwise only print it
-        #[arg(long = "broadcast", default_value_t = true)]
-        broadcast: bool,
         /// `EventId` of the Maker\'s original order event on Nostr
         #[arg(short = 'i', long)]
         maker_order_event_id: EventId,
+        #[command(flatten)]
+        common_options: CommonOrderOptions,
     },
 }
