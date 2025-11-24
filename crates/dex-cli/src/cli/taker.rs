@@ -1,5 +1,4 @@
 use crate::cli::processor::CommonOrderOptions;
-use crate::common::DCDCliArguments;
 use clap::Subcommand;
 use nostr::EventId;
 use simplicity::elements::OutPoint;
@@ -22,11 +21,6 @@ pub enum TakerCommands {
         /// Amount of collateral (in satoshis) that the Taker will lock into the DCD contract
         #[arg(long = "coll-amount-deposit")]
         collateral_amount_to_deposit: u64,
-        /// Taproot internal pubkey (hex) used to derive the contract output address
-        #[arg(long = "taproot-pubkey-gen")]
-        dcd_taproot_pubkey_gen: String,
-        #[command(flatten)]
-        dcd_arguments: Option<DCDCliArguments>,
         /// `EventId` of the Maker\'s original order event on Nostr
         #[arg(short = 'i', long)]
         maker_order_event_id: EventId,
@@ -52,11 +46,6 @@ pub enum TakerCommands {
         /// Amount of filler tokens (in satoshis) that the Taker returns to exit early
         #[arg(long = "filler-to-return")]
         filler_token_amount_to_return: u64,
-        /// Taproot internal pubkey (hex) used to derive the contract output address
-        #[arg(long = "taproot-pubkey-gen")]
-        dcd_taproot_pubkey_gen: String,
-        #[command(flatten)]
-        dcd_arguments: Option<DCDCliArguments>,
         /// `EventId` of the Maker\'s original order event on Nostr
         #[arg(short = 'i', long)]
         maker_order_event_id: EventId,
@@ -88,11 +77,6 @@ pub enum TakerCommands {
         /// Schnorr/ecdsa signature produced by the oracle over the published price
         #[arg(long = "oracle-sign")]
         oracle_signature: String,
-        /// Taproot internal pubkey (hex) used to derive the contract output address
-        #[arg(long = "taproot-pubkey-gen")]
-        dcd_taproot_pubkey_gen: String,
-        #[command(flatten)]
-        dcd_arguments: Option<DCDCliArguments>,
         /// `EventId` of the Maker\'s original order event on Nostr
         #[arg(short = 'i', long)]
         maker_order_event_id: EventId,

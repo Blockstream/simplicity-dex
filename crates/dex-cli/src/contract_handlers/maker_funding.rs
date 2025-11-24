@@ -1,7 +1,7 @@
 use crate::common::keys::derive_secret_key_from_index;
 use crate::common::settings::Settings;
 use crate::common::store::SledError;
-use crate::common::{DCDCliMakerFundArguments, broadcast_tx_inner, decode_hex};
+use crate::common::{broadcast_tx_inner, decode_hex};
 use dex_nostr_relay::relay_processor::OrderPlaceEventTags;
 use elements::bitcoin::hex::DisplayHex;
 use elements::bitcoin::secp256k1;
@@ -77,7 +77,6 @@ impl ProcessedArgs {
 #[instrument(level = "debug", skip_all, err)]
 pub fn process_args(
     account_index: u32,
-    dcd_init_params: Option<DCDCliMakerFundArguments>,
     dcd_taproot_pubkey_gen: impl AsRef<str>,
 ) -> crate::error::Result<ProcessedArgs> {
     let settings = Settings::load().map_err(|err| crate::error::CliError::EnvNotSet(err.to_string()))?;
@@ -89,35 +88,21 @@ pub fn process_args(
 
     let taproot_pubkey_gen = dcd_taproot_pubkey_gen.as_ref().to_string();
 
-    let args = match dcd_init_params {
-        None => {
-            let dcd_args = crate::common::store::store_utils::get_dcd_args(&taproot_pubkey_gen)?;
-            let filler_token_entropy =
-                crate::common::store::store_utils::get_filler_token_entropy(&taproot_pubkey_gen)?;
-            let grantor_collateral_token_entropy =
-                crate::common::store::store_utils::get_grantor_collateral_token_entropy(&taproot_pubkey_gen)?;
-            let grantor_settlement_token_entropy =
-                crate::common::store::store_utils::get_grantor_settlement_token_entropy(&taproot_pubkey_gen)?;
+    let args = {
+        let dcd_args = crate::common::store::utils::get_dcd_args(&taproot_pubkey_gen)?;
+        let filler_token_entropy = crate::common::store::utils::get_filler_token_entropy(&taproot_pubkey_gen)?;
+        let grantor_collateral_token_entropy =
+            crate::common::store::utils::get_grantor_collateral_token_entropy(&taproot_pubkey_gen)?;
+        let grantor_settlement_token_entropy =
+            crate::common::store::utils::get_grantor_settlement_token_entropy(&taproot_pubkey_gen)?;
 
-            ProcessedArgs {
-                keypair,
-                dcd_arguments: dcd_args,
-                dcd_taproot_pubkey_gen: taproot_pubkey_gen,
-                filler_token_entropy,
-                grantor_collateral_token_entropy,
-                grantor_settlement_token_entropy,
-            }
-        }
-        Some(x) => {
-            let dcd_args = x.convert_to_dcd_arguments()?;
-            ProcessedArgs {
-                keypair,
-                dcd_arguments: dcd_args,
-                dcd_taproot_pubkey_gen: taproot_pubkey_gen,
-                filler_token_entropy: x.filler_asset_entropy,
-                grantor_collateral_token_entropy: x.grantor_collateral_asset_entropy,
-                grantor_settlement_token_entropy: x.settlement_asset_entropy,
-            }
+        ProcessedArgs {
+            keypair,
+            dcd_arguments: dcd_args,
+            dcd_taproot_pubkey_gen: taproot_pubkey_gen,
+            filler_token_entropy,
+            grantor_collateral_token_entropy,
+            grantor_settlement_token_entropy,
         }
     };
     Ok(args)
@@ -209,6 +194,6 @@ pub fn save_args_to_cache(
         dcd_arguments,
     }: &ArgsToSave,
 ) -> crate::error::Result<()> {
-    crate::common::store::store_utils::save_dcd_args(taproot_pubkey_gen, dcd_arguments)?;
+    crate::common::store::utils::save_dcd_args(taproot_pubkey_gen, dcd_arguments)?;
     Ok(())
 }

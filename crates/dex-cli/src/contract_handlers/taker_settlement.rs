@@ -1,9 +1,13 @@
+use crate::common::broadcast_tx_inner;
 use crate::common::keys::derive_secret_key_from_index;
 use crate::common::settings::Settings;
 use crate::common::store::SledError;
-use crate::common::{DCDCliArguments, broadcast_tx_inner};
+use crate::common::store::utils::OrderParams;
+use crate::contract_handlers::common::get_order_params;
+use dex_nostr_relay::relay_processor::RelayProcessor;
 use elements::bitcoin::hex::DisplayHex;
 use elements::bitcoin::secp256k1;
+use nostr::EventId;
 use simplicity::elements::OutPoint;
 use simplicity::elements::pset::serialize::Serialize;
 use simplicity_contracts::DCDArguments;
@@ -38,13 +42,13 @@ pub struct Utxos {
 }
 
 #[instrument(level = "debug", skip_all, err)]
-pub fn process_args(
+pub async fn process_args(
     account_index: u32,
-    dcd_init_params: Option<DCDCliArguments>,
-    dcd_taproot_pubkey_gen: impl AsRef<str>,
     price_at_current_block_height: u64,
     filler_amount_to_burn: u64,
     oracle_signature: String,
+    maker_order_event_id: EventId,
+    relay_processor: &RelayProcessor,
 ) -> crate::error::Result<ProcessedArgs> {
     let settings = Settings::load().map_err(|err| crate::error::CliError::EnvNotSet(err.to_string()))?;
 
@@ -53,17 +57,12 @@ pub fn process_args(
         &derive_secret_key_from_index(account_index, settings.clone()),
     );
 
-    let taproot_pubkey_gen = dcd_taproot_pubkey_gen.as_ref().to_string();
-
-    let dcd_arguments: DCDArguments = match dcd_init_params {
-        None => crate::common::store::store_utils::get_dcd_args(&taproot_pubkey_gen)?,
-        Some(x) => x.convert_to_dcd_arguments()?,
-    };
+    let order_params: OrderParams = get_order_params(maker_order_event_id, relay_processor).await?;
 
     Ok(ProcessedArgs {
         keypair,
-        dcd_arguments,
-        dcd_taproot_pubkey_gen: taproot_pubkey_gen,
+        dcd_arguments: order_params.dcd_args,
+        dcd_taproot_pubkey_gen: order_params.taproot_pubkey_gen,
         price_at_current_block_height,
         filler_amount_to_burn,
         oracle_signature,
@@ -142,6 +141,6 @@ pub fn save_args_to_cache(
         dcd_arguments,
     }: &ArgsToSave,
 ) -> crate::error::Result<()> {
-    crate::common::store::store_utils::save_dcd_args(taproot_pubkey_gen, dcd_arguments)?;
+    crate::common::store::utils::save_dcd_args(taproot_pubkey_gen, dcd_arguments)?;
     Ok(())
 }

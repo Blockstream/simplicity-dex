@@ -1,5 +1,5 @@
 use crate::cli::CommonOrderOptions;
-use crate::common::{DCDCliArguments, DCDCliMakerFundArguments, InitOrderArgs};
+use crate::common::InitOrderArgs;
 use clap::Subcommand;
 use nostr::EventId;
 use simplicity::elements::OutPoint;
@@ -56,8 +56,6 @@ pub enum MakerCommands {
         #[arg(long = "taproot-pubkey-gen")]
         dcd_taproot_pubkey_gen: String,
         #[command(flatten)]
-        dcd_arguments: Option<DCDCliMakerFundArguments>,
-        #[command(flatten)]
         common_options: CommonOrderOptions,
     },
     #[command(
@@ -76,14 +74,9 @@ pub enum MakerCommands {
         /// Miner fee in satoshis (LBTC) for the early-termination collateral transaction
         #[arg(long = "fee-amount", default_value_t = 1500)]
         fee_amount: u64,
-        /// Taproot internal pubkey (hex) used to derive the contract output address
-        #[arg(long = "taproot-pubkey-gen")]
-        dcd_taproot_pubkey_gen: String,
         /// Amount of grantor collateral tokens (in satoshis) to burn for early termination
         #[arg(long = "grantor-coll-burn")]
         grantor_collateral_amount_to_burn: u64,
-        #[command(flatten)]
-        dcd_arguments: Option<DCDCliArguments>,
         /// `EventId` of the Maker\'s original order event on Nostr
         #[arg(short = 'i', long)]
         maker_order_event_id: EventId,
@@ -109,11 +102,6 @@ pub enum MakerCommands {
         /// Amount of grantor settlement tokens (in satoshis) to burn for early termination
         #[arg(long = "grantor-settl-burn")]
         grantor_settlement_amount_to_burn: u64,
-        /// Taproot internal pubkey (hex) used to derive the contract output address
-        #[arg(long = "taproot-pubkey-gen")]
-        dcd_taproot_pubkey_gen: String,
-        #[command(flatten)]
-        dcd_arguments: Option<DCDCliArguments>,
         /// `EventId` of the Maker\'s original order event on Nostr
         #[arg(short = 'i', long)]
         maker_order_event_id: EventId,
@@ -148,11 +136,6 @@ pub enum MakerCommands {
         /// Amount of grantor tokens (in satoshis) to burn during settlement
         #[arg(long = "grantor-amount-burn")]
         grantor_amount_to_burn: u64,
-        /// Taproot internal pubkey (hex) used to derive the contract output address
-        #[arg(long = "taproot-pubkey-gen")]
-        dcd_taproot_pubkey_gen: String,
-        #[command(flatten)]
-        dcd_arguments: Option<DCDCliArguments>,
         /// `EventId` of the Maker\'s original order event on Nostr
         #[arg(short = 'i', long)]
         maker_order_event_id: EventId,

@@ -162,15 +162,15 @@ pub fn save_args_to_cache(
         dcd_args,
     }: &ArgsToSave,
 ) -> crate::error::Result<()> {
-    crate::common::store::store_utils::save_filler_token_entropy(taproot_pubkey, filler_token_entropy)?;
-    crate::common::store::store_utils::save_grantor_collateral_token_entropy(
+    crate::common::store::utils::save_filler_token_entropy(taproot_pubkey, filler_token_entropy)?;
+    crate::common::store::utils::save_grantor_collateral_token_entropy(
         taproot_pubkey,
         grantor_collateral_token_entropy,
     )?;
-    crate::common::store::store_utils::save_grantor_settlement_token_entropy(
+    crate::common::store::utils::save_grantor_settlement_token_entropy(
         taproot_pubkey,
         grantor_settlement_token_entropy,
     )?;
-    crate::common::store::store_utils::save_dcd_args(taproot_pubkey, dcd_args)?;
+    crate::common::store::utils::save_dcd_args(taproot_pubkey, dcd_args)?;
     Ok(())
 }

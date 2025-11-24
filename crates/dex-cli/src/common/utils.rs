@@ -7,45 +7,14 @@ use simplicity::bitcoin::secp256k1;
 use simplicity::bitcoin::secp256k1::SecretKey;
 use simplicityhl::elements::AssetId;
 use simplicityhl_core::broadcast_tx;
-use std::fmt::Debug;
-use std::{io::Write, path::PathBuf};
+use std::{io::Write};
 
-const DEFAULT_RELAYS_FILEPATH: &str = ".simplicity-dex/relays.txt";
-const DEFAULT_KEY_PATH: &str = ".simplicity-dex/keypair.txt";
 pub const DEFAULT_CLIENT_TIMEOUT_SECS: u64 = 10;
 
 pub(crate) fn write_into_stdout<T: AsRef<str> + std::fmt::Debug>(text: T) -> std::io::Result<usize> {
     let mut output = text.as_ref().to_string();
     output.push('\n');
     std::io::stdout().write(output.as_bytes())
-}
-
-#[must_use]
-pub fn default_key_path() -> PathBuf {
-    dirs::home_dir()
-        .unwrap_or_else(|| PathBuf::from("."))
-        .join(DEFAULT_KEY_PATH)
-}
-
-#[must_use]
-pub fn default_relays_path() -> PathBuf {
-    dirs::home_dir()
-        .unwrap_or_else(|| PathBuf::from("."))
-        .join(DEFAULT_RELAYS_FILEPATH)
-}
-
-#[derive(Debug, thiserror::Error)]
-pub enum FileError {
-    #[error("Unable to parse url: {1}, error: {0}")]
-    UrlParseError(nostr::types::url::Error, String),
-    #[error("Got error on reading/writing to file: {1}, error: {0}")]
-    ProblemWithFile(std::io::Error, PathBuf),
-    #[error("Incorrect path to the file, please check validity of the path (err: path is not a file), got path: {0}")]
-    IncorrectPathToFile(PathBuf),
-    #[error("File is empty, got path: {0}")]
-    EmptyFile(PathBuf),
-    #[error("File is empty, got path: {0}")]
-    KeyParseError(nostr::key::Error, String),
 }
 
 pub(crate) fn broadcast_tx_inner(tx: &simplicityhl::elements::Transaction) -> crate::error::Result<String> {

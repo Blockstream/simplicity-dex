@@ -80,30 +80,36 @@ impl Store {
         Err(SledError::ArgumentNotFound)
     }
 
-    pub fn get_arguments<A>(&self, taproot_pubkey_gen: &str) -> Result<A>
+    pub fn get_arguments<A>(&self, key: impl AsRef<[u8]>) -> Result<A>
     where
         A: Encodable + simplicityhl_core::encoding::Decode<()>,
     {
-        if let Some(value) = self.store.get(taproot_pubkey_gen)? {
+        if let Some(value) = self.store.get(key)? {
             return Encodable::decode(&value).map_err(|err| SledError::Encode(err.to_string()));
         }
         Err(SledError::ArgumentNotFound)
     }
-    pub fn get_arguments_raw(&self, taproot_pubkey_gen: &str) -> Result<IVec> {
-        self.store
-            .get(taproot_pubkey_gen)?
-            .ok_or_else(|| SledError::ArgumentNotFound)
+
+    pub fn get_arguments_raw(&self, key: impl AsRef<[u8]>) -> Result<IVec> {
+        self.store.get(key)?.ok_or_else(|| SledError::ArgumentNotFound)
     }
 }
 
-pub mod store_utils {
+pub mod utils {
     use crate::common::store::Store;
+    use nostr::EventId;
     use simplicity_contracts::DCDArguments;
     use simplicityhl_core::{AssetEntropyHex, Encodable};
 
     const FILLER_TOKEN_ENTROPY_STORE_NAME: &str = "filler_token_entropy";
     const GRANTOR_COLLATERAL_TOKEN_ENTROPY_STORE_NAME: &str = "grantor_collateral_token_entropy";
     const GRANTOR_SETTLEMENT_TOKEN_ENTROPY_STORE_NAME: &str = "grantor_settlement_token_entropy";
+
+    #[derive(Debug, bincode::Encode, bincode::Decode)]
+    pub struct OrderParams {
+        pub taproot_pubkey_gen: String,
+        pub dcd_args: DCDArguments,
+    }
 
     pub fn save_dcd_args(taproot_pubkey: &impl ToString, dcd_args: &DCDArguments) -> crate::error::Result<()> {
         let store = Store::load()?;
@@ -113,7 +119,7 @@ pub mod store_utils {
 
     pub fn get_dcd_args(taproot_pubkey: &impl ToString) -> crate::error::Result<DCDArguments> {
         let store = Store::load()?;
-        let dcd_args: DCDArguments = store.get_arguments(&taproot_pubkey.to_string())?;
+        let dcd_args: DCDArguments = store.get_arguments(taproot_pubkey.to_string())?;
         Ok(dcd_args)
     }
 
@@ -132,7 +138,7 @@ pub mod store_utils {
 
     pub fn get_filler_token_entropy(taproot_pubkey: &impl ToString) -> crate::error::Result<AssetEntropyHex> {
         let store = Store::load()?;
-        let bytes = store.get_arguments_raw(&get_filler_entropy_key(taproot_pubkey))?;
+        let bytes = store.get_arguments_raw(get_filler_entropy_key(taproot_pubkey))?;
         let x = String::from_utf8(bytes.to_vec()).map_err(|err| {
             crate::error::CliError::Cache(format!(
                 "Failed to obtain cached value for 'filler_token_entropy', err: {err}"
@@ -164,7 +170,7 @@ pub mod store_utils {
         taproot_pubkey: &impl ToString,
     ) -> crate::error::Result<AssetEntropyHex> {
         let store = Store::load()?;
-        let bytes = store.get_arguments_raw(&get_grantor_collateral_token_entropy_key(taproot_pubkey))?;
+        let bytes = store.get_arguments_raw(get_grantor_collateral_token_entropy_key(taproot_pubkey))?;
         let x = String::from_utf8(bytes.to_vec()).map_err(|err| {
             crate::error::CliError::Cache(format!(
                 "Failed to obtain cached value for 'filler_token_entropy', err: {err}"
@@ -196,13 +202,42 @@ pub mod store_utils {
         taproot_pubkey: &impl ToString,
     ) -> crate::error::Result<AssetEntropyHex> {
         let store = Store::load()?;
-        let bytes = store.get_arguments_raw(&get_grantor_settlement_token_entropy_key(taproot_pubkey))?;
+        let bytes = store.get_arguments_raw(get_grantor_settlement_token_entropy_key(taproot_pubkey))?;
         let x = String::from_utf8(bytes.to_vec()).map_err(|err| {
             crate::error::CliError::Cache(format!(
                 "Failed to obtain cached value for 'filler_token_entropy', err: {err}"
             ))
         })?;
         Ok(x)
+    }
+
+    pub fn save_order_params_by_event_id(
+        event_id: EventId,
+        taproot_pubkey: &impl ToString,
+        asset_entropy: DCDArguments,
+    ) -> crate::error::Result<()> {
+        let bytes = bincode::encode_to_vec(
+            OrderParams {
+                taproot_pubkey_gen: taproot_pubkey.to_string(),
+                dcd_args: asset_entropy,
+            },
+            bincode::config::standard(),
+        )
+        .unwrap();
+        let store = Store::load()?;
+        store.insert_value(event_id, bytes)?;
+        Ok(())
+    }
+
+    pub fn get_order_params_by_event_id(event_id: EventId) -> crate::error::Result<OrderParams> {
+        let store = Store::load()?;
+        let bytes = store.get_arguments_raw(event_id)?.to_vec();
+        let decoded: OrderParams = bincode::decode_from_slice(&bytes, bincode::config::standard())
+            .map_err(|err| {
+                crate::error::CliError::Cache(format!("Failed to obtain order params by event id, err: {err}"))
+            })?
+            .0;
+        Ok(decoded)
     }
 }
 

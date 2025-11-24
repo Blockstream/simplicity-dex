@@ -1,4 +1,5 @@
 pub(crate) mod address;
+pub(crate) mod common;
 pub(crate) mod faucet;
 pub(crate) mod maker_funding;
 pub(crate) mod maker_init;

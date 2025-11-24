@@ -1,9 +1,7 @@
 use crate::cli::helper::HelperCommands;
 use crate::cli::{DexCommands, MakerCommands, TakerCommands};
 use crate::common::config::AggregatedConfig;
-use crate::common::{
-    DCDCliArguments, DCDCliMakerFundArguments, DEFAULT_CLIENT_TIMEOUT_SECS, InitOrderArgs, write_into_stdout,
-};
+use crate::common::{DEFAULT_CLIENT_TIMEOUT_SECS, InitOrderArgs, write_into_stdout};
 use crate::contract_handlers;
 use clap::{Parser, Subcommand};
 use dex_nostr_relay::relay_client::ClientConfig;
@@ -93,8 +91,6 @@ struct MakerSettlementCliContext {
     price_at_current_block_height: u64,
     oracle_signature: String,
     grantor_amount_to_burn: u64,
-    dcd_taproot_pubkey_gen: String,
-    dcd_arguments: Option<DCDCliArguments>,
     maker_order_event_id: EventId,
 }
 
@@ -104,8 +100,6 @@ struct MakerSettlementTerminationCliContext {
     grantor_settlement_token_utxo: OutPoint,
     fee_amount: u64,
     grantor_settlement_amount_to_burn: u64,
-    dcd_taproot_pubkey_gen: String,
-    dcd_arguments: Option<DCDCliArguments>,
     maker_order_event_id: EventId,
 }
 
@@ -114,9 +108,7 @@ struct MakerCollateralTerminationCliContext {
     fee_utxo: OutPoint,
     collateral_token_utxo: OutPoint,
     fee_amount: u64,
-    dcd_taproot_pubkey_gen: String,
     grantor_collateral_amount_to_burn: u64,
-    dcd_arguments: Option<DCDCliArguments>,
     maker_order_event_id: EventId,
 }
 
@@ -128,7 +120,6 @@ struct MakerFundCliContext {
     fee_utxo: OutPoint,
     fee_amount: u64,
     dcd_taproot_pubkey_gen: String,
-    dcd_arguments: Option<DCDCliMakerFundArguments>,
 }
 
 struct MakerInitCliContext {
@@ -239,7 +230,6 @@ impl Cli {
                 fee_utxo,
                 fee_amount,
                 dcd_taproot_pubkey_gen,
-                dcd_arguments,
                 common_options,
             } => {
                 Self::_process_maker_fund(
@@ -252,7 +242,6 @@ impl Cli {
                         fee_utxo,
                         fee_amount,
                         dcd_taproot_pubkey_gen,
-                        dcd_arguments,
                     },
                     common_options,
                 )
@@ -263,9 +252,7 @@ impl Cli {
                 fee_utxo,
                 collateral_token_utxo,
                 fee_amount,
-                dcd_taproot_pubkey_gen,
                 grantor_collateral_amount_to_burn,
-                dcd_arguments,
                 maker_order_event_id,
                 common_options,
             } => {
@@ -276,9 +263,7 @@ impl Cli {
                         fee_utxo,
                         collateral_token_utxo,
                         fee_amount,
-                        dcd_taproot_pubkey_gen,
                         grantor_collateral_amount_to_burn,
-                        dcd_arguments,
                         maker_order_event_id,
                     },
                     common_options,
@@ -291,8 +276,6 @@ impl Cli {
                 grantor_settlement_token_utxo,
                 fee_amount,
                 grantor_settlement_amount_to_burn,
-                dcd_taproot_pubkey_gen,
-                dcd_arguments,
                 maker_order_event_id,
                 common_options,
             } => {
@@ -304,8 +287,6 @@ impl Cli {
                         grantor_settlement_token_utxo,
                         fee_amount,
                         grantor_settlement_amount_to_burn,
-                        dcd_taproot_pubkey_gen,
-                        dcd_arguments,
                         maker_order_event_id,
                     },
                     common_options,
@@ -321,8 +302,6 @@ impl Cli {
                 price_at_current_block_height,
                 oracle_signature,
                 grantor_amount_to_burn,
-                dcd_taproot_pubkey_gen,
-                dcd_arguments,
                 maker_order_event_id,
                 common_options,
             } => {
@@ -337,8 +316,6 @@ impl Cli {
                         price_at_current_block_height,
                         oracle_signature,
                         grantor_amount_to_burn,
-                        dcd_taproot_pubkey_gen,
-                        dcd_arguments,
                         maker_order_event_id,
                     },
                     common_options,
@@ -391,7 +368,6 @@ impl Cli {
             fee_utxo,
             fee_amount,
             dcd_taproot_pubkey_gen,
-            dcd_arguments,
         }: MakerFundCliContext,
         CommonOrderOptions {
             account_index,
@@ -401,7 +377,8 @@ impl Cli {
         use contract_handlers::maker_funding::{Utxos, handle, process_args, save_args_to_cache};
 
         agg_config.check_nostr_keypair_existence()?;
-        let processed_args = process_args(account_index, dcd_arguments, dcd_taproot_pubkey_gen)?;
+
+        let processed_args = process_args(account_index, dcd_taproot_pubkey_gen)?;
         let event_to_publish = processed_args.extract_event();
         let (tx_id, args_to_save) = handle(
             processed_args,
@@ -430,9 +407,7 @@ impl Cli {
             fee_utxo,
             collateral_token_utxo,
             fee_amount,
-            dcd_taproot_pubkey_gen,
             grantor_collateral_amount_to_burn,
-            dcd_arguments,
             maker_order_event_id,
         }: MakerCollateralTerminationCliContext,
         CommonOrderOptions {
@@ -445,10 +420,11 @@ impl Cli {
         agg_config.check_nostr_keypair_existence()?;
         let processed_args = contract_handlers::maker_termination_collateral::process_args(
             account_index,
-            dcd_arguments,
-            dcd_taproot_pubkey_gen,
             grantor_collateral_amount_to_burn,
-        )?;
+            maker_order_event_id,
+            relay_processor,
+        )
+        .await?;
         let (tx_id, args_to_save) = handle(
             processed_args,
             Utxos {
@@ -479,8 +455,6 @@ impl Cli {
             grantor_settlement_token_utxo,
             fee_amount,
             grantor_settlement_amount_to_burn,
-            dcd_taproot_pubkey_gen,
-            dcd_arguments,
             maker_order_event_id,
         }: MakerSettlementTerminationCliContext,
         CommonOrderOptions {
@@ -493,10 +467,11 @@ impl Cli {
         agg_config.check_nostr_keypair_existence()?;
         let processed_args = contract_handlers::maker_termination_settlement::process_args(
             account_index,
-            dcd_arguments,
-            dcd_taproot_pubkey_gen,
             grantor_settlement_amount_to_burn,
-        )?;
+            maker_order_event_id,
+            relay_processor,
+        )
+        .await?;
         let (tx_id, args_to_save) = handle(
             processed_args,
             Utxos {
@@ -531,8 +506,6 @@ impl Cli {
             price_at_current_block_height,
             oracle_signature,
             grantor_amount_to_burn,
-            dcd_taproot_pubkey_gen,
-            dcd_arguments,
             maker_order_event_id,
         }: MakerSettlementCliContext,
         CommonOrderOptions {
@@ -545,12 +518,13 @@ impl Cli {
         agg_config.check_nostr_keypair_existence()?;
         let processed_args = process_args(
             account_index,
-            dcd_arguments,
-            dcd_taproot_pubkey_gen,
             price_at_current_block_height,
             oracle_signature,
             grantor_amount_to_burn,
-        )?;
+            maker_order_event_id,
+            relay_processor,
+        )
+        .await?;
         let (tx_id, args_to_save) = handle(
             processed_args,
             Utxos {
@@ -585,20 +559,19 @@ impl Cli {
                 collateral_token_utxo,
                 fee_amount,
                 collateral_amount_to_deposit,
-                dcd_taproot_pubkey_gen,
-                dcd_arguments,
                 common_options,
-                maker_order_event_id: maker_event_id,
+                maker_order_event_id,
             } => {
                 use contract_handlers::taker_funding::{Utxos, handle, process_args, save_args_to_cache};
 
                 agg_config.check_nostr_keypair_existence()?;
                 let processed_args = process_args(
                     common_options.account_index,
-                    dcd_arguments,
-                    dcd_taproot_pubkey_gen,
                     collateral_amount_to_deposit,
-                )?;
+                    maker_order_event_id,
+                    relay_processor,
+                )
+                .await?;
                 let (tx_id, args_to_save) = handle(
                     processed_args,
                     Utxos {
@@ -609,7 +582,7 @@ impl Cli {
                     common_options.is_offline,
                 )?;
                 let reply_event_id = relay_processor
-                    .reply_order(maker_event_id, ReplyOption::TakerFund { tx_id })
+                    .reply_order(maker_order_event_id, ReplyOption::TakerFund { tx_id })
                     .await?;
                 save_args_to_cache(&args_to_save)?;
                 format!("[Taker] Tx fund sending result: {tx_id:?}, reply event id: {reply_event_id}")
@@ -620,8 +593,6 @@ impl Cli {
                 fee_utxo,
                 fee_amount,
                 filler_token_amount_to_return,
-                dcd_taproot_pubkey_gen,
-                dcd_arguments,
                 common_options,
                 maker_order_event_id,
             } => {
@@ -630,10 +601,11 @@ impl Cli {
                 agg_config.check_nostr_keypair_existence()?;
                 let processed_args = process_args(
                     common_options.account_index,
-                    dcd_arguments,
-                    dcd_taproot_pubkey_gen,
                     filler_token_amount_to_return,
-                )?;
+                    maker_order_event_id,
+                    relay_processor,
+                )
+                .await?;
                 let (tx_id, args_to_save) = handle(
                     processed_args,
                     Utxos {
@@ -658,8 +630,6 @@ impl Cli {
                 price_at_current_block_height,
                 filler_amount_to_burn,
                 oracle_signature,
-                dcd_taproot_pubkey_gen,
-                dcd_arguments,
                 common_options,
                 maker_order_event_id,
             } => {
@@ -668,12 +638,13 @@ impl Cli {
                 agg_config.check_nostr_keypair_existence()?;
                 let processed_args = process_args(
                     common_options.account_index,
-                    dcd_arguments,
-                    dcd_taproot_pubkey_gen,
                     price_at_current_block_height,
                     filler_amount_to_burn,
                     oracle_signature,
-                )?;
+                    maker_order_event_id,
+                    relay_processor,
+                )
+                .await?;
                 let (tx_id, args_to_save) = handle(
                     processed_args,
                     Utxos {
@@ -795,7 +766,7 @@ impl Cli {
             }
             DexCommands::ImportParams { event_id } => {
                 let res = relay_processor.get_order_by_id(event_id).await?;
-                crate::common::store::store_utils::save_dcd_args(&res.dcd_taproot_pubkey_gen, &res.dcd_arguments)?;
+                crate::common::store::utils::save_dcd_args(&res.dcd_taproot_pubkey_gen, &res.dcd_arguments)?;
                 format!("Order {event_id}: {res}")
             }
         })
