@@ -4,13 +4,13 @@ mod tests {
     use crate::utils::{DEFAULT_CLIENT_TIMEOUT, DEFAULT_RELAY_LIST, TEST_LOGGER};
     use std::str::FromStr;
 
-    use std::time::Duration;
     use bincode::error::IntegerType::U64;
     use dex_nostr_relay::relay_client::ClientConfig;
     use dex_nostr_relay::relay_processor::{ListOrdersEventFilter, OrderPlaceEventTags, RelayProcessor};
     use dex_nostr_relay::types::{CustomKind, MakerOrderKind, ReplyOption, TakerOrderKind};
     use nostr::{Keys, ToBech32};
     use simplicityhl::elements::Txid;
+    use std::time::Duration;
 
     use tracing::{info, instrument};
 

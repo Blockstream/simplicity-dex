@@ -7,7 +7,7 @@ use simplicity::bitcoin::secp256k1;
 use simplicity::bitcoin::secp256k1::SecretKey;
 use simplicityhl::elements::AssetId;
 use simplicityhl_core::broadcast_tx;
-use std::{io::Write};
+use std::io::Write;
 
 pub const DEFAULT_CLIENT_TIMEOUT_SECS: u64 = 10;
 
@@ -48,4 +48,9 @@ pub(crate) fn entropy_to_asset_id(el: impl AsRef<[u8]>) -> crate::error::Result<
     asset_entropy_bytes.reverse();
     let midstate = sha256::Midstate::from_byte_array(asset_entropy_bytes);
     Ok(AssetId::from_entropy(midstate))
+}
+
+pub fn validate_hex(s: &str) -> Result<String, String> {
+    hex::decode(s).map_err(|err| crate::error::CliError::FromHex(err, s.to_string()).to_string())?;
+    Ok(s.to_string())
 }

@@ -13,13 +13,30 @@ use crate::error::CliError;
 use tracing::instrument;
 
 /// `MAKER_EXPIRATION_TIME` = 31 days
-pub const MAKER_EXPIRATION_TIME: u64 = 2_678_400;
+const MAKER_EXPIRATION_TIME: u64 = 2_678_400;
+
+pub struct Seed(pub SeedInner);
+pub type SeedInner = [u8; 32];
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(try_from = "String")]
+pub struct SeedHex {
+    pub seed_hex: String,
+}
+
+impl TryFrom<String> for SeedHex {
+    type Error = String;
+    fn try_from(s: String) -> Result<Self, Self::Error> {
+        Ok(SeedHex { seed_hex: s })
+    }
+}
 
 #[derive(Debug)]
 pub struct AggregatedConfig {
     pub nostr_keypair: Option<Keys>,
     pub relays: Vec<RelayUrl>,
-    pub maker_expiration_time: Option<u64>,
+    pub seed_hex: Option<SeedHex>,
+    pub maker_expiration_time: u64,
 }
 
 #[derive(Debug, Clone)]
@@ -42,6 +59,12 @@ impl From<KeysWrapper> for ValueKind {
     }
 }
 
+impl From<SeedHex> for ValueKind {
+    fn from(val: SeedHex) -> Self {
+        ValueKind::String(val.seed_hex)
+    }
+}
+
 impl AggregatedConfig {
     /// Build aggregated configuration from CLI arguments and optional config file.
     ///
@@ -57,22 +80,26 @@ impl AggregatedConfig {
         pub struct AggregatedConfigInner {
             pub nostr_keypair: Option<KeysWrapper>,
             pub relays: Option<Vec<RelayUrl>>,
-            pub maker_expiration_time: Option<u64>,
+            pub seed_hex: Option<SeedHex>,
+            pub maker_expiration_time: u64,
         }
 
         let Cli {
             nostr_key,
             relays_list,
             nostr_config_path,
+            seed_hex,
             maker_expiration_time,
             ..
         } = cli;
 
-        let mut config_builder = Config::builder().add_source(
-            File::from(nostr_config_path.clone())
-                .format(FileFormat::Toml)
-                .required(DEFAULT_CONFIG_PATH != nostr_config_path.to_string_lossy().as_ref()),
-        );
+        let mut config_builder = Config::builder()
+            .add_source(
+                File::from(nostr_config_path.clone())
+                    .format(FileFormat::Toml)
+                    .required(DEFAULT_CONFIG_PATH != nostr_config_path.to_string_lossy().as_ref()),
+            )
+            .set_default("maker_expiration_time", MAKER_EXPIRATION_TIME)?;
 
         if let Some(nostr_key) = nostr_key {
             tracing::debug!("Adding keypair value from CLI");
@@ -92,15 +119,20 @@ impl AggregatedConfig {
                 ),
             )?;
         }
-        
-        if let Some(maker_expiration_time) = maker_expiration_time {
-            tracing::debug!("Adding expiration time from CLI, expiration_time: '{:?}'", maker_expiration_time);
-            config_builder = config_builder.set_override_option(
-                "maker_expiration_time", Some(maker_expiration_time.clone())
-            )?;
+
+        if let Some(seed_hex) = seed_hex {
+            tracing::debug!("Adding SeedHex value from CLI");
+            config_builder = config_builder.set_override_option("seed_hex", Some(seed_hex.clone()))?;
         }
 
-        // TODO(Alex): add Liquid private key
+        if let Some(maker_expiration_time) = maker_expiration_time {
+            tracing::debug!(
+                "Adding expiration time from config, expiration_time: '{:?}'",
+                maker_expiration_time
+            );
+            config_builder =
+                config_builder.set_override_option("maker_expiration_time", Some(maker_expiration_time.clone()))?;
+        }
 
         let config = match config_builder.build()?.try_deserialize::<AggregatedConfigInner>() {
             Ok(conf) => Ok(conf),
@@ -120,6 +152,7 @@ impl AggregatedConfig {
         let aggregated_config = AggregatedConfig {
             nostr_keypair: config.nostr_keypair.map(|x| x.0),
             relays,
+            seed_hex: config.seed_hex,
             maker_expiration_time: config.maker_expiration_time,
         };
 

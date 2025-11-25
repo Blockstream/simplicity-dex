@@ -1,7 +1,7 @@
 use crate::cli::helper::HelperCommands;
 use crate::cli::{DexCommands, MakerCommands, TakerCommands};
-use crate::common::config::{AggregatedConfig, MAKER_EXPIRATION_TIME};
-use crate::common::{DEFAULT_CLIENT_TIMEOUT_SECS, InitOrderArgs, write_into_stdout};
+use crate::common::config::{AggregatedConfig, SeedHex};
+use crate::common::{DEFAULT_CLIENT_TIMEOUT_SECS, InitOrderArgs, validate_hex, write_into_stdout};
 use crate::contract_handlers;
 use clap::{Parser, Subcommand};
 use dex_nostr_relay::relay_client::ClientConfig;
@@ -28,7 +28,10 @@ pub struct Cli {
     /// Path to a config file containing the list of relays and(or) nostr keypair to use
     #[arg(short = 'c', long, default_value = DEFAULT_CONFIG_PATH, env = "DEX_NOSTR_CONFIG_PATH")]
     pub(crate) nostr_config_path: PathBuf,
-    
+
+    #[arg(short = 's', long, env = "DEX_SEED_HEX", value_parser = validate_hex)]
+    pub(crate) seed_hex: Option<String>,
+
     #[arg(short = 'e', long)]
     pub(crate) maker_expiration_time: Option<u64>,
 
@@ -395,8 +398,10 @@ impl Cli {
             fee_amount,
             is_offline,
         )?;
-        let expiration_time = agg_config.maker_expiration_time.unwrap_or(MAKER_EXPIRATION_TIME);
-        let res = relay_processor.place_order(event_to_publish, tx_id, expiration_time).await?;
+        let expiration_time = agg_config.maker_expiration_time;
+        let res = relay_processor
+            .place_order(event_to_publish, tx_id, expiration_time)
+            .await?;
         save_args_to_cache(&args_to_save)?;
         Ok(format!("[Maker] Creating order, tx_id: {tx_id}, event_id: {res:#?}"))
     }
@@ -421,7 +426,7 @@ impl Cli {
     ) -> crate::error::Result<String> {
         use contract_handlers::maker_termination_collateral::{Utxos, handle, save_args_to_cache};
 
-        agg_config.check_nostr_keypair_existence()?;  //todo
+        agg_config.check_nostr_keypair_existence()?; //todo
         let processed_args = contract_handlers::maker_termination_collateral::process_args(
             account_index,
             grantor_collateral_amount_to_burn,
