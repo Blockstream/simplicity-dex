@@ -2,7 +2,7 @@ use crate::relay_client::RelayClient;
 use crate::relay_processor::OrderPlaceEventTags;
 use crate::types::{
     BLOCKSTREAM_MAKER_CONTENT, CustomKind, MAKER_COLLATERAL_ASSET_ID_TAG, MAKER_DCD_ARG_TAG, MAKER_DCD_TAPROOT_TAG,
-    MAKER_EXPIRATION_TIME, MAKER_FILLER_ASSET_ID_TAG, MAKER_FUND_TX_ID_TAG, MAKER_GRANTOR_COLLATERAL_ASSET_ID_TAG,
+    MAKER_FILLER_ASSET_ID_TAG, MAKER_FUND_TX_ID_TAG, MAKER_GRANTOR_COLLATERAL_ASSET_ID_TAG,
     MAKER_GRANTOR_SETTLEMENT_ASSET_ID_TAG, MAKER_SETTLEMENT_ASSET_ID_TAG, MakerOrderKind,
 };
 use nostr::util::hex;
@@ -24,7 +24,7 @@ pub async fn handle(client: &RelayClient, tags: OrderPlaceEventTags, tx_id: Txid
     let maker_order = EventBuilder::new(MakerOrderKind::get_kind(), BLOCKSTREAM_MAKER_CONTENT)
         .tags([
             Tag::public_key(client_pubkey),
-            Tag::expiration(Timestamp::from(timestamp_now.as_u64() + MAKER_EXPIRATION_TIME)),
+            // Tag::expiration(Timestamp::from(timestamp_now.as_u64() + MAKER_EXPIRATION_TIME)),
             Tag::custom(TagKind::Custom(Cow::from(MAKER_DCD_ARG_TAG)), [dcd_arguments]),
             Tag::custom(
                 TagKind::Custom(Cow::from(MAKER_DCD_TAPROOT_TAG)),

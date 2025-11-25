@@ -1,5 +1,3 @@
-// TODO(Illia): refactor this.
-
 use elements::hex::ToHex;
 use elements::secp256k1_zkp::PublicKey;
 use hex::FromHex;
@@ -7,7 +5,7 @@ use simplicity::bitcoin::secp256k1;
 use simplicity::bitcoin::secp256k1::SecretKey;
 use simplicityhl::elements::AssetId;
 use simplicityhl_core::broadcast_tx;
-use std::{io::Write};
+use std::io::Write;
 
 pub const DEFAULT_CLIENT_TIMEOUT_SECS: u64 = 10;
 
