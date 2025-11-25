@@ -74,7 +74,7 @@ mod tests {
         info!(
             "=== order replies, amount: {}, orders: {:#?}",
             order_replies.len(),
-            order_replies
+            order_replies,
         );
         assert_eq!(order_replies.len(), 1);
         assert_eq!(order_replies.first().unwrap().event_kind, TakerOrderKind::get_kind());

@@ -22,7 +22,7 @@ fn filter_expired_events(events_to_filter: Events) -> Events {
     events_to_filter
         .into_iter()
         .filter(|x| match x.tags.expiration() {
-            None => false,
+            None => true,
             Some(t) => t.as_u64() > time_now.as_u64(),
         })
         .collect()

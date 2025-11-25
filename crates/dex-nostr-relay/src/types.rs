@@ -1,4 +1,5 @@
 use crate::handlers::common::timestamp_to_chrono_utc;
+use crate::relay_processor::OrderPlaceEventTags;
 use chrono::TimeZone;
 use nostr::{Event, EventId, Kind, PublicKey, Tag, TagKind, Tags};
 use simplicity::elements::AssetId;
@@ -264,41 +265,6 @@ impl fmt::Display for MakerOrderEvent {
 }
 
 impl MakerOrderEvent {
-    pub fn parse_event(event: &Event) -> Option<Self> {
-        event.verify().ok()?;
-        if event.kind != MakerOrderKind::get_kind() {
-            return None;
-        }
-
-        let time = timestamp_to_chrono_utc(event.created_at)?;
-        let dcd_taproot_pubkey_gen = event.tags.get(2)?.content()?.to_string();
-        let dcd_arguments = {
-            let bytes = hex::decode(event.tags.get(1)?.content()?).ok()?;
-            let decoded: DCDArguments = bincode::decode_from_slice(&bytes, bincode::config::standard()).ok()?.0;
-            decoded
-        };
-
-        let filler_asset_id = AssetId::from_str(event.tags.get(3)?.content()?).ok()?;
-        let grantor_collateral_asset_id = AssetId::from_str(event.tags.get(4)?.content()?).ok()?;
-        let grantor_settlement_asset_id = AssetId::from_str(event.tags.get(5)?.content()?).ok()?;
-        let settlement_asset_id = AssetId::from_str(event.tags.get(6)?.content()?).ok()?;
-        let collateral_asset_id = AssetId::from_str(event.tags.get(7)?.content()?).ok()?;
-        let maker_fund_tx_id = Txid::from_str(event.tags.get(8)?.content()?).ok()?;
-
-        Some(MakerOrderEvent {
-            event_id: event.id,
-            time,
-            dcd_arguments,
-            dcd_taproot_pubkey_gen,
-            filler_asset_id,
-            grantor_collateral_asset_id,
-            grantor_settlement_asset_id,
-            settlement_asset_id,
-            collateral_asset_id,
-            maker_fund_tx_id,
-        })
-    }
-
     #[must_use]
     pub fn summary(&self) -> MakerOrderSummary {
         let oracle_full = &self.dcd_arguments.oracle_public_key;
@@ -377,6 +343,92 @@ impl MakerOrderEvent {
             maker_fund_tx_id: self.maker_fund_tx_id.to_string(),
             event_id: self.event_id,
         }
+    }
+
+    pub fn parse_event(event: &Event) -> Option<Self> {
+        event.verify().ok()?;
+        if event.kind != MakerOrderKind::get_kind() {
+            return None;
+        }
+        let time = timestamp_to_chrono_utc(event.created_at)?;
+        let dcd_arguments = {
+            let bytes = hex::decode(event.tags.get(0)?.content()?).ok()?;
+            let decoded: DCDArguments = bincode::decode_from_slice(&bytes, bincode::config::standard()).ok()?.0;
+            decoded
+        };
+        let dcd_taproot_pubkey_gen = event.tags.get(1)?.content()?.to_string();
+        let filler_asset_id = AssetId::from_str(event.tags.get(2)?.content()?).ok()?;
+        let grantor_collateral_asset_id = AssetId::from_str(event.tags.get(3)?.content()?).ok()?;
+        let grantor_settlement_asset_id = AssetId::from_str(event.tags.get(4)?.content()?).ok()?;
+        let settlement_asset_id = AssetId::from_str(event.tags.get(5)?.content()?).ok()?;
+        let collateral_asset_id = AssetId::from_str(event.tags.get(6)?.content()?).ok()?;
+        let maker_fund_tx_id = Txid::from_str(event.tags.get(7)?.content()?).ok()?;
+
+        Some(MakerOrderEvent {
+            event_id: event.id,
+            time,
+            dcd_arguments,
+            dcd_taproot_pubkey_gen,
+            filler_asset_id,
+            grantor_collateral_asset_id,
+            grantor_settlement_asset_id,
+            settlement_asset_id,
+            collateral_asset_id,
+            maker_fund_tx_id,
+        })
+    }
+
+    /// Form a list of Nostr tags representing a maker order event.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err(crate::error::NostrRelayError::BincodeEncoding)` if serialization of
+    /// `DCDArguments` via `bincode` fails. The function returns a `crate::error::Result<Vec<Tag>>`
+    /// to propagate that error to the caller.
+    pub fn form_tags(
+        tags: OrderPlaceEventTags,
+        tx_id: Txid,
+        client_pubkey: PublicKey,
+    ) -> crate::error::Result<Vec<Tag>> {
+        let dcd_arguments = {
+            let x = bincode::encode_to_vec(&tags.dcd_arguments, bincode::config::standard()).map_err(|err| {
+                crate::error::NostrRelayError::BincodeEncoding {
+                    err,
+                    struct_to_encode: format!("DCDArgs: {:#?}", tags.dcd_arguments),
+                }
+            })?;
+            nostr::prelude::hex::encode(x)
+        };
+        Ok(vec![
+            Tag::public_key(client_pubkey),
+            // Tag::expiration(Timestamp::from(timestamp_now.as_u64() + MAKER_EXPIRATION_TIME)),
+            Tag::custom(TagKind::Custom(Cow::from(MAKER_DCD_ARG_TAG)), [dcd_arguments]),
+            Tag::custom(
+                TagKind::Custom(Cow::from(MAKER_DCD_TAPROOT_TAG)),
+                [tags.dcd_taproot_pubkey_gen],
+            ),
+            Tag::custom(
+                TagKind::Custom(Cow::from(MAKER_FILLER_ASSET_ID_TAG)),
+                [tags.filler_asset_id.to_string()],
+            ),
+            Tag::custom(
+                TagKind::Custom(Cow::from(MAKER_GRANTOR_COLLATERAL_ASSET_ID_TAG)),
+                [tags.grantor_collateral_asset_id.to_string()],
+            ),
+            Tag::custom(
+                TagKind::Custom(Cow::from(MAKER_GRANTOR_SETTLEMENT_ASSET_ID_TAG)),
+                [tags.grantor_settlement_asset_id.to_string()],
+            ),
+            Tag::custom(
+                TagKind::Custom(Cow::from(MAKER_SETTLEMENT_ASSET_ID_TAG)),
+                [tags.settlement_asset_id.to_string()],
+            ),
+            Tag::custom(
+                TagKind::Custom(Cow::from(MAKER_COLLATERAL_ASSET_ID_TAG)),
+                [tags.collateral_asset_id.to_string()],
+            ),
+            Tag::custom(TagKind::Custom(Cow::from(MAKER_FUND_TX_ID_TAG)), [tx_id.to_string()]),
+        ])
     }
 }
 

@@ -17,6 +17,11 @@ pub enum NostrRelayError {
     NoEventsFound(String),
     #[error("Found many events, but required to be only one with filter: '{0}'")]
     NotOnlyOneEventFound(String),
+    #[error("Failed to encode '{struct_to_encode}', err: `{err}`")]
+    BincodeEncoding {
+        err: bincode::error::EncodeError,
+        struct_to_encode: String,
+    },
 }
 
 pub type Result<T> = std::result::Result<T, NostrRelayError>;
