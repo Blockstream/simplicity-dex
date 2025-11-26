@@ -1,5 +1,5 @@
+use crate::common::config::AggregatedConfig;
 use crate::common::keys::derive_secret_key_from_index;
-use crate::common::settings::Settings;
 use crate::common::{broadcast_tx_inner, entropy_to_asset_id};
 use elements::bitcoin::hex::DisplayHex;
 use elements::bitcoin::secp256k1;
@@ -76,12 +76,14 @@ impl TryInto<DcdInitParams> for InnerDcdInitParams {
 }
 
 #[instrument(level = "debug", skip_all, err)]
-pub fn process_args(account_index: u32, dcd_init_params: InnerDcdInitParams) -> crate::error::Result<ProcessedArgs> {
-    let settings = Settings::load().map_err(|err| crate::error::CliError::EnvNotSet(err.to_string()))?;
-
+pub fn process_args(
+    account_index: u32,
+    dcd_init_params: InnerDcdInitParams,
+    config: &AggregatedConfig,
+) -> crate::error::Result<ProcessedArgs> {
     let keypair = secp256k1::Keypair::from_secret_key(
         secp256k1::SECP256K1,
-        &derive_secret_key_from_index(account_index, settings.clone()),
+        &derive_secret_key_from_index(account_index, config)?,
     );
     let dcd_init_params: DcdInitParams = dcd_init_params
         .try_into()

@@ -1,5 +1,5 @@
+use crate::common::config::AggregatedConfig;
 use crate::common::keys::derive_secret_key_from_index;
-use crate::common::settings::Settings;
 use crate::common::store::Store;
 use crate::common::{broadcast_tx_inner, decode_hex};
 use elements::bitcoin::hex::DisplayHex;
@@ -18,6 +18,7 @@ pub fn create_asset(
     fee_amount: u64,
     issue_amount: u64,
     is_offline: bool,
+    config: &AggregatedConfig,
 ) -> crate::error::Result<()> {
     let store = Store::load()?;
 
@@ -25,10 +26,9 @@ pub fn create_asset(
         return Err(crate::error::CliError::AssetNameExists { name: asset_name });
     }
 
-    let settings = Settings::load().map_err(|err| crate::error::CliError::EnvNotSet(err.to_string()))?;
     let keypair = secp256k1::Keypair::from_secret_key(
         secp256k1::SECP256K1,
-        &derive_secret_key_from_index(account_index, settings.clone()),
+        &derive_secret_key_from_index(account_index, config)?,
     );
     let blinding_key = derive_public_blinder_key();
 
@@ -61,6 +61,7 @@ pub fn create_asset(
     Ok(())
 }
 
+//#[allow(clippy::too_many_arguments)] todo ??
 pub fn mint_asset(
     account_index: u32,
     asset_name: String,
@@ -69,6 +70,7 @@ pub fn mint_asset(
     reissue_amount: u64,
     fee_amount: u64,
     is_offline: bool,
+    config: &AggregatedConfig,
 ) -> crate::error::Result<()> {
     let store = Store::load()?;
 
@@ -78,10 +80,9 @@ pub fn mint_asset(
     let asset_entropy = decode_hex(&asset_entropy)?;
     let asset_entropy = entropy_to_midstate(asset_entropy)?;
 
-    let settings = Settings::load().map_err(|err| crate::error::CliError::EnvNotSet(err.to_string()))?;
     let keypair = secp256k1::Keypair::from_secret_key(
         secp256k1::SECP256K1,
-        &derive_secret_key_from_index(account_index, settings.clone()),
+        &derive_secret_key_from_index(account_index, config)?,
     );
     let blinding_key = derive_public_blinder_key();
     let ReissueAssetResponse {

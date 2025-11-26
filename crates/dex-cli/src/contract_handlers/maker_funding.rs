@@ -1,5 +1,5 @@
+use crate::common::config::AggregatedConfig;
 use crate::common::keys::derive_secret_key_from_index;
-use crate::common::settings::Settings;
 use crate::common::store::SledError;
 use crate::common::{broadcast_tx_inner, decode_hex};
 use dex_nostr_relay::relay_processor::OrderPlaceEventTags;
@@ -78,12 +78,11 @@ impl ProcessedArgs {
 pub fn process_args(
     account_index: u32,
     dcd_taproot_pubkey_gen: impl AsRef<str>,
+    config: &AggregatedConfig,
 ) -> crate::error::Result<ProcessedArgs> {
-    let settings = Settings::load().map_err(|err| crate::error::CliError::EnvNotSet(err.to_string()))?;
-
     let keypair = secp256k1::Keypair::from_secret_key(
         secp256k1::SECP256K1,
-        &derive_secret_key_from_index(account_index, settings.clone()),
+        &derive_secret_key_from_index(account_index, config)?,
     );
 
     let taproot_pubkey_gen = dcd_taproot_pubkey_gen.as_ref().to_string();

@@ -1,6 +1,6 @@
 use crate::cli::helper::HelperCommands;
 use crate::cli::{DexCommands, MakerCommands, TakerCommands};
-use crate::common::config::{Seed, AggregatedConfig};
+use crate::common::config::{AggregatedConfig, Seed};
 use crate::common::{DEFAULT_CLIENT_TIMEOUT_SECS, InitOrderArgs, write_into_stdout};
 use crate::contract_handlers;
 use clap::{Parser, Subcommand};
@@ -197,7 +197,7 @@ impl Cli {
                 }
                 Command::Maker { action } => Self::process_maker_commands(&cli_app_context, action).await?,
                 Command::Taker { action } => Self::process_taker_commands(&cli_app_context, action).await?,
-                Command::Helpers { action } => Self::process_helper_commands(action)?,
+                Command::Helpers { action } => Self::process_helper_commands(&cli_app_context, action)?,
                 Command::Dex { action } => Self::process_dex_commands(&cli_app_context, action).await?,
             }
         };
@@ -219,6 +219,7 @@ impl Cli {
                 fee_amount,
                 common_options,
             } => Self::_process_maker_init_order(
+                cli_app_context,
                 MakerInitCliContext {
                     first_lbtc_utxo,
                     second_lbtc_utxo,
@@ -332,6 +333,7 @@ impl Cli {
     }
 
     fn _process_maker_init_order(
+        cli_app_context: &CliAppContext,
         MakerInitCliContext {
             first_lbtc_utxo,
             second_lbtc_utxo,
@@ -346,7 +348,7 @@ impl Cli {
     ) -> crate::error::Result<String> {
         use contract_handlers::maker_init::{Utxos, handle, process_args, save_args_to_cache};
 
-        let processed_args = process_args(account_index, init_order_args.into())?;
+        let processed_args = process_args(account_index, init_order_args.into(), &cli_app_context.agg_config)?;
         let (tx_res, args_to_save) = handle(
             processed_args,
             Utxos {
@@ -384,7 +386,7 @@ impl Cli {
 
         agg_config.check_nostr_keypair_existence()?;
 
-        let processed_args = process_args(account_index, dcd_taproot_pubkey_gen)?;
+        let processed_args = process_args(account_index, dcd_taproot_pubkey_gen, agg_config)?;
         let event_to_publish = processed_args.extract_event();
         let (tx_id, args_to_save) = handle(
             processed_args,
@@ -426,12 +428,13 @@ impl Cli {
     ) -> crate::error::Result<String> {
         use contract_handlers::maker_termination_collateral::{Utxos, handle, save_args_to_cache};
 
-        agg_config.check_nostr_keypair_existence()?; //todo
+        agg_config.check_nostr_keypair_existence()?;
         let processed_args = contract_handlers::maker_termination_collateral::process_args(
             account_index,
             grantor_collateral_amount_to_burn,
             maker_order_event_id,
             relay_processor,
+            agg_config,
         )
         .await?;
         let (tx_id, args_to_save) = handle(
@@ -479,6 +482,7 @@ impl Cli {
             grantor_settlement_amount_to_burn,
             maker_order_event_id,
             relay_processor,
+            agg_config,
         )
         .await?;
         let (tx_id, args_to_save) = handle(
@@ -532,6 +536,7 @@ impl Cli {
             grantor_amount_to_burn,
             maker_order_event_id,
             relay_processor,
+            agg_config,
         )
         .await?;
         let (tx_id, args_to_save) = handle(
@@ -579,6 +584,7 @@ impl Cli {
                     collateral_amount_to_deposit,
                     maker_order_event_id,
                     relay_processor,
+                    agg_config,
                 )
                 .await?;
                 let (tx_id, args_to_save) = handle(
@@ -613,6 +619,7 @@ impl Cli {
                     filler_token_amount_to_return,
                     maker_order_event_id,
                     relay_processor,
+                    agg_config,
                 )
                 .await?;
                 let (tx_id, args_to_save) = handle(
@@ -652,6 +659,7 @@ impl Cli {
                     oracle_signature,
                     maker_order_event_id,
                     relay_processor,
+                    agg_config,
                 )
                 .await?;
                 let (tx_id, args_to_save) = handle(
@@ -673,7 +681,7 @@ impl Cli {
         })
     }
 
-    fn process_helper_commands(cmd: HelperCommands) -> crate::error::Result<String> {
+    fn process_helper_commands(cli_app_context: &CliAppContext, cmd: HelperCommands) -> crate::error::Result<String> {
         Ok(match cmd {
             HelperCommands::Faucet {
                 fee_utxo_outpoint,
@@ -689,6 +697,7 @@ impl Cli {
                     fee_amount,
                     issue_amount,
                     common_options.is_offline,
+                    &cli_app_context.agg_config,
                 )?;
                 "Asset creation -- done".to_string()
             }
@@ -708,6 +717,7 @@ impl Cli {
                     reissue_amount,
                     fee_amount,
                     common_options.is_offline,
+                    &cli_app_context.agg_config,
                 )?;
                 "Asset minting -- done".to_string()
             }
@@ -723,11 +733,12 @@ impl Cli {
                     fee_utxo,
                     fee_amount,
                     common_options.is_offline,
+                    &cli_app_context.agg_config,
                 )?;
                 format!("Split utxo result tx_id: {tx_res:?}")
             }
             HelperCommands::Address { account_index: index } => {
-                let (x_only_pubkey, addr) = contract_handlers::address::handle(index)?;
+                let (x_only_pubkey, addr) = contract_handlers::address::handle(index, &cli_app_context.agg_config)?;
                 format!("X Only Public Key: '{x_only_pubkey}', P2PK Address: '{addr}'")
             }
         })

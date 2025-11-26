@@ -49,14 +49,14 @@ impl FromStr for Seed {
         if bytes.len() != 32 {
             return Err(CliError::InvalidSeedLength {
                 got: bytes.len(),
-                expected: 32
+                expected: 32,
             });
         }
         let mut inner = [0u8; 32];
         inner.copy_from_slice(&bytes);
         Ok(Seed(inner))
     }
-}   
+}
 
 impl<'de> Deserialize<'de> for Seed {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
@@ -146,7 +146,7 @@ impl AggregatedConfig {
                 maker_expiration_time
             );
             config_builder =
-                config_builder.set_override_option("maker_expiration_time", Some(maker_expiration_time.clone()))?;
+                config_builder.set_override_option("maker_expiration_time", Some(*maker_expiration_time))?;
         }
 
         let config = match config_builder.build()?.try_deserialize::<AggregatedConfigInner>() {
@@ -164,14 +164,14 @@ impl AggregatedConfig {
             return Err(ConfigExtended("Relays configuration is empty..".to_string()));
         }
 
-        if config.seed_hex.is_none() {
-            return Err(ConfigExtended("No seed found in configuration and CLI".to_string()));
-        }
+        let seed_hex = config
+            .seed_hex
+            .ok_or_else(|| ConfigExtended("No seed found in configuration and CLI".to_string()))?;
 
         let aggregated_config = AggregatedConfig {
             nostr_keypair: config.nostr_keypair.map(|x| x.0),
             relays,
-            seed_hex: config.seed_hex.unwrap(),
+            seed_hex,
             maker_expiration_time: config.maker_expiration_time,
         };
 
