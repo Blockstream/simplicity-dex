@@ -7,6 +7,7 @@ use clap::{Parser, Subcommand};
 use dex_nostr_relay::relay_client::ClientConfig;
 use dex_nostr_relay::relay_processor::{ListOrdersEventFilter, RelayProcessor};
 use dex_nostr_relay::types::ReplyOption;
+use elements::hex::ToHex;
 use nostr::{EventId, Keys, RelayUrl, Timestamp};
 use simplicity::elements::OutPoint;
 use std::path::PathBuf;
@@ -130,6 +131,33 @@ struct MakerInitCliContext {
     fee_amount: u64,
 }
 
+struct MergeTokens2CliContext {
+    token_utxo_1: OutPoint,
+    token_utxo_2: OutPoint,
+    fee_utxo: OutPoint,
+    fee_amount: u64,
+    maker_order_event_id: EventId,
+}
+
+struct MergeTokens3CliContext {
+    token_utxo_1: OutPoint,
+    token_utxo_2: OutPoint,
+    token_utxo_3: OutPoint,
+    fee_utxo: OutPoint,
+    fee_amount: u64,
+    maker_order_event_id: EventId,
+}
+
+struct MergeTokens4CliContext {
+    token_utxo_1: OutPoint,
+    token_utxo_2: OutPoint,
+    token_utxo_3: OutPoint,
+    token_utxo_4: OutPoint,
+    fee_utxo: OutPoint,
+    fee_amount: u64,
+    maker_order_event_id: EventId,
+}
+
 impl Cli {
     /// Initialize aggregated CLI configuration from CLI args, config file and env.
     ///
@@ -191,7 +219,7 @@ impl Cli {
                 }
                 Command::Maker { action } => Self::process_maker_commands(&cli_app_context, action).await?,
                 Command::Taker { action } => Self::process_taker_commands(&cli_app_context, action).await?,
-                Command::Helpers { action } => Self::process_helper_commands(action)?,
+                Command::Helpers { action } => Self::process_helper_commands(&cli_app_context, action).await?,
                 Command::Dex { action } => Self::process_dex_commands(&cli_app_context, action).await?,
             }
         };
@@ -296,8 +324,8 @@ impl Cli {
             MakerCommands::Settlement {
                 grantor_collateral_token_utxo,
                 grantor_settlement_token_utxo,
-                fee_utxo,
                 asset_utxo,
+                fee_utxo,
                 fee_amount,
                 price_at_current_block_height,
                 oracle_signature,
@@ -664,25 +692,19 @@ impl Cli {
         })
     }
 
-    fn process_helper_commands(cmd: HelperCommands) -> crate::error::Result<String> {
-        Ok(match cmd {
+    #[allow(clippy::too_many_lines)]
+    async fn process_helper_commands(
+        cli_app_context: &CliAppContext,
+        action: HelperCommands,
+    ) -> crate::error::Result<String> {
+        Ok(match action {
             HelperCommands::Faucet {
                 fee_utxo_outpoint,
                 asset_name,
                 issue_amount,
                 fee_amount,
                 common_options,
-            } => {
-                contract_handlers::faucet::create_asset(
-                    common_options.account_index,
-                    asset_name,
-                    fee_utxo_outpoint,
-                    fee_amount,
-                    issue_amount,
-                    common_options.is_offline,
-                )?;
-                "Asset creation -- done".to_string()
-            }
+            } => Self::_process_helper_faucet(fee_utxo_outpoint, asset_name, issue_amount, fee_amount, common_options)?,
             HelperCommands::MintTokens {
                 reissue_asset_outpoint,
                 fee_utxo_outpoint,
@@ -690,38 +712,316 @@ impl Cli {
                 reissue_amount,
                 fee_amount,
                 common_options,
-            } => {
-                contract_handlers::faucet::mint_asset(
-                    common_options.account_index,
-                    asset_name,
-                    reissue_asset_outpoint,
-                    fee_utxo_outpoint,
-                    reissue_amount,
-                    fee_amount,
-                    common_options.is_offline,
-                )?;
-                "Asset minting -- done".to_string()
-            }
+            } => Self::_process_helper_mint_tokens(
+                reissue_asset_outpoint,
+                fee_utxo_outpoint,
+                asset_name,
+                reissue_amount,
+                fee_amount,
+                common_options,
+            )?,
             HelperCommands::SplitNativeThree {
                 split_amount,
                 fee_utxo,
                 fee_amount,
                 common_options,
+            } => Self::_process_helper_split_native_three(split_amount, fee_utxo, fee_amount, common_options)?,
+            HelperCommands::Address { account_index: index } => Self::_process_helper_address(index)?,
+            HelperCommands::OracleSignature {
+                price_at_current_block_height,
+                settlement_height,
+                oracle_account_index,
+            } => Self::_process_helper_oracle_signature(
+                price_at_current_block_height,
+                settlement_height,
+                oracle_account_index,
+            )?,
+            HelperCommands::MergeTokens2 {
+                token_utxo_1,
+                token_utxo_2,
+                fee_utxo,
+                fee_amount,
+                maker_order_event_id,
+                common_options,
             } => {
-                let tx_res = contract_handlers::split_utxo::handle(
-                    common_options.account_index,
-                    split_amount,
-                    fee_utxo,
-                    fee_amount,
-                    common_options.is_offline,
-                )?;
-                format!("Split utxo result tx_id: {tx_res:?}")
+                Self::_process_helper_merge_tokens2(
+                    cli_app_context,
+                    MergeTokens2CliContext {
+                        token_utxo_1,
+                        token_utxo_2,
+                        fee_utxo,
+                        fee_amount,
+                        maker_order_event_id,
+                    },
+                    common_options,
+                )
+                .await?
             }
-            HelperCommands::Address { account_index: index } => {
-                let (x_only_pubkey, addr) = contract_handlers::address::handle(index)?;
-                format!("X Only Public Key: '{x_only_pubkey}', P2PK Address: '{addr}'")
+            HelperCommands::MergeTokens3 {
+                token_utxo_1,
+                token_utxo_2,
+                token_utxo_3,
+                fee_utxo,
+                fee_amount,
+                maker_order_event_id,
+                common_options,
+            } => {
+                Self::_process_helper_merge_tokens3(
+                    cli_app_context,
+                    MergeTokens3CliContext {
+                        token_utxo_1,
+                        token_utxo_2,
+                        token_utxo_3,
+                        fee_utxo,
+                        fee_amount,
+                        maker_order_event_id,
+                    },
+                    common_options,
+                )
+                .await?
+            }
+            HelperCommands::MergeTokens4 {
+                token_utxo_1,
+                token_utxo_2,
+                token_utxo_3,
+                token_utxo_4,
+                fee_utxo,
+                fee_amount,
+                maker_order_event_id,
+                common_options,
+            } => {
+                Self::_process_helper_merge_tokens4(
+                    cli_app_context,
+                    MergeTokens4CliContext {
+                        token_utxo_1,
+                        token_utxo_2,
+                        token_utxo_3,
+                        token_utxo_4,
+                        fee_utxo,
+                        fee_amount,
+                        maker_order_event_id,
+                    },
+                    common_options,
+                )
+                .await?
             }
         })
+    }
+
+    fn _process_helper_faucet(
+        fee_utxo_outpoint: OutPoint,
+        asset_name: String,
+        issue_amount: u64,
+        fee_amount: u64,
+        CommonOrderOptions {
+            account_index,
+            is_offline,
+        }: CommonOrderOptions,
+    ) -> crate::error::Result<String> {
+        contract_handlers::faucet::create_asset(
+            account_index,
+            asset_name,
+            fee_utxo_outpoint,
+            fee_amount,
+            issue_amount,
+            is_offline,
+        )?;
+        Ok("Asset creation -- done".to_string())
+    }
+
+    fn _process_helper_mint_tokens(
+        reissue_asset_outpoint: OutPoint,
+        fee_utxo_outpoint: OutPoint,
+        asset_name: String,
+        reissue_amount: u64,
+        fee_amount: u64,
+        CommonOrderOptions {
+            account_index,
+            is_offline,
+        }: CommonOrderOptions,
+    ) -> crate::error::Result<String> {
+        contract_handlers::faucet::mint_asset(
+            account_index,
+            asset_name,
+            reissue_asset_outpoint,
+            fee_utxo_outpoint,
+            reissue_amount,
+            fee_amount,
+            is_offline,
+        )?;
+        Ok("Asset minting -- done".to_string())
+    }
+
+    fn _process_helper_split_native_three(
+        split_amount: u64,
+        fee_utxo: OutPoint,
+        fee_amount: u64,
+        CommonOrderOptions {
+            account_index,
+            is_offline,
+        }: CommonOrderOptions,
+    ) -> crate::error::Result<String> {
+        let tx_res =
+            contract_handlers::split_utxo::handle(account_index, split_amount, fee_utxo, fee_amount, is_offline)?;
+        Ok(format!("Split utxo result tx_id: {tx_res:?}"))
+    }
+
+    fn _process_helper_address(index: u32) -> crate::error::Result<String> {
+        let (x_only_pubkey, addr) = contract_handlers::address::handle(index)?;
+        Ok(format!("X Only Public Key: '{x_only_pubkey}', P2PK Address: '{addr}'"))
+    }
+
+    fn _process_helper_oracle_signature(
+        price_at_current_block_height: u64,
+        settlement_height: u32,
+        oracle_account_index: Option<u32>,
+    ) -> crate::error::Result<String> {
+        let (pubkey, msg, signature) = contract_handlers::oracle_signature::handle(
+            oracle_account_index,
+            price_at_current_block_height,
+            settlement_height,
+        )?;
+        Ok(format!(
+            "Oracle signature for msg: '{}', signature: '{}', pubkey used: '{}'",
+            msg.to_hex(),
+            hex::encode(signature.serialize()),
+            pubkey.x_only_public_key().0.to_hex()
+        ))
+    }
+
+    async fn _process_helper_merge_tokens2(
+        CliAppContext {
+            agg_config,
+            relay_processor,
+        }: &CliAppContext,
+        MergeTokens2CliContext {
+            token_utxo_1,
+            token_utxo_2,
+            fee_utxo,
+            fee_amount,
+            maker_order_event_id,
+        }: MergeTokens2CliContext,
+        CommonOrderOptions {
+            account_index,
+            is_offline,
+        }: CommonOrderOptions,
+    ) -> crate::error::Result<String> {
+        use contract_handlers::merge_tokens::{
+            merge2::{Utxos2, handle},
+            process_args, save_args_to_cache,
+        };
+
+        agg_config.check_nostr_keypair_existence()?;
+        let processed_args = process_args(account_index, maker_order_event_id, relay_processor).await?;
+        let (tx_id, args_to_save) = handle(
+            processed_args,
+            Utxos2 {
+                utxo_1: token_utxo_1,
+                utxo_2: token_utxo_2,
+                fee: fee_utxo,
+            },
+            fee_amount,
+            is_offline,
+        )?;
+        save_args_to_cache(&args_to_save)?;
+        let reply_event_id = relay_processor
+            .reply_order(maker_order_event_id, ReplyOption::TakerSettlement { tx_id })
+            .await?;
+        Ok(format!(
+            "[Taker] Final settlement tx result: {tx_id:?}, reply event id: {reply_event_id}"
+        ))
+    }
+
+    async fn _process_helper_merge_tokens3(
+        CliAppContext {
+            agg_config,
+            relay_processor,
+        }: &CliAppContext,
+        MergeTokens3CliContext {
+            token_utxo_1,
+            token_utxo_2,
+            token_utxo_3,
+            fee_utxo,
+            fee_amount,
+            maker_order_event_id,
+        }: MergeTokens3CliContext,
+        CommonOrderOptions {
+            account_index,
+            is_offline,
+        }: CommonOrderOptions,
+    ) -> crate::error::Result<String> {
+        use contract_handlers::merge_tokens::{
+            merge3::{Utxos3, handle},
+            process_args, save_args_to_cache,
+        };
+
+        agg_config.check_nostr_keypair_existence()?;
+        let processed_args = process_args(account_index, maker_order_event_id, relay_processor).await?;
+        let (tx_id, args_to_save) = handle(
+            processed_args,
+            Utxos3 {
+                utxo_1: token_utxo_1,
+                utxo_2: token_utxo_2,
+                utxo_3: token_utxo_3,
+                fee: fee_utxo,
+            },
+            fee_amount,
+            is_offline,
+        )?;
+        save_args_to_cache(&args_to_save)?;
+        let reply_event_id = relay_processor
+            .reply_order(maker_order_event_id, ReplyOption::TakerSettlement { tx_id })
+            .await?;
+        Ok(format!(
+            "[Taker] Final settlement tx result: {tx_id:?}, reply event id: {reply_event_id}"
+        ))
+    }
+
+    async fn _process_helper_merge_tokens4(
+        CliAppContext {
+            agg_config,
+            relay_processor,
+        }: &CliAppContext,
+        MergeTokens4CliContext {
+            token_utxo_1,
+            token_utxo_2,
+            token_utxo_3,
+            token_utxo_4,
+            fee_utxo,
+            fee_amount,
+            maker_order_event_id,
+        }: MergeTokens4CliContext,
+        CommonOrderOptions {
+            account_index,
+            is_offline,
+        }: CommonOrderOptions,
+    ) -> crate::error::Result<String> {
+        use contract_handlers::merge_tokens::{
+            merge4::{Utxos4, handle},
+            process_args, save_args_to_cache,
+        };
+
+        agg_config.check_nostr_keypair_existence()?;
+        let processed_args = process_args(account_index, maker_order_event_id, relay_processor).await?;
+        let (tx_id, args_to_save) = handle(
+            processed_args,
+            Utxos4 {
+                utxo_1: token_utxo_1,
+                utxo_2: token_utxo_2,
+                utxo_3: token_utxo_3,
+                utxo_4: token_utxo_4,
+                fee: fee_utxo,
+            },
+            fee_amount,
+            is_offline,
+        )?;
+        save_args_to_cache(&args_to_save)?;
+        let reply_event_id = relay_processor
+            .reply_order(maker_order_event_id, ReplyOption::TakerSettlement { tx_id })
+            .await?;
+        Ok(format!(
+            "[Taker] Final settlement tx result: {tx_id:?}, reply event id: {reply_event_id}"
+        ))
     }
 
     async fn process_dex_commands(

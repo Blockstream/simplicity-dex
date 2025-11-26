@@ -26,8 +26,8 @@ global-utils = { workspace = true }
 hex = { workspace = true }
 nostr = { workspace = true }
 serde_json = { workspace = true }
-simplicity-contracts = { workspace = true }
-simplicity-contracts-adapter = { workspace = true }
+contracts = { workspace = true }
+contracts-adapter = { workspace = true }
 simplicity-lang = { workspace = true }
 simplicityhl = { workspace = true }
 simplicityhl-core = { workspace = true }

@@ -97,8 +97,8 @@ impl Store {
 
 pub mod utils {
     use crate::common::store::Store;
+    use contracts::DCDArguments;
     use nostr::EventId;
-    use simplicity_contracts::DCDArguments;
     use simplicityhl_core::{AssetEntropyHex, Encodable};
 
     const FILLER_TOKEN_ENTROPY_STORE_NAME: &str = "filler_token_entropy";
@@ -243,7 +243,7 @@ pub mod utils {
 
 #[cfg(test)]
 mod tests {
-    use simplicity_contracts::get_options_program;
+    use contracts::get_options_program;
     use simplicityhl::simplicity::elements;
     use simplicityhl_core::{Encodable, TaprootPubkeyGen};
     use simplicityhl_core::{LIQUID_TESTNET_TEST_ASSET_ID_STR, create_p2tr_address};
@@ -309,7 +309,7 @@ mod tests {
         params: &'static AddressParams,
     ) -> anyhow::Result<Address> {
         Ok(create_p2tr_address(
-            get_options_program(&simplicity_contracts::build_arguments::OptionsArguments {
+            get_options_program(&contracts::build_arguments::OptionsArguments {
                 start_time: arguments.start_time,
                 expiry_time: arguments.expiry_time,
                 collateral_per_contract: arguments.collateral_per_contract,

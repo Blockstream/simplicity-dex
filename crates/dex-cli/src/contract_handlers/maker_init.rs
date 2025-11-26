@@ -1,15 +1,16 @@
 use crate::common::keys::derive_secret_key_from_index;
 use crate::common::settings::Settings;
 use crate::common::{broadcast_tx_inner, entropy_to_asset_id};
-use elements::bitcoin::hex::DisplayHex;
-use elements::bitcoin::secp256k1;
-use simplicity::elements::OutPoint;
-use simplicity::elements::pset::serialize::Serialize;
-use simplicity_contracts::DCDArguments;
-use simplicity_contracts_adapter::dcd::{
+use contracts::DCDArguments;
+use contracts_adapter::dcd::{
     BaseContractContext, CreationContext, DcdInitParams, DcdInitResponse, DcdManager, FillerTokenEntropyHex,
     GrantorCollateralAssetEntropyHex, GrantorSettlementAssetEntropyHex, MakerInitContext,
 };
+use elements::bitcoin::hex::DisplayHex;
+use elements::bitcoin::secp256k1;
+use elements::hex::ToHex;
+use simplicity::elements::OutPoint;
+use simplicity::elements::pset::serialize::Serialize;
 use simplicityhl::elements::{AddressParams, Txid};
 use simplicityhl_core::{
     AssetEntropyHex, AssetIdHex, LIQUID_TESTNET_BITCOIN_ASSET, LIQUID_TESTNET_GENESIS, TaprootPubkeyGen,
@@ -70,7 +71,7 @@ impl TryInto<DcdInitParams> for InnerDcdInitParams {
             strike_price: self.strike_price,
             collateral_asset_id: self.collateral_asset_id,
             settlement_asset_id: entropy_to_asset_id(self.settlement_asset_entropy)?.to_string(),
-            oracle_public_key: self.oracle_public_key.to_string(),
+            oracle_public_key: self.oracle_public_key.x_only_public_key().0.to_hex(),
         })
     }
 }

@@ -6,7 +6,8 @@ use simplicity::elements::OutPoint;
 #[derive(Debug, Subcommand)]
 pub enum TakerCommands {
     #[command(
-        about = "Fund an existing DCD order as Taker and lock collateral into the contract [authentication required]"
+        about = "Fund an existing DCD order as Taker and lock collateral into the contract [authentication required]",
+        name = "fund"
     )]
     FundOrder {
         /// UTXO containing filler tokens provided by the Taker to fund the contract
@@ -32,7 +33,7 @@ pub enum TakerCommands {
     )]
     TerminationEarly {
         /// UTXO containing filler tokens that the Taker returns to exit the contract early
-        #[arg(long = "filler-utxos")]
+        #[arg(long = "filler-utxo")]
         filler_token_utxo: OutPoint,
         /// UTXO containing the collateral asset that the Taker will withdraw back
         #[arg(long = "coll-utxo")]

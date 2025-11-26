@@ -4,16 +4,16 @@ use crate::common::settings::Settings;
 use crate::common::store::SledError;
 use crate::common::store::utils::OrderParams;
 use crate::contract_handlers::common::get_order_params;
+use contracts::DCDArguments;
+use contracts_adapter::dcd::{
+    BaseContractContext, CommonContext, DcdContractContext, DcdManager, TakerTerminationEarlyContext,
+};
 use dex_nostr_relay::relay_processor::RelayProcessor;
 use elements::bitcoin::hex::DisplayHex;
 use elements::bitcoin::secp256k1;
 use nostr::EventId;
 use simplicity::elements::OutPoint;
 use simplicity::elements::pset::serialize::Serialize;
-use simplicity_contracts::DCDArguments;
-use simplicity_contracts_adapter::dcd::{
-    BaseContractContext, CommonContext, DcdContractContext, DcdManager, TakerTerminationEarlyContext,
-};
 use simplicityhl::elements::{AddressParams, Txid};
 use simplicityhl_core::{LIQUID_TESTNET_BITCOIN_ASSET, LIQUID_TESTNET_GENESIS, TaprootPubkeyGen};
 use tracing::instrument;
@@ -89,7 +89,7 @@ pub fn handle(
         &dcd_taproot_pubkey_gen,
         &dcd_arguments,
         base_contract_context.address_params,
-        &simplicity_contracts::get_dcd_address,
+        &contracts::get_dcd_address,
     )
     .map_err(|e| SledError::TapRootGen(e.to_string()))?;
 

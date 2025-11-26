@@ -1,5 +1,5 @@
 use crate::relay_client::RelayClient;
-use crate::types::{BLOCKSTREAM_TAKER_CONTENT, CustomKind, ReplyOption, TakerOrderKind};
+use crate::types::ReplyOption;
 
 use nostr::{EventBuilder, EventId, Timestamp};
 
@@ -15,8 +15,7 @@ pub async fn handle(
     // Build tags based on reply option variant
     let tags = reply_option.form_tags(source_event_id, client_pubkey);
 
-    // todo: add generic Tag -> tags formed with Taker and with Maker
-    let reply_event_builder = EventBuilder::new(TakerOrderKind::get_kind(), BLOCKSTREAM_TAKER_CONTENT)
+    let reply_event_builder = EventBuilder::new(reply_option.get_kind(), reply_option.get_content())
         .tags(tags)
         .custom_created_at(timestamp_now);
 

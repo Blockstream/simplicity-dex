@@ -1,5 +1,6 @@
 use crate::cli::CommonOrderOptions;
 use clap::Subcommand;
+use nostr::EventId;
 use simplicity::elements::OutPoint;
 
 #[derive(Debug, Subcommand)]
@@ -56,6 +57,87 @@ pub enum HelperCommands {
         fee_utxo: OutPoint,
         #[arg(long = "fee-amount", default_value_t = 500)]
         fee_amount: u64,
+        #[command(flatten)]
+        common_options: CommonOrderOptions,
+    },
+    #[command(about = "Sign oracle message with keypair [testing only]")]
+    OracleSignature {
+        /// Price at current block height
+        #[arg(long = "price-at-current-block-height")]
+        price_at_current_block_height: u64,
+        /// Settlement height
+        #[arg(long = "settlement-height")]
+        settlement_height: u32,
+        /// Oracle account index to derive key from `SEED_HEX`
+        #[arg(long = "oracle-account-index")]
+        oracle_account_index: Option<u32>,
+    },
+    #[command(about = "Merge 2 token UTXOs into 1")]
+    MergeTokens2 {
+        /// First token UTXO
+        #[arg(long = "token-utxo-1")]
+        token_utxo_1: OutPoint,
+        /// Second token UTXO
+        #[arg(long = "token-utxo-2")]
+        token_utxo_2: OutPoint,
+        /// Fee UTXO
+        #[arg(long = "fee-utxo")]
+        fee_utxo: OutPoint,
+        /// Miner fee in satoshis (LBTC) for the final settlement transaction
+        #[arg(long = "fee-amount", default_value_t = 1500)]
+        fee_amount: u64,
+        /// `EventId` of the Maker\'s original order event on Nostr
+        #[arg(short = 'i', long)]
+        maker_order_event_id: EventId,
+        #[command(flatten)]
+        common_options: CommonOrderOptions,
+    },
+    #[command(about = "Merge 3 token UTXOs into 1")]
+    MergeTokens3 {
+        /// First token UTXO
+        #[arg(long = "token-utxo-1")]
+        token_utxo_1: OutPoint,
+        /// Second token UTXO
+        #[arg(long = "token-utxo-2")]
+        token_utxo_2: OutPoint,
+        /// Third token UTXO
+        #[arg(long = "token-utxo-3")]
+        token_utxo_3: OutPoint,
+        /// Fee UTXO
+        #[arg(long = "fee-utxo")]
+        fee_utxo: OutPoint,
+        /// Miner fee in satoshis (LBTC) for the final settlement transaction
+        #[arg(long = "fee-amount", default_value_t = 1500)]
+        fee_amount: u64,
+        /// `EventId` of the Maker\'s original order event on Nostr
+        #[arg(short = 'i', long)]
+        maker_order_event_id: EventId,
+        #[command(flatten)]
+        common_options: CommonOrderOptions,
+    },
+    #[command(about = "Merge 4 token UTXOs into 1")]
+    MergeTokens4 {
+        /// First token UTXO
+        #[arg(long = "token-utxo-1")]
+        token_utxo_1: OutPoint,
+        /// Second token UTXO
+        #[arg(long = "token-utxo-2")]
+        token_utxo_2: OutPoint,
+        /// Third token UTXO
+        #[arg(long = "token-utxo-3")]
+        token_utxo_3: OutPoint,
+        /// Fourth token UTXO
+        #[arg(long = "token-utxo-4")]
+        token_utxo_4: OutPoint,
+        /// Fee UTXO
+        #[arg(long = "fee-utxo")]
+        fee_utxo: OutPoint,
+        /// Miner fee in satoshis (LBTC) for the final settlement transaction
+        #[arg(long = "fee-amount", default_value_t = 1500)]
+        fee_amount: u64,
+        /// `EventId` of the Maker\'s original order event on Nostr
+        #[arg(short = 'i', long)]
+        maker_order_event_id: EventId,
         #[command(flatten)]
         common_options: CommonOrderOptions,
     },

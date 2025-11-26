@@ -1,12 +1,12 @@
+use crate::common::broadcast_tx_inner;
 use crate::common::keys::derive_secret_key_from_index;
 use crate::common::settings::Settings;
 use crate::common::store::Store;
-use crate::common::{broadcast_tx_inner, decode_hex};
+use contracts_adapter::basic::{IssueAssetResponse, ReissueAssetResponse};
 use elements::bitcoin::hex::DisplayHex;
-use elements::bitcoin::secp256k1;
+use simplicity::bitcoin::secp256k1;
 use simplicity::elements::OutPoint;
 use simplicity::hashes::sha256::Midstate;
-use simplicity_contracts_adapter::basic::{IssueAssetResponse, ReissueAssetResponse};
 use simplicityhl::elements::AddressParams;
 use simplicityhl::elements::pset::serialize::Serialize;
 use simplicityhl_core::{LIQUID_TESTNET_BITCOIN_ASSET, LIQUID_TESTNET_GENESIS, derive_public_blinder_key};
@@ -37,12 +37,12 @@ pub fn create_asset(
         asset_id,
         reissuance_asset_id,
         asset_entropy,
-    } = simplicity_contracts_adapter::basic::issue_asset(
+    } = contracts_adapter::basic::issue_asset(
         &keypair,
         &blinding_key,
         fee_utxo,
-        fee_amount,
         issue_amount,
+        fee_amount,
         &AddressParams::LIQUID_TESTNET,
         LIQUID_TESTNET_BITCOIN_ASSET,
         *LIQUID_TESTNET_GENESIS,
@@ -75,8 +75,10 @@ pub fn mint_asset(
     let Some(asset_entropy) = store.get_value(&asset_name)? else {
         return Err(crate::error::CliError::AssetNameExists { name: asset_name });
     };
-    let asset_entropy = decode_hex(&asset_entropy)?;
-    let asset_entropy = entropy_to_midstate(asset_entropy)?;
+
+    let asset_entropy = String::from_utf8(asset_entropy.to_vec())
+        .map_err(|err| crate::error::CliError::Custom(format!("Failed to convert bytes to string, err: {err}")))?;
+    let asset_entropy = entropy_to_midstate(&asset_entropy)?;
 
     let settings = Settings::load().map_err(|err| crate::error::CliError::EnvNotSet(err.to_string()))?;
     let keypair = secp256k1::Keypair::from_secret_key(
@@ -88,7 +90,7 @@ pub fn mint_asset(
         tx,
         asset_id,
         reissuance_asset_id,
-    } = simplicity_contracts_adapter::basic::reissue_asset(
+    } = contracts_adapter::basic::reissue_asset(
         &keypair,
         &blinding_key,
         reissue_asset_utxo,

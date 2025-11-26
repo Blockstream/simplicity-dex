@@ -1,9 +1,9 @@
 use crate::handlers::common::timestamp_to_chrono_utc;
 use crate::relay_processor::OrderPlaceEventTags;
 use chrono::TimeZone;
+use contracts::DCDArguments;
 use nostr::{Event, EventId, Kind, PublicKey, Tag, TagKind, Tags};
 use simplicity::elements::AssetId;
-use simplicity_contracts::DCDArguments;
 use simplicityhl::elements::Txid;
 use std::borrow::Cow;
 use std::fmt;
@@ -25,7 +25,8 @@ pub trait CustomKind {
 
 pub const POW_DIFFICULTY: u8 = 1;
 pub const BLOCKSTREAM_MAKER_CONTENT: &str = "Liquid order [Maker]!";
-pub const BLOCKSTREAM_TAKER_CONTENT: &str = "Liquid order [Taker]!";
+pub const BLOCKSTREAM_TAKER_REPLY_CONTENT: &str = "Liquid reply [Taker]!";
+pub const BLOCKSTREAM_MAKER_REPLY_CONTENT: &str = "Liquid reply [Maker]!";
 /// `MAKER_EXPIRATION_TIME` = 31 days
 /// TODO: move to the config
 pub const MAKER_EXPIRATION_TIME: u64 = 2_678_400;
@@ -39,14 +40,19 @@ pub const MAKER_COLLATERAL_ASSET_ID_TAG: &str = "collateral_asset_id";
 pub const MAKER_FUND_TX_ID_TAG: &str = "maker_fund_tx_id";
 
 pub struct MakerOrderKind;
-pub struct TakerOrderKind;
+pub struct TakerReplyOrderKind;
+pub struct MakerReplyOrderKind;
 
 impl CustomKind for MakerOrderKind {
     const ORDER_KIND_NUMBER: u16 = 9901;
 }
 
-impl CustomKind for TakerOrderKind {
+impl CustomKind for TakerReplyOrderKind {
     const ORDER_KIND_NUMBER: u16 = 9902;
+}
+
+impl CustomKind for MakerReplyOrderKind {
+    const ORDER_KIND_NUMBER: u16 = 9903;
 }
 
 #[derive(Debug)]
@@ -470,6 +476,30 @@ impl ReplyOption {
             "taker_termination_early" => Some(ReplyOption::TakerTerminationEarly { tx_id }),
             "taker_settlement" => Some(ReplyOption::TakerSettlement { tx_id }),
             _ => None,
+        }
+    }
+
+    #[must_use]
+    pub fn get_kind(&self) -> Kind {
+        match self {
+            ReplyOption::TakerFund { .. }
+            | ReplyOption::TakerTerminationEarly { .. }
+            | ReplyOption::TakerSettlement { .. } => TakerReplyOrderKind::get_kind(),
+            ReplyOption::MakerTerminationCollateral { .. }
+            | ReplyOption::MakerTerminationSettlement { .. }
+            | ReplyOption::MakerSettlement { .. } => MakerReplyOrderKind::get_kind(),
+        }
+    }
+
+    #[must_use]
+    pub fn get_content(&self) -> String {
+        match self {
+            ReplyOption::TakerFund { .. }
+            | ReplyOption::TakerTerminationEarly { .. }
+            | ReplyOption::TakerSettlement { .. } => BLOCKSTREAM_TAKER_REPLY_CONTENT.to_string(),
+            ReplyOption::MakerTerminationCollateral { .. }
+            | ReplyOption::MakerTerminationSettlement { .. }
+            | ReplyOption::MakerSettlement { .. } => BLOCKSTREAM_MAKER_REPLY_CONTENT.to_string(),
         }
     }
 

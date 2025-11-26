@@ -20,7 +20,7 @@ pub fn handle(
         &derive_secret_key_from_index(account_index, settings.clone()),
     );
     let recipient_addr = get_p2pk_address(&keypair.x_only_public_key().0, &AddressParams::LIQUID_TESTNET).unwrap();
-    let transaction = simplicity_contracts_adapter::basic::split_native_three(
+    let transaction = contracts_adapter::basic::split_native_three(
         &keypair,
         fee_utxo,
         &recipient_addr,

@@ -17,8 +17,8 @@ global-utils = { workspace = true }
 hex = { workspace = true }
 nostr = { workspace = true }
 nostr-sdk = { workspace = true }
-simplicity-contracts-adapter = { workspace = true }
-simplicity-contracts = { workspace = true }
+contracts-adapter = { workspace = true }
+contracts = { workspace = true }
 simplicity-lang = { workspace = true }
 simplicityhl = { workspace = true }
 simplicityhl-core = { workspace = true }

@@ -1,10 +1,10 @@
 use crate::handlers;
 use crate::relay_client::{ClientConfig, RelayClient};
 use crate::types::{CustomKind, MakerOrderEvent, MakerOrderSummary, OrderReplyEvent, ReplyOption};
+use contracts::DCDArguments;
 use nostr::prelude::IntoNostrSigner;
 use nostr::{EventId, PublicKey, TryIntoUrl};
 use nostr_sdk::prelude::Events;
-use simplicity_contracts::DCDArguments;
 use simplicityhl::elements::{AssetId, Txid};
 
 use nostr::{Filter, Timestamp};

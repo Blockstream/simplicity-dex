@@ -6,6 +6,8 @@ pub(crate) mod maker_init;
 pub(crate) mod maker_settlement;
 pub(crate) mod maker_termination_collateral;
 pub(crate) mod maker_termination_settlement;
+pub(crate) mod merge_tokens;
+pub(crate) mod oracle_signature;
 pub(crate) mod split_utxo;
 pub(crate) mod taker_early_termination;
 pub(crate) mod taker_funding;

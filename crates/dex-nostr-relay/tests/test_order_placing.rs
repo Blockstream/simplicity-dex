@@ -8,7 +8,7 @@ mod tests {
 
     use dex_nostr_relay::relay_client::ClientConfig;
     use dex_nostr_relay::relay_processor::{ListOrdersEventFilter, OrderPlaceEventTags, RelayProcessor};
-    use dex_nostr_relay::types::{CustomKind, MakerOrderKind, ReplyOption, TakerOrderKind};
+    use dex_nostr_relay::types::{CustomKind, MakerOrderKind, ReplyOption, TakerReplyOrderKind};
     use nostr::{Keys, ToBech32};
     use simplicityhl::elements::Txid;
 
@@ -77,7 +77,10 @@ mod tests {
             order_replies,
         );
         assert_eq!(order_replies.len(), 1);
-        assert_eq!(order_replies.first().unwrap().event_kind, TakerOrderKind::get_kind());
+        assert_eq!(
+            order_replies.first().unwrap().event_kind,
+            TakerReplyOrderKind::get_kind()
+        );
 
         let orders_listed = relay_processor_maker
             .list_orders(ListOrdersEventFilter {

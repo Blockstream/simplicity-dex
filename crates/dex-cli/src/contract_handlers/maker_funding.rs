@@ -2,16 +2,16 @@ use crate::common::keys::derive_secret_key_from_index;
 use crate::common::settings::Settings;
 use crate::common::store::SledError;
 use crate::common::{broadcast_tx_inner, decode_hex};
+use contracts::DCDArguments;
+use contracts_adapter::dcd::{
+    AssetEntropyProcessed, BaseContractContext, COLLATERAL_ASSET_ID, CreationContext, DcdContractContext, DcdManager,
+    MakerFundingContext, raw_asset_entropy_bytes_to_midstate,
+};
 use dex_nostr_relay::relay_processor::OrderPlaceEventTags;
 use elements::bitcoin::hex::DisplayHex;
 use elements::bitcoin::secp256k1;
 use simplicity::elements::OutPoint;
 use simplicity::elements::pset::serialize::Serialize;
-use simplicity_contracts::DCDArguments;
-use simplicity_contracts_adapter::dcd::{
-    AssetEntropyProcessed, BaseContractContext, COLLATERAL_ASSET_ID, CreationContext, DcdContractContext, DcdManager,
-    MakerFundingContext, raw_asset_entropy_bytes_to_midstate,
-};
 use simplicityhl::elements::{AddressParams, AssetId, Txid};
 use simplicityhl_core::{
     AssetEntropyHex, LIQUID_TESTNET_BITCOIN_ASSET, LIQUID_TESTNET_GENESIS, TaprootPubkeyGen, derive_public_blinder_key,
@@ -47,7 +47,7 @@ impl ProcessedArgs {
     pub fn extract_event(&self) -> OrderPlaceEventTags {
         let convert_entropy_to_asset_id = |x: &str| {
             let x = hex::decode(x).unwrap();
-            let token_entropy = simplicity_contracts_adapter::dcd::convert_bytes_to_asset_entropy(x).unwrap();
+            let token_entropy = contracts_adapter::dcd::convert_bytes_to_asset_entropy(x).unwrap();
             let AssetEntropyProcessed {
                 entropy: filler_token_asset_entropy,
                 reversed_bytes: _filler_reversed_bytes,
@@ -147,7 +147,7 @@ pub fn handle(
         &dcd_taproot_pubkey_gen,
         &dcd_arguments,
         base_contract_context.address_params,
-        &simplicity_contracts::get_dcd_address,
+        &contracts::get_dcd_address,
     )
     .map_err(|e| SledError::TapRootGen(e.to_string()))?;
     tracing::debug!("=== dcd arguments: {:?}", dcd_arguments);

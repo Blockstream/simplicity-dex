@@ -11,7 +11,7 @@ pub enum CliError {
     Io(#[from] std::io::Error),
     #[error(transparent)]
     NostrRelay(#[from] NostrRelayError),
-    #[error("Occurred error with usage of Dcd manager, err: {0}")]
+    #[error("Occurred error with usage of Dcd manager, err: '{0}'")]
     DcdManager(String),
     #[error("Configuration error, err: '{0}'")]
     Config(#[from] ConfigError),
