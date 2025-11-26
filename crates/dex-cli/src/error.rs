@@ -33,6 +33,8 @@ pub enum CliError {
     AssetNameAbsent { name: String },
     #[error("Failed to covert value from hex, err: '{0}', value: '{1}'")]
     FromHex(hex::FromHexError, String),
+    #[error("Invalid Seed length: expected {expected}, got {got}")]
+    InvalidSeedLength { got: usize, expected: usize },
     #[error("Failed to convert dcd inner params into dcd params, err msg: '{0}'")]
     InnerDcdConversion(String),
     #[error("Expected at least {expected} elements, got {got}")]

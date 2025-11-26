@@ -49,8 +49,3 @@ pub(crate) fn entropy_to_asset_id(el: impl AsRef<[u8]>) -> crate::error::Result<
     let midstate = sha256::Midstate::from_byte_array(asset_entropy_bytes);
     Ok(AssetId::from_entropy(midstate))
 }
-
-pub fn validate_hex(s: &str) -> Result<String, String> {
-    hex::decode(s).map_err(|err| crate::error::CliError::FromHex(err, s.to_string()).to_string())?;
-    Ok(s.to_string())
-}

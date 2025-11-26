@@ -1,7 +1,7 @@
 use crate::cli::helper::HelperCommands;
 use crate::cli::{DexCommands, MakerCommands, TakerCommands};
-use crate::common::config::{AggregatedConfig, SeedHex};
-use crate::common::{DEFAULT_CLIENT_TIMEOUT_SECS, InitOrderArgs, validate_hex, write_into_stdout};
+use crate::common::config::{Seed, AggregatedConfig};
+use crate::common::{DEFAULT_CLIENT_TIMEOUT_SECS, InitOrderArgs, write_into_stdout};
 use crate::contract_handlers;
 use clap::{Parser, Subcommand};
 use dex_nostr_relay::relay_client::ClientConfig;
@@ -29,8 +29,8 @@ pub struct Cli {
     #[arg(short = 'c', long, default_value = DEFAULT_CONFIG_PATH, env = "DEX_NOSTR_CONFIG_PATH")]
     pub(crate) nostr_config_path: PathBuf,
 
-    #[arg(short = 's', long, env = "DEX_SEED_HEX", value_parser = validate_hex)]
-    pub(crate) seed_hex: Option<String>,
+    #[arg(short = 's', long, env = "DEX_SEED_HEX")]
+    pub(crate) seed_hex: Option<Seed>,
 
     #[arg(short = 'e', long)]
     pub(crate) maker_expiration_time: Option<u64>,

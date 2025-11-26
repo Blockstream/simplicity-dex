@@ -15,27 +15,16 @@ use tracing::instrument;
 /// `MAKER_EXPIRATION_TIME` = 31 days
 const MAKER_EXPIRATION_TIME: u64 = 2_678_400;
 
+#[derive(Debug, Clone)]
 pub struct Seed(pub SeedInner);
 pub type SeedInner = [u8; 32];
-
-#[derive(Clone, Debug, Deserialize)]
-#[serde(try_from = "String")]
-pub struct SeedHex {
-    pub seed_hex: String,
-}
-
-impl TryFrom<String> for SeedHex {
-    type Error = String;
-    fn try_from(s: String) -> Result<Self, Self::Error> {
-        Ok(SeedHex { seed_hex: s })
-    }
-}
+pub type SeedHex = String;
 
 #[derive(Debug)]
 pub struct AggregatedConfig {
     pub nostr_keypair: Option<Keys>,
     pub relays: Vec<RelayUrl>,
-    pub seed_hex: Option<SeedHex>,
+    pub seed_hex: Seed,
     pub maker_expiration_time: u64,
 }
 
@@ -53,15 +42,41 @@ impl<'de> Deserialize<'de> for KeysWrapper {
     }
 }
 
-impl From<KeysWrapper> for ValueKind {
-    fn from(val: KeysWrapper) -> Self {
-        ValueKind::String(val.0.secret_key().to_secret_hex())
+impl FromStr for Seed {
+    type Err = CliError;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let bytes = hex::decode(s).map_err(|err| crate::error::CliError::FromHex(err, s.to_string()))?;
+        if bytes.len() != 32 {
+            return Err(CliError::InvalidSeedLength {
+                got: bytes.len(),
+                expected: 32
+            });
+        }
+        let mut inner = [0u8; 32];
+        inner.copy_from_slice(&bytes);
+        Ok(Seed(inner))
+    }
+}   
+
+impl<'de> Deserialize<'de> for Seed {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        Seed::from_str(&s).map_err(serde::de::Error::custom)
     }
 }
 
-impl From<SeedHex> for ValueKind {
-    fn from(val: SeedHex) -> Self {
-        ValueKind::String(val.seed_hex)
+impl From<Seed> for ValueKind {
+    fn from(val: Seed) -> Self {
+        ValueKind::String(hex::encode(val.0))
+    }
+}
+
+impl From<KeysWrapper> for ValueKind {
+    fn from(val: KeysWrapper) -> Self {
+        ValueKind::String(val.0.secret_key().to_secret_hex())
     }
 }
 
@@ -80,7 +95,7 @@ impl AggregatedConfig {
         pub struct AggregatedConfigInner {
             pub nostr_keypair: Option<KeysWrapper>,
             pub relays: Option<Vec<RelayUrl>>,
-            pub seed_hex: Option<SeedHex>,
+            pub seed_hex: Option<Seed>,
             pub maker_expiration_time: u64,
         }
 
@@ -149,10 +164,14 @@ impl AggregatedConfig {
             return Err(ConfigExtended("Relays configuration is empty..".to_string()));
         }
 
+        if config.seed_hex.is_none() {
+            return Err(ConfigExtended("No seed found in configuration and CLI".to_string()));
+        }
+
         let aggregated_config = AggregatedConfig {
             nostr_keypair: config.nostr_keypair.map(|x| x.0),
             relays,
-            seed_hex: config.seed_hex,
+            seed_hex: config.seed_hex.unwrap(),
             maker_expiration_time: config.maker_expiration_time,
         };
 
