@@ -18,7 +18,6 @@ const MAKER_EXPIRATION_TIME: u64 = 2_678_400;
 #[derive(Debug, Clone)]
 pub struct Seed(pub SeedInner);
 pub type SeedInner = [u8; 32];
-pub type SeedHex = String;
 
 #[derive(Debug)]
 pub struct AggregatedConfig {

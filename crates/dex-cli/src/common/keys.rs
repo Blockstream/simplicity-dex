@@ -2,7 +2,9 @@ use crate::common::config::AggregatedConfig;
 use crate::error::CliError;
 use simplicityhl::elements::secp256k1_zkp as secp256k1;
 
-/// todo write errors
+/// # Errors
+///
+/// Returns `CliError::EcCurve` if the derived 32 byte array is not a valid secp256k1 secret key
 pub fn derive_secret_key_from_index(index: u32, config: &AggregatedConfig) -> Result<secp256k1::SecretKey, CliError> {
     let mut seed = config.seed_hex.0;
 

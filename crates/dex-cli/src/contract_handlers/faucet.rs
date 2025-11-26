@@ -61,7 +61,7 @@ pub fn create_asset(
     Ok(())
 }
 
-//#[allow(clippy::too_many_arguments)] todo ??
+#[allow(clippy::too_many_arguments)]
 pub fn mint_asset(
     account_index: u32,
     asset_name: String,

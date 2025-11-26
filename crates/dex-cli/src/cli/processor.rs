@@ -29,9 +29,11 @@ pub struct Cli {
     #[arg(short = 'c', long, default_value = DEFAULT_CONFIG_PATH, env = "DEX_NOSTR_CONFIG_PATH")]
     pub(crate) nostr_config_path: PathBuf,
 
+    /// Hex-encoded 32-byte seed used to derive internal wallet keys
     #[arg(short = 's', long, env = "DEX_SEED_HEX")]
     pub(crate) seed_hex: Option<Seed>,
 
+    /// Expiration time for the maker order in seconds
     #[arg(short = 'e', long)]
     pub(crate) maker_expiration_time: Option<u64>,
 
