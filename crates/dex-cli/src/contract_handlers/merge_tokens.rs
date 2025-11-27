@@ -221,10 +221,11 @@ pub mod merge3 {
 }
 pub mod merge4 {
     use super::{
-        AddressParams, ArgsToSave, BaseContractContext, CommonContext, DcdContractContext, DcdManager, DisplayHex,
-        LIQUID_TESTNET_BITCOIN_ASSET, LIQUID_TESTNET_GENESIS, OutPoint, ProcessedArgs, Serialize, SledError,
-        TaprootPubkeyGen, Txid, broadcast_tx_inner, instrument,
+        AddressParams, ArgsToSave, BaseContractContext, CommonContext, DcdContractContext, DcdManager,
+        LIQUID_TESTNET_BITCOIN_ASSET, LIQUID_TESTNET_GENESIS, OutPoint, ProcessedArgs, SledError, TaprootPubkeyGen,
+        Txid, instrument,
     };
+    use crate::contract_handlers::common::broadcast_or_get_raw_tx;
     use contracts::MergeBranch;
     use contracts_adapter::dcd::MergeTokensContext;
     use tokio::task;
@@ -295,11 +296,7 @@ pub mod merge4 {
         )
         .map_err(|err| crate::error::CliError::DcdManager(err.to_string()))?;
 
-        if is_offline {
-            println!("{}", transaction.serialize().to_lower_hex_string());
-        } else {
-            println!("Broadcasted txid: {}", broadcast_tx_inner(&transaction)?);
-        }
+        broadcast_or_get_raw_tx(is_offline, &transaction)?;
 
         Ok((
             transaction.txid(),

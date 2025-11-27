@@ -1,19 +1,16 @@
-use crate::common::broadcast_tx_inner;
 use crate::common::keys::derive_keypair_from_index;
 use crate::common::settings::Settings;
 use crate::common::store::SledError;
 use crate::common::store::utils::OrderParams;
-use crate::contract_handlers::common::get_order_params;
+use crate::contract_handlers::common::{broadcast_or_get_raw_tx, get_order_params};
 use contracts::DCDArguments;
 use contracts_adapter::dcd::{
     BaseContractContext, CommonContext, DcdContractContext, DcdManager, TakerTerminationEarlyContext,
 };
 use dex_nostr_relay::relay_processor::RelayProcessor;
-use elements::bitcoin::hex::DisplayHex;
 use elements::bitcoin::secp256k1;
 use nostr::EventId;
 use simplicity::elements::OutPoint;
-use simplicity::elements::pset::serialize::Serialize;
 use simplicityhl::elements::{AddressParams, Txid};
 use simplicityhl_core::{LIQUID_TESTNET_BITCOIN_ASSET, LIQUID_TESTNET_GENESIS, TaprootPubkeyGen};
 use tokio::task;
@@ -118,11 +115,7 @@ fn handle_sync(
     )
     .map_err(|err| crate::error::CliError::DcdManager(err.to_string()))?;
 
-    if is_offline {
-        println!("{}", transaction.serialize().to_lower_hex_string());
-    } else {
-        println!("Broadcasted txid: {}", broadcast_tx_inner(&transaction)?);
-    }
+    broadcast_or_get_raw_tx(is_offline, &transaction)?;
 
     Ok((
         transaction.txid(),

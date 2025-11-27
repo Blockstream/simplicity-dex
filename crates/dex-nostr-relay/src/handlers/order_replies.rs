@@ -3,7 +3,7 @@ use crate::types::{CustomKind, OrderReplyEvent, TakerReplyOrderKind};
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::handlers::common::filter_order_reply_events;
+use crate::handlers::common::{filter_order_reply_events, sort_order_replies_by_time};
 use nostr::{EventId, Filter, SingleLetterTag};
 
 pub async fn handle(client: &RelayClient, event_id: EventId) -> crate::error::Result<Vec<OrderReplyEvent>> {
@@ -20,5 +20,7 @@ pub async fn handle(client: &RelayClient, event_id: EventId) -> crate::error::Re
         })
         .await?;
     let events = filter_order_reply_events(&events);
+    let events = sort_order_replies_by_time(events);
+
     Ok(events)
 }

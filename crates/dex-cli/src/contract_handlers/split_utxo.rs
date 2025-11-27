@@ -1,8 +1,6 @@
-use crate::common::broadcast_tx_inner;
 use crate::common::keys::derive_keypair_from_index;
 use crate::common::settings::Settings;
-use elements::bitcoin::hex::DisplayHex;
-use simplicityhl::elements::pset::serialize::Serialize;
+use crate::contract_handlers::common::broadcast_or_get_raw_tx;
 use simplicityhl::elements::{AddressParams, OutPoint, Txid};
 use simplicityhl_core::{LIQUID_TESTNET_BITCOIN_ASSET, LIQUID_TESTNET_GENESIS, get_p2pk_address};
 use tokio::task;
@@ -40,10 +38,7 @@ fn handle_sync(
     )
     .map_err(|err| crate::error::CliError::DcdManager(err.to_string()))?;
 
-    if is_offline {
-        println!("{}", transaction.serialize().to_lower_hex_string());
-    } else {
-        println!("Broadcasted txid: {}", broadcast_tx_inner(&transaction)?);
-    }
+    broadcast_or_get_raw_tx(is_offline, &transaction)?;
+
     Ok(transaction.txid())
 }

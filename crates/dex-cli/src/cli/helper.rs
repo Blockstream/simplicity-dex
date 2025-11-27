@@ -70,7 +70,7 @@ pub enum HelperCommands {
         settlement_height: u32,
         /// Oracle account index to derive key from `SEED_HEX`
         #[arg(long = "oracle-account-index")]
-        oracle_account_index: Option<u32>,
+        oracle_account_index: u32,
     },
     #[command(about = "Merge 2 token UTXOs into 1")]
     MergeTokens2 {

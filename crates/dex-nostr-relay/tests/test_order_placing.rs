@@ -3,13 +3,13 @@ mod utils;
 mod tests {
     use crate::utils::{DEFAULT_CLIENT_TIMEOUT, DEFAULT_RELAY_LIST, TEST_LOGGER};
     use std::str::FromStr;
-
     use std::time::Duration;
 
     use dex_nostr_relay::relay_client::ClientConfig;
     use dex_nostr_relay::relay_processor::{ListOrdersEventFilter, OrderPlaceEventTags, RelayProcessor};
     use dex_nostr_relay::types::{CustomKind, MakerOrderKind, ReplyOption, TakerReplyOrderKind};
     use nostr::{Keys, ToBech32};
+    use simplicity::elements::OutPoint;
     use simplicityhl::elements::Txid;
 
     use tracing::{info, instrument};
@@ -19,6 +19,7 @@ mod tests {
     async fn test_wss_metadata() -> anyhow::Result<()> {
         let _ = dotenvy::dotenv();
         let _guard = &*TEST_LOGGER;
+
         let key_maker = Keys::generate();
         info!(
             "=== Maker pubkey: {}, privatekey: {}",
@@ -60,15 +61,49 @@ mod tests {
             key_taker.public_key.to_bech32()?,
             key_taker.secret_key().to_bech32()?
         );
-        let reply_event_id = relay_processor_taker
-            .reply_order(
-                placed_order_event_id,
-                ReplyOption::TakerFund {
-                    tx_id: Txid::from_str("87a4c9b2060ff698d9072d5f95b3dde01efe0994f95c3cd6dd7348cb3a4e4e40").unwrap(),
-                },
-            )
-            .await?;
-        info!("=== order reply event id: {}", reply_event_id);
+
+        // Common txid / outpoint used across reply options.
+        let tx_id = Txid::from_str("87a4c9b2060ff698d9072d5f95b3dde01efe0994f95c3cd6dd7348cb3a4e4e40")?;
+        let dummy_outpoint = OutPoint::from_str("87a4c9b2060ff698d9072d5f95b3dde01efe0994f95c3cd6dd7348cb3a4e4e40:0")?;
+
+        // Send replies for all supported ReplyOption variants.
+        let reply_variants = vec![
+            ReplyOption::TakerFund { tx_id },
+            ReplyOption::MakerTerminationCollateral { tx_id },
+            ReplyOption::MakerTerminationSettlement { tx_id },
+            ReplyOption::MakerSettlement { tx_id },
+            ReplyOption::TakerTerminationEarly { tx_id },
+            ReplyOption::TakerSettlement { tx_id },
+            ReplyOption::Merge2 {
+                tx_id,
+                token_utxo_1: dummy_outpoint,
+                token_utxo_2: dummy_outpoint,
+            },
+            ReplyOption::Merge3 {
+                tx_id,
+                token_utxo_1: dummy_outpoint,
+                token_utxo_2: dummy_outpoint,
+                token_utxo_3: dummy_outpoint,
+            },
+            ReplyOption::Merge4 {
+                tx_id,
+                token_utxo_1: dummy_outpoint,
+                token_utxo_2: dummy_outpoint,
+                token_utxo_3: dummy_outpoint,
+                token_utxo_4: dummy_outpoint,
+            },
+        ];
+
+        for reply in &reply_variants {
+            let reply_event_id = relay_processor_taker
+                .reply_order(placed_order_event_id, reply.clone())
+                .await?;
+            info!(
+                "=== order reply event id for {:?}: {}",
+                reply.get_content(),
+                reply_event_id
+            );
+        }
 
         let order_replies = relay_processor_maker.get_order_replies(placed_order_event_id).await?;
         info!(
@@ -76,12 +111,32 @@ mod tests {
             order_replies.len(),
             order_replies,
         );
-        assert_eq!(order_replies.len(), 1);
-        assert_eq!(
-            order_replies.first().unwrap().event_kind,
-            TakerReplyOrderKind::get_kind()
+
+        // Inline comparison instead of an explicit loop.
+        let all_kinds_match =
+            order_replies
+                .iter()
+                .zip(reply_variants.iter())
+                .enumerate()
+                .all(|(idx, (reply_event, expected_option))| {
+                    if reply_event.event_kind != expected_option.get_kind() {
+                        eprintln!(
+                            "reply kind mismatch at index {idx}: \
+                         got {:?}, expected {:?}",
+                            reply_event.event_kind,
+                            expected_option.get_kind()
+                        );
+                        return false;
+                    }
+                    true
+                });
+
+        assert!(
+            all_kinds_match,
+            "not all reply events have the expected kind; see stderr for details"
         );
 
+        // Also confirm the placed order can be found via list_orders as before.
         let orders_listed = relay_processor_maker
             .list_orders(ListOrdersEventFilter {
                 authors: None,

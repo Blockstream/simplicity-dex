@@ -1,8 +1,6 @@
-use crate::common::derive_oracle_pubkey;
 use crate::contract_handlers::maker_init::InnerDcdInitParams;
 use clap::Args;
 use contracts_adapter::dcd::COLLATERAL_ASSET_ID;
-use simplicityhl::elements::bitcoin::secp256k1;
 use simplicityhl_core::{AssetEntropyHex, AssetIdHex};
 
 /// Represents either three asset IDs or three asset entropies as provided on the CLI.

@@ -29,19 +29,31 @@ pub fn derive_keypair_from_index(index: u32, seed_hex: impl AsRef<[u8]>) -> secp
 #[cfg(test)]
 mod tests {
     use super::*;
+    use elements::hex::ToHex;
+    use proptest::prelude::*;
     use simplicityhl::elements;
+    use simplicityhl::elements::AddressParams;
+    use simplicityhl_core::get_p2pk_address;
 
-    fn check_secret_for_index(index: u32, expected_hex: &str, seed_hex: impl AsRef<[u8]>) -> anyhow::Result<()> {
+    fn check_seed_hex_gen(
+        index: u32,
+        x_only_pubkey: &str,
+        p2pk_addr: &str,
+        seed_hex: impl AsRef<[u8]>,
+    ) -> anyhow::Result<()> {
         let kp = derive_keypair_from_index(index, &seed_hex);
 
-        let secret = elements::bitcoin::secp256k1::Keypair::from_secret_key(
+        let keypair = elements::bitcoin::secp256k1::Keypair::from_secret_key(
             &elements::bitcoin::secp256k1::SECP256K1,
             &derive_secret_key_from_index(index, &seed_hex),
-        )
-        .secret_key();
+        );
 
-        let sk_bytes = secret.secret_bytes();
-        assert_eq!(hex::encode(sk_bytes), expected_hex.to_lowercase());
+        let public_key = keypair.x_only_public_key().0;
+        let address = get_p2pk_address(&public_key, &AddressParams::LIQUID_TESTNET)?;
+
+        let sk_bytes = keypair.secret_bytes();
+        assert_eq!(public_key.to_string(), x_only_pubkey);
+        assert_eq!(address.to_string(), p2pk_addr);
         Ok(())
     }
 
@@ -56,16 +68,43 @@ mod tests {
         const SEED_HEX: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
         let expected_secrets = [
-            (0u32, "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"),
-            (1u32, "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e0e"),
-            (2u32, "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e0d"),
+            (
+                0u32,
+                "4646ae5047316b4230d0086c8acec687f00b1cd9d1dc634f6cb358ac0a9a8fff",
+                "tex1pyzkfajdprt6gl6288z54c6m4lrg3vp32cajmqrh5kfaegydyrv0qtcg6lm",
+            ),
+            (
+                1u32,
+                "16e47b8867bfbeaae66c0345577751c551903eb90ba479e91f783c507c088732",
+                "tex1prmytj5v08w6jwjtm4exmuxv0nn8favzyqu3aptzrgvl44nfatqmsykjhk3",
+            ),
+            (
+                2u32,
+                "d0d0fce6bc500821c33212666ecfbd9d41a1414d584af4102e7441277d25d872",
+                "tex1phctnz400pn7r3rhh8nyc2xmsg2e9h2n299a8ld4pup0v5def9cdsjz3put",
+            ),
         ];
-        {
-            let (index, expected_secret) = expected_secrets[0];
-            check_secret_for_index(index, expected_secret, SEED_HEX)?;
-        }
+        let check_address_with_index = |i| -> anyhow::Result<()> {
+            let (index, x_only_pubkey, p2pk_addr) = expected_secrets[i];
+            check_seed_hex_gen(index, x_only_pubkey, p2pk_addr, SEED_HEX)?;
+            Ok(())
+        };
 
-        check_keypair_determinism(5, SEED_HEX);
+        check_address_with_index(0)?;
+        check_address_with_index(1)?;
+        check_address_with_index(2)?;
         Ok(())
+    }
+
+    proptest! {
+        #[test]
+        fn prop_keypair_determinism(index in 0u32..u32::MAX, seed in any::<[u8; 32]>()) {
+            let seed_hex = seed.to_hex();
+
+            let kp1 = derive_keypair_from_index(index, &seed_hex);
+            let kp2 = derive_keypair_from_index(index, &seed_hex);
+
+            prop_assert_eq!(kp1.secret_bytes(), kp2.secret_bytes());
+        }
     }
 }

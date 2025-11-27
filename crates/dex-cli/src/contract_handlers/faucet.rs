@@ -1,13 +1,11 @@
-use crate::common::broadcast_tx_inner;
 use crate::common::keys::derive_keypair_from_index;
 use crate::common::settings::Settings;
 use crate::common::store::Store;
+use crate::contract_handlers::common::broadcast_or_get_raw_tx;
 use contracts_adapter::basic::{IssueAssetResponse, ReissueAssetResponse};
-use elements::bitcoin::hex::DisplayHex;
 use simplicity::elements::OutPoint;
 use simplicity::hashes::sha256::Midstate;
-use simplicityhl::elements::AddressParams;
-use simplicityhl::elements::pset::serialize::Serialize;
+use simplicityhl::elements::{AddressParams, Txid};
 use simplicityhl_core::{LIQUID_TESTNET_BITCOIN_ASSET, LIQUID_TESTNET_GENESIS, derive_public_blinder_key};
 use tokio::task;
 
@@ -18,7 +16,7 @@ pub async fn create_asset(
     fee_amount: u64,
     issue_amount: u64,
     is_offline: bool,
-) -> crate::error::Result<()> {
+) -> crate::error::Result<Txid> {
     task::spawn_blocking(move || {
         create_asset_sync(
             account_index,
@@ -39,7 +37,7 @@ fn create_asset_sync(
     fee_amount: u64,
     issue_amount: u64,
     is_offline: bool,
-) -> crate::error::Result<()> {
+) -> crate::error::Result<Txid> {
     let store = Store::load()?;
 
     if store.is_exist(&asset_name)? {
@@ -51,7 +49,7 @@ fn create_asset_sync(
     let blinding_key = derive_public_blinder_key();
 
     let IssueAssetResponse {
-        tx,
+        tx: transaction,
         asset_id,
         reissuance_asset_id,
         asset_entropy,
@@ -71,13 +69,10 @@ fn create_asset_sync(
         "Test token asset entropy: '{asset_entropy}', asset_id: '{asset_id}', \
          reissue_asset_id: '{reissuance_asset_id}'"
     );
-    if is_offline {
-        println!("{}", tx.serialize().to_lower_hex_string());
-    } else {
-        println!("Broadcasted txid: {}", broadcast_tx_inner(&tx)?);
-        store.insert_value(asset_name, asset_entropy.as_bytes())?;
-    }
-    Ok(())
+    broadcast_or_get_raw_tx(is_offline, &transaction)?;
+    store.insert_value(asset_name, asset_entropy.as_bytes())?;
+
+    Ok(transaction.txid())
 }
 
 pub async fn mint_asset(
@@ -88,7 +83,7 @@ pub async fn mint_asset(
     reissue_amount: u64,
     fee_amount: u64,
     is_offline: bool,
-) -> crate::error::Result<()> {
+) -> crate::error::Result<Txid> {
     task::spawn_blocking(move || {
         mint_asset_sync(
             account_index,
@@ -111,7 +106,7 @@ fn mint_asset_sync(
     reissue_amount: u64,
     fee_amount: u64,
     is_offline: bool,
-) -> crate::error::Result<()> {
+) -> crate::error::Result<Txid> {
     let store = Store::load()?;
 
     let Some(asset_entropy) = store.get_value(&asset_name)? else {
@@ -127,7 +122,7 @@ fn mint_asset_sync(
 
     let blinding_key = derive_public_blinder_key();
     let ReissueAssetResponse {
-        tx,
+        tx: transaction,
         asset_id,
         reissuance_asset_id,
     } = contracts_adapter::basic::reissue_asset(
@@ -145,12 +140,9 @@ fn mint_asset_sync(
     .map_err(|err| crate::error::CliError::DcdManager(err.to_string()))?;
 
     println!("Minting asset: '{asset_id}', Reissue asset id: '{reissuance_asset_id}'");
-    if is_offline {
-        println!("{}", tx.serialize().to_lower_hex_string());
-    } else {
-        println!("Broadcasted txid: {}", broadcast_tx_inner(&tx)?);
-    }
-    Ok(())
+    broadcast_or_get_raw_tx(is_offline, &transaction)?;
+
+    Ok(transaction.txid())
 }
 
 pub fn entropy_to_midstate(el: impl AsRef<[u8]>) -> crate::error::Result<Midstate> {

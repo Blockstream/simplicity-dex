@@ -216,7 +216,7 @@ impl Cli {
         let msg = {
             match self.command {
                 Command::ShowConfig => {
-                    format!("config: {:#?}", cli_app_context.agg_config)
+                    format!("Config: {:#?}", cli_app_context.agg_config)
                 }
                 Command::Maker { action } => Self::process_maker_commands(&cli_app_context, action).await?,
                 Command::Taker { action } => Self::process_taker_commands(&cli_app_context, action).await?,
@@ -836,7 +836,7 @@ impl Cli {
             is_offline,
         }: CommonOrderOptions,
     ) -> crate::error::Result<String> {
-        contract_handlers::faucet::create_asset(
+        let tx_id = contract_handlers::faucet::create_asset(
             account_index,
             asset_name,
             fee_utxo_outpoint,
@@ -845,7 +845,7 @@ impl Cli {
             is_offline,
         )
         .await?;
-        Ok("Asset creation -- done".to_string())
+        Ok(format!("Finish asset creation, tx_id: {tx_id}"))
     }
 
     async fn _process_helper_mint_tokens(
@@ -859,7 +859,7 @@ impl Cli {
             is_offline,
         }: CommonOrderOptions,
     ) -> crate::error::Result<String> {
-        contract_handlers::faucet::mint_asset(
+        let tx_id = contract_handlers::faucet::mint_asset(
             account_index,
             asset_name,
             reissue_asset_outpoint,
@@ -869,7 +869,7 @@ impl Cli {
             is_offline,
         )
         .await?;
-        Ok("Asset minting -- done".to_string())
+        Ok(format!("Finish asset minting, tx_id: {tx_id} "))
     }
 
     async fn _process_helper_split_native_three(
@@ -895,7 +895,7 @@ impl Cli {
     fn _process_helper_oracle_signature(
         price_at_current_block_height: u64,
         settlement_height: u32,
-        oracle_account_index: Option<u32>,
+        oracle_account_index: u32,
     ) -> crate::error::Result<String> {
         let (pubkey, msg, signature) = contract_handlers::oracle_signature::handle(
             oracle_account_index,
@@ -947,10 +947,17 @@ impl Cli {
         .await?;
         save_args_to_cache(&args_to_save)?;
         let reply_event_id = relay_processor
-            .reply_order(maker_order_event_id, ReplyOption::TakerSettlement { tx_id })
+            .reply_order(
+                maker_order_event_id,
+                ReplyOption::Merge2 {
+                    tx_id,
+                    token_utxo_1,
+                    token_utxo_2,
+                },
+            )
             .await?;
         Ok(format!(
-            "[Taker] Final settlement tx result: {tx_id:?}, reply event id: {reply_event_id}"
+            "[Taker] Final merge 2 tx result: {tx_id:?}, reply event id: {reply_event_id}"
         ))
     }
 
@@ -993,10 +1000,18 @@ impl Cli {
         .await?;
         save_args_to_cache(&args_to_save)?;
         let reply_event_id = relay_processor
-            .reply_order(maker_order_event_id, ReplyOption::TakerSettlement { tx_id })
+            .reply_order(
+                maker_order_event_id,
+                ReplyOption::Merge3 {
+                    tx_id,
+                    token_utxo_1,
+                    token_utxo_2,
+                    token_utxo_3,
+                },
+            )
             .await?;
         Ok(format!(
-            "[Taker] Final settlement tx result: {tx_id:?}, reply event id: {reply_event_id}"
+            "[Taker] Final merge 3 tx result: {tx_id:?}, reply event id: {reply_event_id}"
         ))
     }
 
@@ -1041,10 +1056,19 @@ impl Cli {
         .await?;
         save_args_to_cache(&args_to_save)?;
         let reply_event_id = relay_processor
-            .reply_order(maker_order_event_id, ReplyOption::TakerSettlement { tx_id })
+            .reply_order(
+                maker_order_event_id,
+                ReplyOption::Merge4 {
+                    tx_id,
+                    token_utxo_1,
+                    token_utxo_2,
+                    token_utxo_3,
+                    token_utxo_4,
+                },
+            )
             .await?;
         Ok(format!(
-            "[Taker] Final settlement tx result: {tx_id:?}, reply event id: {reply_event_id}"
+            "[Taker] Final merge 4 tx result: {tx_id:?}, reply event id: {reply_event_id}"
         ))
     }
 

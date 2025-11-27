@@ -15,19 +15,20 @@ path = "src/bin/main.rs"
 [dependencies]
 anyhow = { workspace = true }
 bincode = { workspace = true }
-clap = { workspace = true, features = ["env"]}
+clap = { workspace = true, features = ["env"] }
 config = { workspace = true }
-dex-nostr-relay = { workspace = true }
-dirs = { workspace = true }
-dotenvy = { workspace = true }
-elements = { workspace = true }
-futures-util = { workspace = true }
-global-utils = { workspace = true }
-hex = { workspace = true }
-nostr = { workspace = true }
-serde_json = { workspace = true }
 contracts = { workspace = true }
 contracts-adapter = { workspace = true }
+dex-nostr-relay = { workspace = true }
+dotenvy = { workspace = true }
+elements = { workspace = true }
+global-utils = { workspace = true }
+hex = { workspace = true }
+humantime = { workspace = true }
+nostr = { workspace = true }
+proptest = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
 simplicity-lang = { workspace = true }
 simplicityhl = { workspace = true }
 simplicityhl-core = { workspace = true }
@@ -35,6 +36,4 @@ sled = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
-serde = { workspace = true }
-humantime = { version = "2.3.0"}
 
