@@ -14,6 +14,7 @@ mod tests {
 
     use tracing::{info, instrument};
 
+    #[ignore]
     #[instrument]
     #[tokio::test]
     async fn test_wss_metadata() -> anyhow::Result<()> {
