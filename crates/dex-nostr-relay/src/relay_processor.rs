@@ -86,7 +86,7 @@ impl RelayProcessor {
         &self,
         tags: OrderPlaceEventTags,
         tx_id: Txid,
-        maker_expiration_time: u64,
+        maker_expiration_time: Option<u64>,
     ) -> crate::error::Result<EventId> {
         let event_id = handlers::place_order::handle(&self.relay_client, tags, tx_id, maker_expiration_time).await?;
         Ok(event_id)

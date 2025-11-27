@@ -8,7 +8,7 @@ pub async fn handle(
     client: &RelayClient,
     tags: OrderPlaceEventTags,
     tx_id: Txid,
-    maker_expiration_time: u64,
+    maker_expiration_time: Option<u64>,
 ) -> crate::error::Result<EventId> {
     let client_signer = client.get_signer().await?;
     let client_pubkey = client_signer.get_public_key().await?;

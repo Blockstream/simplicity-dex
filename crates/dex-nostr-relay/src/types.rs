@@ -392,7 +392,7 @@ impl MakerOrderEvent {
         tags: OrderPlaceEventTags,
         tx_id: Txid,
         client_pubkey: PublicKey,
-        maker_expiration_time: u64,
+        maker_expiration_time: Option<u64>,
         timestamp_now: u64,
     ) -> crate::error::Result<Vec<Tag>> {
         let dcd_arguments = {
@@ -404,9 +404,8 @@ impl MakerOrderEvent {
             })?;
             nostr::prelude::hex::encode(x)
         };
-        Ok(vec![
+        let mut event_tags = vec![ //todo rework (should be not mutable and easy to use optional tags)
             Tag::public_key(client_pubkey),
-            Tag::expiration(Timestamp::from(timestamp_now + maker_expiration_time)),
             Tag::custom(TagKind::Custom(Cow::from(MAKER_DCD_ARG_TAG)), [dcd_arguments]),
             Tag::custom(
                 TagKind::Custom(Cow::from(MAKER_DCD_TAPROOT_TAG)),
@@ -433,7 +432,13 @@ impl MakerOrderEvent {
                 [tags.collateral_asset_id.to_string()],
             ),
             Tag::custom(TagKind::Custom(Cow::from(MAKER_FUND_TX_ID_TAG)), [tx_id.to_string()]),
-        ])
+        ];
+        
+        if let Some(maker_expiration_time) = maker_expiration_time {
+            event_tags.push(Tag::expiration(Timestamp::from(timestamp_now + maker_expiration_time)));
+        }
+        
+        Ok(event_tags)
     }
 }
 

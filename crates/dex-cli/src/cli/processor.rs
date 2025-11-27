@@ -414,7 +414,8 @@ impl Cli {
     ) -> crate::error::Result<String> {
         use contract_handlers::maker_funding::{Utxos, handle, process_args, save_args_to_cache};
 
-        agg_config.check_nostr_keypair_existence()?;
+        agg_config.check_nostr_keypair_existence()?; // todo: add analogous function for seed_hex 
+        // todo: 
 
         let processed_args = process_args(account_index, dcd_taproot_pubkey_gen, agg_config)?;
         let event_to_publish = processed_args.extract_event();
@@ -432,7 +433,7 @@ impl Cli {
         )?;
         let expiration_time = agg_config.maker_expiration_time;
         let res = relay_processor
-            .place_order(event_to_publish, tx_id, expiration_time)
+            .place_order(event_to_publish, tx_id, Some(expiration_time))
             .await?;
         save_args_to_cache(&args_to_save)?;
         Ok(format!("[Maker] Creating order, tx_id: {tx_id}, event_id: {res:#?}"))

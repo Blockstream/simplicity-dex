@@ -23,7 +23,7 @@ pub type SeedInner = [u8; 32];
 pub struct AggregatedConfig {
     pub nostr_keypair: Option<Keys>,
     pub relays: Vec<RelayUrl>,
-    pub seed_hex: Seed,
+    pub seed_hex: Seed, // todo Option<Seed> and check for only func which need it
     pub maker_expiration_time: u64,
 }
 
