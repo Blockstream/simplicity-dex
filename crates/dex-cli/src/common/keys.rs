@@ -41,26 +41,14 @@ mod tests {
         p2pk_addr: &str,
         seed_hex: impl AsRef<[u8]>,
     ) -> anyhow::Result<()> {
-        let kp = derive_keypair_from_index(index, &seed_hex);
-
-        let keypair = elements::bitcoin::secp256k1::Keypair::from_secret_key(
-            &elements::bitcoin::secp256k1::SECP256K1,
-            &derive_secret_key_from_index(index, &seed_hex),
-        );
+        let keypair = derive_keypair_from_index(index, &seed_hex);
 
         let public_key = keypair.x_only_public_key().0;
         let address = get_p2pk_address(&public_key, &AddressParams::LIQUID_TESTNET)?;
 
-        let sk_bytes = keypair.secret_bytes();
         assert_eq!(public_key.to_string(), x_only_pubkey);
         assert_eq!(address.to_string(), p2pk_addr);
         Ok(())
-    }
-
-    fn check_keypair_determinism(index: u32, seed_hex: impl AsRef<[u8]>) {
-        let kp1 = derive_keypair_from_index(index, &seed_hex);
-        let kp2 = derive_keypair_from_index(index, &seed_hex);
-        assert_eq!(kp1.secret_bytes(), kp2.secret_bytes());
     }
 
     #[test]
