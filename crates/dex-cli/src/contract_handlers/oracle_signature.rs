@@ -1,5 +1,5 @@
 use crate::common::derive_public_oracle_keypair;
-use crate::common::keys::derive_secret_key_from_index;
+use crate::common::keys::derive_keypair_from_index;
 use crate::common::settings::Settings;
 use contracts::oracle_msg;
 use elements::bitcoin::secp256k1;
@@ -15,9 +15,7 @@ pub fn handle(
     let settings = Settings::load()?;
     let keypair = match index {
         None => derive_public_oracle_keypair()?,
-        Some(index) => {
-            secp256k1::Keypair::from_secret_key(secp256k1::SECP256K1, &derive_secret_key_from_index(index, settings))
-        }
+        Some(index) => derive_keypair_from_index(index, &settings.seed_hex),
     };
     let pubkey = keypair.public_key();
     let msg = secp256k1::Message::from_digest_slice(&oracle_msg(settlement_height, price_at_current_block_height))?;

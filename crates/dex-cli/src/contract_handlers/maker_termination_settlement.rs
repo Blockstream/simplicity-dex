@@ -1,5 +1,5 @@
 use crate::common::broadcast_tx_inner;
-use crate::common::keys::derive_secret_key_from_index;
+use crate::common::keys::derive_keypair_from_index;
 use crate::common::settings::Settings;
 use crate::common::store::SledError;
 use crate::common::store::utils::OrderParams;
@@ -16,6 +16,7 @@ use simplicity::elements::OutPoint;
 use simplicity::elements::pset::serialize::Serialize;
 use simplicityhl::elements::{AddressParams, Txid};
 use simplicityhl_core::{LIQUID_TESTNET_BITCOIN_ASSET, LIQUID_TESTNET_GENESIS, TaprootPubkeyGen};
+use tokio::task;
 use tracing::instrument;
 
 #[derive(Debug)]
@@ -48,10 +49,7 @@ pub async fn process_args(
 ) -> crate::error::Result<ProcessedArgs> {
     let settings = Settings::load().map_err(|err| crate::error::CliError::EnvNotSet(err.to_string()))?;
 
-    let keypair = secp256k1::Keypair::from_secret_key(
-        secp256k1::SECP256K1,
-        &derive_secret_key_from_index(account_index, settings.clone()),
-    );
+    let keypair = derive_keypair_from_index(account_index, &settings.seed_hex);
 
     let order_params: OrderParams = get_order_params(maker_order_event_id, relay_processor).await?;
 
@@ -64,7 +62,17 @@ pub async fn process_args(
 }
 
 #[instrument(level = "debug", skip_all, err)]
-pub fn handle(
+pub async fn handle(
+    processed_args: ProcessedArgs,
+    utxos: Utxos,
+    fee_amount: u64,
+    is_offline: bool,
+) -> crate::error::Result<(Txid, ArgsToSave)> {
+    task::spawn_blocking(move || handle_sync(processed_args, utxos, fee_amount, is_offline)).await?
+}
+
+#[instrument(level = "debug", skip_all, err)]
+fn handle_sync(
     ProcessedArgs {
         keypair,
         dcd_arguments,
@@ -77,7 +85,7 @@ pub fn handle(
         grantor_settlement_token: grantor_settlement_token_utxo,
     }: Utxos,
     fee_amount: u64,
-    broadcast: bool,
+    is_offline: bool,
 ) -> crate::error::Result<(Txid, ArgsToSave)> {
     tracing::debug!("=== dcd arguments: {:?}", dcd_arguments);
     let base_contract_context = BaseContractContext {
@@ -110,7 +118,7 @@ pub fn handle(
     )
     .map_err(|err| crate::error::CliError::DcdManager(err.to_string()))?;
 
-    if broadcast {
+    if is_offline {
         println!("{}", transaction.serialize().to_lower_hex_string());
     } else {
         println!("Broadcasted txid: {}", broadcast_tx_inner(&transaction)?);

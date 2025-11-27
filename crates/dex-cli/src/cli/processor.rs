@@ -240,16 +240,19 @@ impl Cli {
                 init_order_args,
                 fee_amount,
                 common_options,
-            } => Self::_process_maker_init_order(
-                MakerInitCliContext {
-                    first_lbtc_utxo,
-                    second_lbtc_utxo,
-                    third_lbtc_utxo,
-                    init_order_args,
-                    fee_amount,
-                },
-                common_options,
-            )?,
+            } => {
+                Self::_process_maker_init_order(
+                    MakerInitCliContext {
+                        first_lbtc_utxo,
+                        second_lbtc_utxo,
+                        third_lbtc_utxo,
+                        init_order_args,
+                        fee_amount,
+                    },
+                    common_options,
+                )
+                .await?
+            }
             MakerCommands::Fund {
                 filler_token_utxo,
                 grantor_collateral_token_utxo,
@@ -353,7 +356,7 @@ impl Cli {
         })
     }
 
-    fn _process_maker_init_order(
+    async fn _process_maker_init_order(
         MakerInitCliContext {
             first_lbtc_utxo,
             second_lbtc_utxo,
@@ -378,7 +381,8 @@ impl Cli {
             },
             fee_amount,
             is_offline,
-        )?;
+        )
+        .await?;
         save_args_to_cache(&args_to_save)?;
         Ok(format!("[Maker] Init order tx result: {tx_res:?}"))
     }
@@ -419,7 +423,8 @@ impl Cli {
             },
             fee_amount,
             is_offline,
-        )?;
+        )
+        .await?;
         let res = relay_processor.place_order(event_to_publish, tx_id).await?;
         save_args_to_cache(&args_to_save)?;
         Ok(format!("[Maker] Creating order, tx_id: {tx_id}, event_id: {res:#?}"))
@@ -462,7 +467,8 @@ impl Cli {
             },
             fee_amount,
             is_offline,
-        )?;
+        )
+        .await?;
         save_args_to_cache(&args_to_save)?;
         let reply_event_id = relay_processor
             .reply_order(maker_order_event_id, ReplyOption::MakerTerminationCollateral { tx_id })
@@ -509,7 +515,8 @@ impl Cli {
             },
             fee_amount,
             is_offline,
-        )?;
+        )
+        .await?;
         save_args_to_cache(&args_to_save)?;
         let reply_event_id = relay_processor
             .reply_order(maker_order_event_id, ReplyOption::MakerTerminationSettlement { tx_id })
@@ -563,7 +570,8 @@ impl Cli {
             },
             fee_amount,
             is_offline,
-        )?;
+        )
+        .await?;
         save_args_to_cache(&args_to_save)?;
         let reply_event_id = relay_processor
             .reply_order(maker_order_event_id, ReplyOption::MakerSettlement { tx_id })
@@ -608,7 +616,8 @@ impl Cli {
                     },
                     fee_amount,
                     common_options.is_offline,
-                )?;
+                )
+                .await?;
                 let reply_event_id = relay_processor
                     .reply_order(maker_order_event_id, ReplyOption::TakerFund { tx_id })
                     .await?;
@@ -643,7 +652,8 @@ impl Cli {
                     },
                     fee_amount,
                     common_options.is_offline,
-                )?;
+                )
+                .await?;
                 let reply_event_id = relay_processor
                     .reply_order(maker_order_event_id, ReplyOption::TakerTerminationEarly { tx_id })
                     .await?;
@@ -682,7 +692,8 @@ impl Cli {
                     },
                     fee_amount,
                     common_options.is_offline,
-                )?;
+                )
+                .await?;
                 save_args_to_cache(&args_to_save)?;
                 let reply_event_id = relay_processor
                     .reply_order(maker_order_event_id, ReplyOption::TakerSettlement { tx_id })
@@ -704,7 +715,10 @@ impl Cli {
                 issue_amount,
                 fee_amount,
                 common_options,
-            } => Self::_process_helper_faucet(fee_utxo_outpoint, asset_name, issue_amount, fee_amount, common_options)?,
+            } => {
+                Self::_process_helper_faucet(fee_utxo_outpoint, asset_name, issue_amount, fee_amount, common_options)
+                    .await?
+            }
             HelperCommands::MintTokens {
                 reissue_asset_outpoint,
                 fee_utxo_outpoint,
@@ -712,20 +726,23 @@ impl Cli {
                 reissue_amount,
                 fee_amount,
                 common_options,
-            } => Self::_process_helper_mint_tokens(
-                reissue_asset_outpoint,
-                fee_utxo_outpoint,
-                asset_name,
-                reissue_amount,
-                fee_amount,
-                common_options,
-            )?,
+            } => {
+                Self::_process_helper_mint_tokens(
+                    reissue_asset_outpoint,
+                    fee_utxo_outpoint,
+                    asset_name,
+                    reissue_amount,
+                    fee_amount,
+                    common_options,
+                )
+                .await?
+            }
             HelperCommands::SplitNativeThree {
                 split_amount,
                 fee_utxo,
                 fee_amount,
                 common_options,
-            } => Self::_process_helper_split_native_three(split_amount, fee_utxo, fee_amount, common_options)?,
+            } => Self::_process_helper_split_native_three(split_amount, fee_utxo, fee_amount, common_options).await?,
             HelperCommands::Address { account_index: index } => Self::_process_helper_address(index)?,
             HelperCommands::OracleSignature {
                 price_at_current_block_height,
@@ -808,7 +825,7 @@ impl Cli {
         })
     }
 
-    fn _process_helper_faucet(
+    async fn _process_helper_faucet(
         fee_utxo_outpoint: OutPoint,
         asset_name: String,
         issue_amount: u64,
@@ -825,11 +842,12 @@ impl Cli {
             fee_amount,
             issue_amount,
             is_offline,
-        )?;
+        )
+        .await?;
         Ok("Asset creation -- done".to_string())
     }
 
-    fn _process_helper_mint_tokens(
+    async fn _process_helper_mint_tokens(
         reissue_asset_outpoint: OutPoint,
         fee_utxo_outpoint: OutPoint,
         asset_name: String,
@@ -848,11 +866,12 @@ impl Cli {
             reissue_amount,
             fee_amount,
             is_offline,
-        )?;
+        )
+        .await?;
         Ok("Asset minting -- done".to_string())
     }
 
-    fn _process_helper_split_native_three(
+    async fn _process_helper_split_native_three(
         split_amount: u64,
         fee_utxo: OutPoint,
         fee_amount: u64,
@@ -862,7 +881,8 @@ impl Cli {
         }: CommonOrderOptions,
     ) -> crate::error::Result<String> {
         let tx_res =
-            contract_handlers::split_utxo::handle(account_index, split_amount, fee_utxo, fee_amount, is_offline)?;
+            contract_handlers::split_utxo::handle(account_index, split_amount, fee_utxo, fee_amount, is_offline)
+                .await?;
         Ok(format!("Split utxo result tx_id: {tx_res:?}"))
     }
 
@@ -922,7 +942,8 @@ impl Cli {
             },
             fee_amount,
             is_offline,
-        )?;
+        )
+        .await?;
         save_args_to_cache(&args_to_save)?;
         let reply_event_id = relay_processor
             .reply_order(maker_order_event_id, ReplyOption::TakerSettlement { tx_id })
@@ -967,7 +988,8 @@ impl Cli {
             },
             fee_amount,
             is_offline,
-        )?;
+        )
+        .await?;
         save_args_to_cache(&args_to_save)?;
         let reply_event_id = relay_processor
             .reply_order(maker_order_event_id, ReplyOption::TakerSettlement { tx_id })
@@ -1014,7 +1036,8 @@ impl Cli {
             },
             fee_amount,
             is_offline,
-        )?;
+        )
+        .await?;
         save_args_to_cache(&args_to_save)?;
         let reply_event_id = relay_processor
             .reply_order(maker_order_event_id, ReplyOption::TakerSettlement { tx_id })

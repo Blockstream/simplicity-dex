@@ -1,4 +1,4 @@
-use crate::common::keys::derive_secret_key_from_index;
+use crate::common::keys::derive_keypair_from_index;
 use crate::common::settings::Settings;
 use crate::common::{broadcast_tx_inner, entropy_to_asset_id};
 use contracts::DCDArguments;
@@ -16,6 +16,7 @@ use simplicityhl_core::{
     AssetEntropyHex, AssetIdHex, LIQUID_TESTNET_BITCOIN_ASSET, LIQUID_TESTNET_GENESIS, TaprootPubkeyGen,
     derive_public_blinder_key,
 };
+use tokio::task;
 use tracing::instrument;
 
 #[derive(Debug)]
@@ -80,10 +81,8 @@ impl TryInto<DcdInitParams> for InnerDcdInitParams {
 pub fn process_args(account_index: u32, dcd_init_params: InnerDcdInitParams) -> crate::error::Result<ProcessedArgs> {
     let settings = Settings::load().map_err(|err| crate::error::CliError::EnvNotSet(err.to_string()))?;
 
-    let keypair = secp256k1::Keypair::from_secret_key(
-        secp256k1::SECP256K1,
-        &derive_secret_key_from_index(account_index, settings.clone()),
-    );
+    let keypair = derive_keypair_from_index(account_index, &settings.seed_hex);
+
     let dcd_init_params: DcdInitParams = dcd_init_params
         .try_into()
         .map_err(|err: anyhow::Error| crate::error::CliError::InnerDcdConversion(err.to_string()))?;
@@ -95,7 +94,17 @@ pub fn process_args(account_index: u32, dcd_init_params: InnerDcdInitParams) -> 
 }
 
 #[instrument(level = "debug", skip_all, err)]
-pub fn handle(
+pub async fn handle(
+    processed_args: ProcessedArgs,
+    utxos: Utxos,
+    fee_amount: u64,
+    is_offline: bool,
+) -> crate::error::Result<(Txid, ArgsToSave)> {
+    task::spawn_blocking(move || handle_sync(processed_args, utxos, fee_amount, is_offline)).await?
+}
+
+#[instrument(level = "debug", skip_all, err)]
+fn handle_sync(
     ProcessedArgs {
         keypair,
         dcd_init_params,

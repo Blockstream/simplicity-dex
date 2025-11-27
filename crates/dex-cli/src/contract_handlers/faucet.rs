@@ -1,17 +1,38 @@
 use crate::common::broadcast_tx_inner;
-use crate::common::keys::derive_secret_key_from_index;
+use crate::common::keys::derive_keypair_from_index;
 use crate::common::settings::Settings;
 use crate::common::store::Store;
 use contracts_adapter::basic::{IssueAssetResponse, ReissueAssetResponse};
 use elements::bitcoin::hex::DisplayHex;
-use simplicity::bitcoin::secp256k1;
 use simplicity::elements::OutPoint;
 use simplicity::hashes::sha256::Midstate;
 use simplicityhl::elements::AddressParams;
 use simplicityhl::elements::pset::serialize::Serialize;
 use simplicityhl_core::{LIQUID_TESTNET_BITCOIN_ASSET, LIQUID_TESTNET_GENESIS, derive_public_blinder_key};
+use tokio::task;
 
-pub fn create_asset(
+pub async fn create_asset(
+    account_index: u32,
+    asset_name: String,
+    fee_utxo: OutPoint,
+    fee_amount: u64,
+    issue_amount: u64,
+    is_offline: bool,
+) -> crate::error::Result<()> {
+    task::spawn_blocking(move || {
+        create_asset_sync(
+            account_index,
+            asset_name,
+            fee_utxo,
+            fee_amount,
+            issue_amount,
+            is_offline,
+        )
+    })
+    .await?
+}
+
+fn create_asset_sync(
     account_index: u32,
     asset_name: String,
     fee_utxo: OutPoint,
@@ -26,10 +47,7 @@ pub fn create_asset(
     }
 
     let settings = Settings::load().map_err(|err| crate::error::CliError::EnvNotSet(err.to_string()))?;
-    let keypair = secp256k1::Keypair::from_secret_key(
-        secp256k1::SECP256K1,
-        &derive_secret_key_from_index(account_index, settings.clone()),
-    );
+    let keypair = derive_keypair_from_index(account_index, &settings.seed_hex);
     let blinding_key = derive_public_blinder_key();
 
     let IssueAssetResponse {
@@ -50,7 +68,8 @@ pub fn create_asset(
     .map_err(|err| crate::error::CliError::DcdManager(err.to_string()))?;
 
     println!(
-        "Test token asset entropy: '{asset_entropy}', asset_id: '{asset_id}', reissue_asset_id: '{reissuance_asset_id}'"
+        "Test token asset entropy: '{asset_entropy}', asset_id: '{asset_id}', \
+         reissue_asset_id: '{reissuance_asset_id}'"
     );
     if is_offline {
         println!("{}", tx.serialize().to_lower_hex_string());
@@ -61,7 +80,30 @@ pub fn create_asset(
     Ok(())
 }
 
-pub fn mint_asset(
+pub async fn mint_asset(
+    account_index: u32,
+    asset_name: String,
+    reissue_asset_utxo: OutPoint,
+    fee_utxo: OutPoint,
+    reissue_amount: u64,
+    fee_amount: u64,
+    is_offline: bool,
+) -> crate::error::Result<()> {
+    task::spawn_blocking(move || {
+        mint_asset_sync(
+            account_index,
+            asset_name,
+            reissue_asset_utxo,
+            fee_utxo,
+            reissue_amount,
+            fee_amount,
+            is_offline,
+        )
+    })
+    .await?
+}
+
+fn mint_asset_sync(
     account_index: u32,
     asset_name: String,
     reissue_asset_utxo: OutPoint,
@@ -81,10 +123,8 @@ pub fn mint_asset(
     let asset_entropy = entropy_to_midstate(&asset_entropy)?;
 
     let settings = Settings::load().map_err(|err| crate::error::CliError::EnvNotSet(err.to_string()))?;
-    let keypair = secp256k1::Keypair::from_secret_key(
-        secp256k1::SECP256K1,
-        &derive_secret_key_from_index(account_index, settings.clone()),
-    );
+    let keypair = derive_keypair_from_index(account_index, &settings.seed_hex);
+
     let blinding_key = derive_public_blinder_key();
     let ReissueAssetResponse {
         tx,

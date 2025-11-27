@@ -2,6 +2,7 @@ use crate::common::store::SledError;
 use config::ConfigError;
 use dex_nostr_relay::error::NostrRelayError;
 use elements::bitcoin::secp256k1;
+use tokio::task::JoinError;
 
 pub type Result<T> = core::result::Result<T, CliError>;
 
@@ -45,6 +46,8 @@ pub enum CliError {
     Cache(String),
     #[error("Nostr keypair is required for the action, but it's absent")]
     NoNostrKeypairListed,
+    #[error("Failed to join task, err: '{0}'")]
+    TokioJoinError(#[from] JoinError),
     #[error("Occurred error with msg: '{0}'")]
     Custom(String),
 }

@@ -1,5 +1,5 @@
 use crate::common::broadcast_tx_inner;
-use crate::common::keys::derive_secret_key_from_index;
+use crate::common::keys::derive_keypair_from_index;
 use crate::common::settings::Settings;
 use crate::common::store::SledError;
 use crate::common::store::utils::OrderParams;
@@ -37,10 +37,7 @@ pub async fn process_args(
 ) -> crate::error::Result<ProcessedArgs> {
     let settings = Settings::load().map_err(|err| crate::error::CliError::EnvNotSet(err.to_string()))?;
 
-    let keypair = secp256k1::Keypair::from_secret_key(
-        secp256k1::SECP256K1,
-        &derive_secret_key_from_index(account_index, settings.clone()),
-    );
+    let keypair = derive_keypair_from_index(account_index, &settings.seed_hex);
 
     let order_params: OrderParams = get_order_params(maker_order_event_id, relay_processor).await?;
 
@@ -58,6 +55,7 @@ pub mod merge2 {
     };
     use contracts::MergeBranch;
     use contracts_adapter::dcd::MergeTokensContext;
+    use tokio::task;
 
     #[derive(Debug)]
     pub struct Utxos2 {
@@ -67,7 +65,17 @@ pub mod merge2 {
     }
 
     #[instrument(level = "debug", skip_all, err)]
-    pub fn handle(
+    pub async fn handle(
+        processed_args: ProcessedArgs,
+        utxos: Utxos2,
+        fee_amount: u64,
+        is_offline: bool,
+    ) -> crate::error::Result<(Txid, ArgsToSave)> {
+        task::spawn_blocking(move || handle_sync(processed_args, utxos, fee_amount, is_offline)).await?
+    }
+
+    #[instrument(level = "debug", skip_all, err)]
+    fn handle_sync(
         ProcessedArgs {
             keypair,
             dcd_arguments,
@@ -130,6 +138,7 @@ pub mod merge3 {
     };
     use contracts::MergeBranch;
     use contracts_adapter::dcd::MergeTokensContext;
+    use tokio::task;
 
     #[derive(Debug)]
     pub struct Utxos3 {
@@ -140,7 +149,17 @@ pub mod merge3 {
     }
 
     #[instrument(level = "debug", skip_all, err)]
-    pub fn handle(
+    pub async fn handle(
+        processed_args: ProcessedArgs,
+        utxos: Utxos3,
+        fee_amount: u64,
+        is_offline: bool,
+    ) -> crate::error::Result<(Txid, ArgsToSave)> {
+        task::spawn_blocking(move || handle_sync(processed_args, utxos, fee_amount, is_offline)).await?
+    }
+
+    #[instrument(level = "debug", skip_all, err)]
+    fn handle_sync(
         ProcessedArgs {
             keypair,
             dcd_arguments,
@@ -208,6 +227,7 @@ pub mod merge4 {
     };
     use contracts::MergeBranch;
     use contracts_adapter::dcd::MergeTokensContext;
+    use tokio::task;
 
     #[derive(Debug)]
     pub struct Utxos4 {
@@ -219,7 +239,17 @@ pub mod merge4 {
     }
 
     #[instrument(level = "debug", skip_all, err)]
-    pub fn handle(
+    pub async fn handle(
+        processed_args: ProcessedArgs,
+        utxos: Utxos4,
+        fee_amount: u64,
+        is_offline: bool,
+    ) -> crate::error::Result<(Txid, ArgsToSave)> {
+        task::spawn_blocking(move || handle_sync(processed_args, utxos, fee_amount, is_offline)).await?
+    }
+
+    #[instrument(level = "debug", skip_all, err)]
+    fn handle_sync(
         ProcessedArgs {
             keypair,
             dcd_arguments,
