@@ -3,8 +3,7 @@ mod utils;
 mod tests {
     use crate::utils::{DEFAULT_CLIENT_TIMEOUT, DEFAULT_RELAY_LIST, TEST_LOGGER};
     use std::str::FromStr;
-
-    use bincode::error::IntegerType::U64;
+    
     use dex_nostr_relay::relay_client::ClientConfig;
     use dex_nostr_relay::relay_processor::{ListOrdersEventFilter, OrderPlaceEventTags, RelayProcessor};
     use dex_nostr_relay::types::{CustomKind, MakerOrderKind, ReplyOption, TakerReplyOrderKind};
