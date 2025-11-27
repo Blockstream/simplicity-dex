@@ -12,7 +12,7 @@ use serde::{Deserialize, Deserializer};
 use crate::error::CliError;
 use tracing::instrument;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct AggregatedConfig {
     pub nostr_keypair: Option<Keys>,
     pub relays: Vec<RelayUrl>,

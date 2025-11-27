@@ -78,6 +78,7 @@ pub enum Command {
     ShowConfig,
 }
 
+#[derive(Debug, Clone)]
 struct CliAppContext {
     agg_config: AggregatedConfig,
     relay_processor: RelayProcessor,

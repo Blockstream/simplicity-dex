@@ -32,7 +32,7 @@ pub struct InnerDcdInitParams {
     pub strike_price: u64,
     pub collateral_asset_id: AssetIdHex,
     pub settlement_asset_entropy: AssetEntropyHex,
-    pub oracle_public_key: secp256k1::PublicKey,
+    pub oracle_public_key: String,
 }
 
 #[derive(Debug)]
@@ -72,7 +72,10 @@ impl TryInto<DcdInitParams> for InnerDcdInitParams {
             strike_price: self.strike_price,
             collateral_asset_id: self.collateral_asset_id,
             settlement_asset_id: entropy_to_asset_id(self.settlement_asset_entropy)?.to_string(),
-            oracle_public_key: self.oracle_public_key.x_only_public_key().0.to_hex(),
+            oracle_public_key: self.oracle_public_key.to_string(),
+            // TODO(Illia): replace with actual data
+            fee_script_hash: "0000000000000000000000000000000000000000000000000000000000000000".to_string(),
+            fee_basis_points: 0,
         })
     }
 }

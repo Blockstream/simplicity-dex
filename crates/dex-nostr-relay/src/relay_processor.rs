@@ -10,6 +10,7 @@ use simplicityhl::elements::{AssetId, Txid};
 use nostr::{Filter, Timestamp};
 use std::collections::{BTreeMap, BTreeSet};
 
+#[derive(Debug, Clone)]
 pub struct RelayProcessor {
     relay_client: RelayClient,
 }
