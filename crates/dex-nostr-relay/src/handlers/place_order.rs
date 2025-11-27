@@ -4,13 +4,24 @@ use crate::types::{BLOCKSTREAM_MAKER_CONTENT, CustomKind, MakerOrderEvent, Maker
 use nostr::{EventBuilder, EventId, Timestamp};
 use simplicity::elements::Txid;
 
-pub async fn handle(client: &RelayClient, tags: OrderPlaceEventTags, tx_id: Txid) -> crate::error::Result<EventId> {
+pub async fn handle(
+    client: &RelayClient,
+    tags: OrderPlaceEventTags,
+    tx_id: Txid,
+    maker_expiration_time: u64,
+) -> crate::error::Result<EventId> {
     let client_signer = client.get_signer().await?;
     let client_pubkey = client_signer.get_public_key().await?;
 
     let timestamp_now = Timestamp::now();
 
-    let tags = MakerOrderEvent::form_tags(tags, tx_id, client_pubkey)?;
+    let tags = MakerOrderEvent::form_tags(
+        tags,
+        tx_id,
+        client_pubkey,
+        maker_expiration_time,
+        timestamp_now.as_u64(),
+    )?;
     let maker_order = EventBuilder::new(MakerOrderKind::get_kind(), BLOCKSTREAM_MAKER_CONTENT)
         .tags(tags)
         .custom_created_at(timestamp_now);

@@ -1,6 +1,6 @@
+use crate::common::config::AggregatedConfig;
 use crate::common::derive_public_oracle_keypair;
 use crate::common::keys::derive_secret_key_from_index;
-use crate::common::settings::Settings;
 use contracts::oracle_msg;
 use elements::bitcoin::secp256k1;
 use elements::secp256k1_zkp::Message;
@@ -11,12 +11,12 @@ pub fn handle(
     index: Option<u32>,
     price_at_current_block_height: u64,
     settlement_height: u32,
+    config: &AggregatedConfig,
 ) -> crate::error::Result<(PublicKey, Message, Signature)> {
-    let settings = Settings::load()?;
     let keypair = match index {
         None => derive_public_oracle_keypair()?,
         Some(index) => {
-            secp256k1::Keypair::from_secret_key(secp256k1::SECP256K1, &derive_secret_key_from_index(index, settings))
+            secp256k1::Keypair::from_secret_key(secp256k1::SECP256K1, &derive_secret_key_from_index(index, config)?)
         }
     };
     let pubkey = keypair.public_key();

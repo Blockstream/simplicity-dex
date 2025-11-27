@@ -2,7 +2,7 @@ use crate::handlers::common::timestamp_to_chrono_utc;
 use crate::relay_processor::OrderPlaceEventTags;
 use chrono::TimeZone;
 use contracts::DCDArguments;
-use nostr::{Event, EventId, Kind, PublicKey, Tag, TagKind, Tags};
+use nostr::{Event, EventId, Kind, PublicKey, Tag, TagKind, Tags, Timestamp};
 use simplicity::elements::AssetId;
 use simplicityhl::elements::Txid;
 use std::borrow::Cow;
@@ -27,9 +27,6 @@ pub const POW_DIFFICULTY: u8 = 1;
 pub const BLOCKSTREAM_MAKER_CONTENT: &str = "Liquid order [Maker]!";
 pub const BLOCKSTREAM_TAKER_REPLY_CONTENT: &str = "Liquid reply [Taker]!";
 pub const BLOCKSTREAM_MAKER_REPLY_CONTENT: &str = "Liquid reply [Maker]!";
-/// `MAKER_EXPIRATION_TIME` = 31 days
-/// TODO: move to the config
-pub const MAKER_EXPIRATION_TIME: u64 = 2_678_400;
 pub const MAKER_DCD_ARG_TAG: &str = "dcd_arguments_(hex&bincode)";
 pub const MAKER_DCD_TAPROOT_TAG: &str = "dcd_taproot_pubkey_gen";
 pub const MAKER_FILLER_ASSET_ID_TAG: &str = "filler_asset_id";
@@ -395,6 +392,8 @@ impl MakerOrderEvent {
         tags: OrderPlaceEventTags,
         tx_id: Txid,
         client_pubkey: PublicKey,
+        maker_expiration_time: u64,
+        timestamp_now: u64,
     ) -> crate::error::Result<Vec<Tag>> {
         let dcd_arguments = {
             let x = bincode::encode_to_vec(&tags.dcd_arguments, bincode::config::standard()).map_err(|err| {
@@ -407,7 +406,7 @@ impl MakerOrderEvent {
         };
         Ok(vec![
             Tag::public_key(client_pubkey),
-            // Tag::expiration(Timestamp::from(timestamp_now.as_u64() + MAKER_EXPIRATION_TIME)),
+            Tag::expiration(Timestamp::from(timestamp_now + maker_expiration_time)),
             Tag::custom(TagKind::Custom(Cow::from(MAKER_DCD_ARG_TAG)), [dcd_arguments]),
             Tag::custom(
                 TagKind::Custom(Cow::from(MAKER_DCD_TAPROOT_TAG)),

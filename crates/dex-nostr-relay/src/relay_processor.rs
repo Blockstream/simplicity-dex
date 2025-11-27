@@ -82,8 +82,13 @@ impl RelayProcessor {
     ///
     /// Returns an error if constructing or publishing the order event fails,
     /// or if the relay client encounters an error while sending the event.
-    pub async fn place_order(&self, tags: OrderPlaceEventTags, tx_id: Txid) -> crate::error::Result<EventId> {
-        let event_id = handlers::place_order::handle(&self.relay_client, tags, tx_id).await?;
+    pub async fn place_order(
+        &self,
+        tags: OrderPlaceEventTags,
+        tx_id: Txid,
+        maker_expiration_time: u64,
+    ) -> crate::error::Result<EventId> {
+        let event_id = handlers::place_order::handle(&self.relay_client, tags, tx_id, maker_expiration_time).await?;
         Ok(event_id)
     }
 
