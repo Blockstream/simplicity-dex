@@ -14,13 +14,13 @@ pub enum TakerCommands {
         #[arg(long = "filler-utxo")]
         filler_token_utxo: OutPoint,
         /// UTXO containing collateral asset that the Taker locks into the DCD contract
-        #[arg(long = "coll-utxo")]
+        #[arg(long = "collateral-utxo")]
         collateral_token_utxo: OutPoint,
         /// Miner fee in satoshis (LBTC) for the Taker funding transaction
         #[arg(long = "fee-amount", default_value_t = 1500)]
         fee_amount: u64,
         /// Amount of collateral (in satoshis) that the Taker will lock into the DCD contract
-        #[arg(long = "coll-amount-deposit")]
+        #[arg(long = "collateral-amount-deposit")]
         collateral_amount_to_deposit: u64,
         /// `EventId` of the Maker\'s original order event on Nostr
         #[arg(short = 'i', long)]
@@ -36,7 +36,7 @@ pub enum TakerCommands {
         #[arg(long = "filler-utxo")]
         filler_token_utxo: OutPoint,
         /// UTXO containing the collateral asset that the Taker will withdraw back
-        #[arg(long = "coll-utxo")]
+        #[arg(long = "collateral-utxo")]
         collateral_token_utxo: OutPoint,
         /// UTXO used to pay miner fees for the early-termination transaction
         #[arg(long = "fee-utxo")]
