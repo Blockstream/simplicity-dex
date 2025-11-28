@@ -7,7 +7,7 @@ the patterns used across crates (not exhaustive; follow Rust and crate docs for 
 
 - crates/dex-cli — command line client and UX helpers
 - crates/dex-nostr-relay — relay logic, event parsing and storage
-- crates/* — other helpers, contract handlers, tests
+- crates/global-utils — other helpers
 
 ## Prerequisites
 
@@ -44,17 +44,17 @@ Maker and Taker responsible for taking such steps:
 
 1. Create your own contract with your values. For example can be taken
 
-* `taker-funding-start-time` <TAKER_FUNDING_START_TIME> (timestamp can be taken from https://www.epochconverter.com/)
-* `taker-funding-end-time` = 
-* `contract-expiry-time` <CONTRACT_EXPIRY_TIME>
-* `early-termination-end-time` <EARLY_TERMINATION_END_TIME>
-* `settlement-height` <SETTLEMENT_HEIGHT>
-* `principal-collateral-amount` <PRINCIPAL_COLLATERAL_AMOUNT>
-* `incentive-basis-points` 1000
-* `filler-per-principal-collateral` <FILLER_PER_PRINCIPAL_COLLATERAL>
-* `strike-price` <STRIKE_PRICE>
-* `settlement-asset-entropy` <SETTLEMENT_ASSET_ENTROPY>
-* `oracle-pubkey` = `757f7c05d2d8f92ab37b880710491222a0d22b66be83ae68ff75cc6cb15dd2eb` (`./simplicity-dex helpers address --account-index 5`)
+* `taker-funding-start-time` 1764328373 (timestamp can be taken from https://www.epochconverter.com/)
+* `taker-funding-end-time` 1764358373 (Block time when taker funding period ends)
+* `contract-expiry-time` 1764359373 (Block time when contract expires)
+* `early-termination-end-time` 1764359373 (Block time when early termination is no longer allowed)
+* `settlement-height` 2169368 (Block height at which oracle price is attested)
+* `principal-collateral-amount` 2000 (Base collateral amount)
+* `incentive-basis-points` 1000 (Incentive in basis points (1 bp = 0.01%))
+* `filler-per-principal-collateral` 100 (Filler token ratio)
+* `strike-price` 25 (Oracle strike price for settlement)
+* `settlement-asset-entropy` `0ffa97b7ee6fcaac30b0c04803726f13c5176af59596874a3a770cbfd2a8d183`  (Asset entropy (hex) for settlement)
+* `oracle-pubkey` `757f7c05d2d8f92ab37b880710491222a0d22b66be83ae68ff75cc6cb15dd2eb` (`./simplicity-dex helpers address --account-index 5`)
 
 Actual command in cli:
 ```bash
@@ -90,7 +90,6 @@ Actual command in cli:
 
 ```bash
 ./simplicity-dex taker fund
-error: the following required arguments were not provided:
   --filler-utxo <FILLER_TOKEN_UTXO>
   --collateral-utxo <COLLATERAL_TOKEN_UTXO>
   --collateral-amount-deposit <COLLATERAL_AMOUNT_TO_DEPOSIT>
@@ -126,11 +125,40 @@ error: the following required arguments were not provided:
 This is made exactly for combining outs into one to eliminate execution of contract with usage of little fragments
 ```bash
 ./simplicity-dex helpers merge-tokens4
-error: the following required arguments were not provided:
   --token-utxo-1 <TOKEN_UTXO_1>
   --token-utxo-2 <TOKEN_UTXO_2>
   --token-utxo-3 <TOKEN_UTXO_3>
   --token-utxo-4 <TOKEN_UTXO_4>
   --fee-utxo <FEE_UTXO>
   --maker-order-event-id <MAKER_ORDER_EVENT_ID>
+```
+
+* For early collateral termination Maker can use command: 
+```bash
+./simplicity-dex maker termination-collateral
+  --grantor-collateral-utxo <GRANTOR_COLLATERAL_TOKEN_UTXO>
+  --collateral-utxo <COLLATERAL_TOKEN_UTXO>
+  --fee-utxo <FEE_UTXO>
+  --grantor-collateral-burn <GRANTOR_COLLATERAL_AMOUNT_TO_BURN>
+  --maker-order-event-id <MAKER_ORDER_EVENT_ID> 
+```
+
+* For early settlement termination Maker can use command:
+```bash
+./simplicity-dex maker termination-settlement
+  --settlement-asset-utxo <SETTLEMENT_ASSET_UTXO>
+  --grantor-settlement-utxo <GRANTOR_SETTLEMENT_TOKEN_UTXO>
+  --fee-utxo <FEE_UTXO>
+  --grantor-settlement-amount-burn <GRANTOR_SETTLEMENT_AMOUNT_TO_BURN>
+  --maker-order-event-id <MAKER_ORDER_EVENT_ID>
+```
+
+* For early termination Taker can use command:
+```bash
+./simplicity-dex taker termination-early
+  --filler-utxo <FILLER_TOKEN_UTXO>
+  --collateral-utxo <COLLATERAL_TOKEN_UTXO>
+  --fee-utxo <FEE_UTXO>
+  --filler-to-return <FILLER_TOKEN_AMOUNT_TO_RETURN>
+  --maker-order-event-id <MAKER_ORDER_EVENT_ID
 ```
