@@ -1,9 +1,8 @@
 use crate::common::broadcast_tx_inner;
 use crate::common::config::AggregatedConfig;
-use crate::common::keys::derive_secret_key_from_index;
 use crate::common::store::SledError;
 use crate::common::store::utils::OrderParams;
-use crate::contract_handlers::common::get_order_params;
+use crate::contract_handlers::common::{derive_keypair_from_config, get_order_params};
 use contracts::DCDArguments;
 use contracts_adapter::dcd::{
     BaseContractContext, CommonContext, DcdContractContext, DcdManager, MakerSettlementContext,
@@ -46,10 +45,7 @@ pub async fn process_args(
     relay_processor: &RelayProcessor,
     config: &AggregatedConfig,
 ) -> crate::error::Result<ProcessedArgs> {
-    let keypair = secp256k1::Keypair::from_secret_key(
-        secp256k1::SECP256K1,
-        &derive_secret_key_from_index(account_index, config)?,
-    );
+    let keypair = derive_keypair_from_config(account_index, config)?;
 
     let order_params: OrderParams = get_order_params(maker_order_event_id, relay_processor).await?;
 

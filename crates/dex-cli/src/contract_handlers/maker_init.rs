@@ -1,6 +1,6 @@
 use crate::common::config::AggregatedConfig;
-use crate::common::keys::derive_secret_key_from_index;
 use crate::common::{broadcast_tx_inner, entropy_to_asset_id};
+use crate::contract_handlers::common::derive_keypair_from_config;
 use contracts::DCDArguments;
 use contracts_adapter::dcd::{
     BaseContractContext, CreationContext, DcdInitParams, DcdInitResponse, DcdManager, FillerTokenEntropyHex,
@@ -82,10 +82,7 @@ pub fn process_args(
     dcd_init_params: InnerDcdInitParams,
     config: &AggregatedConfig,
 ) -> crate::error::Result<ProcessedArgs> {
-    let keypair = secp256k1::Keypair::from_secret_key(
-        secp256k1::SECP256K1,
-        &derive_secret_key_from_index(account_index, config)?,
-    );
+    let keypair = derive_keypair_from_config(account_index, config)?;
     let dcd_init_params: DcdInitParams = dcd_init_params
         .try_into()
         .map_err(|err: anyhow::Error| crate::error::CliError::InnerDcdConversion(err.to_string()))?;

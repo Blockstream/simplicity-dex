@@ -1,7 +1,7 @@
 use crate::common::config::AggregatedConfig;
-use crate::common::keys::derive_secret_key_from_index;
 use crate::common::store::SledError;
 use crate::common::{broadcast_tx_inner, decode_hex};
+use crate::contract_handlers::common::derive_keypair_from_config;
 use contracts::DCDArguments;
 use contracts_adapter::dcd::{
     AssetEntropyProcessed, BaseContractContext, COLLATERAL_ASSET_ID, CreationContext, DcdContractContext, DcdManager,
@@ -80,10 +80,7 @@ pub fn process_args(
     dcd_taproot_pubkey_gen: impl AsRef<str>,
     config: &AggregatedConfig,
 ) -> crate::error::Result<ProcessedArgs> {
-    let keypair = secp256k1::Keypair::from_secret_key(
-        secp256k1::SECP256K1,
-        &derive_secret_key_from_index(account_index, config)?,
-    );
+    let keypair = derive_keypair_from_config(account_index, config)?;
 
     let taproot_pubkey_gen = dcd_taproot_pubkey_gen.as_ref().to_string();
 

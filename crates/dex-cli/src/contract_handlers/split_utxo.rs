@@ -1,8 +1,7 @@
 use crate::common::broadcast_tx_inner;
 use crate::common::config::AggregatedConfig;
-use crate::common::keys::derive_secret_key_from_index;
+use crate::contract_handlers::common::derive_keypair_from_config;
 use elements::bitcoin::hex::DisplayHex;
-use nostr::secp256k1;
 use simplicityhl::elements::pset::serialize::Serialize;
 use simplicityhl::elements::{AddressParams, OutPoint, Txid};
 use simplicityhl_core::{LIQUID_TESTNET_BITCOIN_ASSET, LIQUID_TESTNET_GENESIS, get_p2pk_address};
@@ -15,10 +14,7 @@ pub fn handle(
     is_offline: bool,
     config: &AggregatedConfig,
 ) -> crate::error::Result<Txid> {
-    let keypair = secp256k1::Keypair::from_secret_key(
-        secp256k1::SECP256K1,
-        &derive_secret_key_from_index(account_index, config)?,
-    );
+    let keypair = derive_keypair_from_config(account_index, config)?;
     let recipient_addr = get_p2pk_address(&keypair.x_only_public_key().0, &AddressParams::LIQUID_TESTNET).unwrap();
     let transaction = contracts_adapter::basic::split_native_three(
         &keypair,

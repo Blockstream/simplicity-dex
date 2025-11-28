@@ -1,6 +1,10 @@
+use crate::common::config::AggregatedConfig;
+use crate::common::keys::derive_keypair_from_index;
 use crate::common::store::utils::{OrderParams, save_order_params_by_event_id};
+use crate::error::CliError;
 use dex_nostr_relay::relay_processor::RelayProcessor;
 use nostr::EventId;
+use simplicityhl::elements::secp256k1_zkp as secp256k1;
 
 pub async fn get_order_params(
     maker_order_event_id: EventId,
@@ -22,4 +26,9 @@ pub async fn get_order_params(
             }
         },
     )
+}
+
+pub fn derive_keypair_from_config(index: u32, config: &AggregatedConfig) -> crate::error::Result<secp256k1::Keypair> {
+    let seed = config.seed_hex.as_ref().ok_or(CliError::NoSeedHex)?;
+    derive_keypair_from_index(index, seed.0)
 }

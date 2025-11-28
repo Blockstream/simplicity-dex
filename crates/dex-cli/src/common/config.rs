@@ -23,7 +23,7 @@ pub type SeedInner = [u8; 32];
 pub struct AggregatedConfig {
     pub nostr_keypair: Option<Keys>,
     pub relays: Vec<RelayUrl>,
-    pub seed_hex: Seed, // todo Option<Seed> and check for only func which need it
+    pub seed_hex: Option<Seed>,
     pub maker_expiration_time: u64,
 }
 
@@ -163,14 +163,10 @@ impl AggregatedConfig {
             return Err(ConfigExtended("Relays configuration is empty..".to_string()));
         }
 
-        let seed_hex = config
-            .seed_hex
-            .ok_or_else(|| ConfigExtended("No seed found in configuration and CLI".to_string()))?;
-
         let aggregated_config = AggregatedConfig {
             nostr_keypair: config.nostr_keypair.map(|x| x.0),
             relays,
-            seed_hex,
+            seed_hex: config.seed_hex,
             maker_expiration_time: config.maker_expiration_time,
         };
 
@@ -187,6 +183,18 @@ impl AggregatedConfig {
     pub fn check_nostr_keypair_existence(&self) -> crate::error::Result<()> {
         if self.nostr_keypair.is_none() {
             return Err(CliError::NoNostrKeypairListed);
+        }
+        Ok(())
+    }
+
+    /// Ensure that a Seed hex is present in the aggregated configuration.
+    ///
+    /// # Errors
+    ///
+    /// Returns `CliError::NoSeedHex` if `seed_hex` is `None`.
+    pub fn check_seed_hex_existence(&self) -> crate::error::Result<()> {
+        if self.seed_hex.is_none() {
+            return Err(CliError::NoSeedHex);
         }
         Ok(())
     }

@@ -1,10 +1,9 @@
 use crate::common::broadcast_tx_inner;
 use crate::common::config::AggregatedConfig;
-use crate::common::keys::derive_secret_key_from_index;
 use crate::common::store::Store;
+use crate::contract_handlers::common::derive_keypair_from_config;
 use contracts_adapter::basic::{IssueAssetResponse, ReissueAssetResponse};
 use elements::bitcoin::hex::DisplayHex;
-use simplicity::bitcoin::secp256k1;
 use simplicity::elements::OutPoint;
 use simplicity::hashes::sha256::Midstate;
 use simplicityhl::elements::AddressParams;
@@ -26,10 +25,7 @@ pub fn create_asset(
         return Err(crate::error::CliError::AssetNameExists { name: asset_name });
     }
 
-    let keypair = secp256k1::Keypair::from_secret_key(
-        secp256k1::SECP256K1,
-        &derive_secret_key_from_index(account_index, config)?,
-    );
+    let keypair = derive_keypair_from_config(account_index, config)?;
     let blinding_key = derive_public_blinder_key();
 
     let IssueAssetResponse {
@@ -82,10 +78,7 @@ pub fn mint_asset(
         .map_err(|err| crate::error::CliError::Custom(format!("Failed to convert bytes to string, err: {err}")))?;
     let asset_entropy = entropy_to_midstate(&asset_entropy)?;
 
-    let keypair = secp256k1::Keypair::from_secret_key(
-        secp256k1::SECP256K1,
-        &derive_secret_key_from_index(account_index, config)?,
-    );
+    let keypair = derive_keypair_from_config(account_index, config)?;
     let blinding_key = derive_public_blinder_key();
     let ReissueAssetResponse {
         tx,

@@ -47,6 +47,8 @@ pub enum CliError {
     Cache(String),
     #[error("Nostr keypair is required for the action, but it's absent")]
     NoNostrKeypairListed,
+    #[error("Seed hex is required for the action, but it's absent")]
+    NoSeedHex,
     #[error("Occurred error with msg: '{0}'")]
     Custom(String),
 }

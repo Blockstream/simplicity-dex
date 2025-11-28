@@ -404,7 +404,7 @@ impl MakerOrderEvent {
             })?;
             nostr::prelude::hex::encode(x)
         };
-        let mut event_tags = vec![ //todo rework (should be not mutable and easy to use optional tags)
+        let mut event_tags = vec![
             Tag::public_key(client_pubkey),
             Tag::custom(TagKind::Custom(Cow::from(MAKER_DCD_ARG_TAG)), [dcd_arguments]),
             Tag::custom(
@@ -433,11 +433,11 @@ impl MakerOrderEvent {
             ),
             Tag::custom(TagKind::Custom(Cow::from(MAKER_FUND_TX_ID_TAG)), [tx_id.to_string()]),
         ];
-        
+
         if let Some(maker_expiration_time) = maker_expiration_time {
             event_tags.push(Tag::expiration(Timestamp::from(timestamp_now + maker_expiration_time)));
         }
-        
+
         Ok(event_tags)
     }
 }

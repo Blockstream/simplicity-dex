@@ -378,6 +378,8 @@ impl Cli {
     ) -> crate::error::Result<String> {
         use contract_handlers::maker_init::{Utxos, handle, process_args, save_args_to_cache};
 
+        cli_app_context.agg_config.check_seed_hex_existence()?;
+
         let processed_args = process_args(account_index, init_order_args.into(), &cli_app_context.agg_config)?;
         let (tx_res, args_to_save) = handle(
             processed_args,
@@ -414,8 +416,8 @@ impl Cli {
     ) -> crate::error::Result<String> {
         use contract_handlers::maker_funding::{Utxos, handle, process_args, save_args_to_cache};
 
-        agg_config.check_nostr_keypair_existence()?; // todo: add analogous function for seed_hex 
-        // todo: 
+        agg_config.check_nostr_keypair_existence()?;
+        agg_config.check_seed_hex_existence()?;
 
         let processed_args = process_args(account_index, dcd_taproot_pubkey_gen, agg_config)?;
         let event_to_publish = processed_args.extract_event();
@@ -460,6 +462,7 @@ impl Cli {
         use contract_handlers::maker_termination_collateral::{Utxos, handle, save_args_to_cache};
 
         agg_config.check_nostr_keypair_existence()?;
+        agg_config.check_seed_hex_existence()?;
         let processed_args = contract_handlers::maker_termination_collateral::process_args(
             account_index,
             grantor_collateral_amount_to_burn,
@@ -508,6 +511,7 @@ impl Cli {
         use contract_handlers::maker_termination_settlement::{Utxos, handle, save_args_to_cache};
 
         agg_config.check_nostr_keypair_existence()?;
+        agg_config.check_seed_hex_existence()?;
         let processed_args = contract_handlers::maker_termination_settlement::process_args(
             account_index,
             grantor_settlement_amount_to_burn,
@@ -560,6 +564,7 @@ impl Cli {
         use contract_handlers::maker_settlement::{Utxos, handle, process_args, save_args_to_cache};
 
         agg_config.check_nostr_keypair_existence()?;
+        agg_config.check_seed_hex_existence()?;
         let processed_args = process_args(
             account_index,
             price_at_current_block_height,
@@ -610,6 +615,7 @@ impl Cli {
                 use contract_handlers::taker_funding::{Utxos, handle, process_args, save_args_to_cache};
 
                 agg_config.check_nostr_keypair_existence()?;
+                agg_config.check_seed_hex_existence()?;
                 let processed_args = process_args(
                     common_options.account_index,
                     collateral_amount_to_deposit,
@@ -645,6 +651,7 @@ impl Cli {
                 use contract_handlers::taker_early_termination::{Utxos, handle, process_args, save_args_to_cache};
 
                 agg_config.check_nostr_keypair_existence()?;
+                agg_config.check_seed_hex_existence()?;
                 let processed_args = process_args(
                     common_options.account_index,
                     filler_token_amount_to_return,
@@ -683,6 +690,7 @@ impl Cli {
                 use contract_handlers::taker_settlement::{Utxos, handle, process_args, save_args_to_cache};
 
                 agg_config.check_nostr_keypair_existence()?;
+                agg_config.check_seed_hex_existence()?;
                 let processed_args = process_args(
                     common_options.account_index,
                     price_at_current_block_height,
@@ -854,6 +862,7 @@ impl Cli {
             is_offline,
         }: CommonOrderOptions,
     ) -> crate::error::Result<String> {
+        cli_app_context.agg_config.check_seed_hex_existence()?;
         contract_handlers::faucet::create_asset(
             account_index,
             asset_name,
@@ -878,6 +887,7 @@ impl Cli {
             is_offline,
         }: CommonOrderOptions,
     ) -> crate::error::Result<String> {
+        cli_app_context.agg_config.check_seed_hex_existence()?;
         contract_handlers::faucet::mint_asset(
             account_index,
             asset_name,
@@ -901,6 +911,7 @@ impl Cli {
             is_offline,
         }: CommonOrderOptions,
     ) -> crate::error::Result<String> {
+        cli_app_context.agg_config.check_seed_hex_existence()?;
         let tx_res = contract_handlers::split_utxo::handle(
             account_index,
             split_amount,
@@ -913,6 +924,7 @@ impl Cli {
     }
 
     fn _process_helper_address(cli_app_context: &CliAppContext, index: u32) -> crate::error::Result<String> {
+        cli_app_context.agg_config.check_seed_hex_existence()?;
         let (x_only_pubkey, addr) = contract_handlers::address::handle(index, &cli_app_context.agg_config)?;
         Ok(format!("X Only Public Key: '{x_only_pubkey}', P2PK Address: '{addr}'"))
     }
@@ -923,6 +935,7 @@ impl Cli {
         settlement_height: u32,
         oracle_account_index: Option<u32>,
     ) -> crate::error::Result<String> {
+        cli_app_context.agg_config.check_seed_hex_existence()?;
         let (pubkey, msg, signature) = contract_handlers::oracle_signature::handle(
             oracle_account_index,
             price_at_current_block_height,
@@ -960,6 +973,7 @@ impl Cli {
         };
 
         agg_config.check_nostr_keypair_existence()?;
+        agg_config.check_seed_hex_existence()?;
         let processed_args = process_args(account_index, maker_order_event_id, relay_processor, agg_config).await?;
         let (tx_id, args_to_save) = handle(
             processed_args,
@@ -1004,6 +1018,7 @@ impl Cli {
         };
 
         agg_config.check_nostr_keypair_existence()?;
+        agg_config.check_seed_hex_existence()?;
         let processed_args = process_args(account_index, maker_order_event_id, relay_processor, agg_config).await?;
         let (tx_id, args_to_save) = handle(
             processed_args,
@@ -1050,6 +1065,7 @@ impl Cli {
         };
 
         agg_config.check_nostr_keypair_existence()?;
+        agg_config.check_seed_hex_existence()?;
         let processed_args = process_args(account_index, maker_order_event_id, relay_processor, agg_config).await?;
         let (tx_id, args_to_save) = handle(
             processed_args,
