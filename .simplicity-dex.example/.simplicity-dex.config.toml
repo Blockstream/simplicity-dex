@@ -1,4 +1,5 @@
-nostr_keypair = "nsec..."
+# Keypair can be generated here: https://start.nostr.net/
+nostr_keypair = "keypair..."
 relays = [
     "wss://relay.damus.io",
     "wss://nostr.wine/",

@@ -53,6 +53,7 @@ pub mod merge2 {
     };
     use contracts::MergeBranch;
     use contracts_adapter::dcd::MergeTokensContext;
+    use tokio::task;
 
     #[derive(Debug)]
     pub struct Utxos2 {
@@ -62,7 +63,17 @@ pub mod merge2 {
     }
 
     #[instrument(level = "debug", skip_all, err)]
-    pub fn handle(
+    pub async fn handle(
+        processed_args: ProcessedArgs,
+        utxos: Utxos2,
+        fee_amount: u64,
+        is_offline: bool,
+    ) -> crate::error::Result<(Txid, ArgsToSave)> {
+        task::spawn_blocking(move || handle_sync(processed_args, utxos, fee_amount, is_offline)).await?
+    }
+
+    #[instrument(level = "debug", skip_all, err)]
+    fn handle_sync(
         ProcessedArgs {
             keypair,
             dcd_arguments,
@@ -125,6 +136,7 @@ pub mod merge3 {
     };
     use contracts::MergeBranch;
     use contracts_adapter::dcd::MergeTokensContext;
+    use tokio::task;
 
     #[derive(Debug)]
     pub struct Utxos3 {
@@ -135,7 +147,17 @@ pub mod merge3 {
     }
 
     #[instrument(level = "debug", skip_all, err)]
-    pub fn handle(
+    pub async fn handle(
+        processed_args: ProcessedArgs,
+        utxos: Utxos3,
+        fee_amount: u64,
+        is_offline: bool,
+    ) -> crate::error::Result<(Txid, ArgsToSave)> {
+        task::spawn_blocking(move || handle_sync(processed_args, utxos, fee_amount, is_offline)).await?
+    }
+
+    #[instrument(level = "debug", skip_all, err)]
+    fn handle_sync(
         ProcessedArgs {
             keypair,
             dcd_arguments,
@@ -197,12 +219,14 @@ pub mod merge3 {
 }
 pub mod merge4 {
     use super::{
-        AddressParams, ArgsToSave, BaseContractContext, CommonContext, DcdContractContext, DcdManager, DisplayHex,
-        LIQUID_TESTNET_BITCOIN_ASSET, LIQUID_TESTNET_GENESIS, OutPoint, ProcessedArgs, Serialize, SledError,
-        TaprootPubkeyGen, Txid, broadcast_tx_inner, instrument,
+        AddressParams, ArgsToSave, BaseContractContext, CommonContext, DcdContractContext, DcdManager,
+        LIQUID_TESTNET_BITCOIN_ASSET, LIQUID_TESTNET_GENESIS, OutPoint, ProcessedArgs, SledError, TaprootPubkeyGen,
+        Txid, instrument,
     };
+    use crate::contract_handlers::common::broadcast_or_get_raw_tx;
     use contracts::MergeBranch;
     use contracts_adapter::dcd::MergeTokensContext;
+    use tokio::task;
 
     #[derive(Debug)]
     pub struct Utxos4 {
@@ -214,7 +238,17 @@ pub mod merge4 {
     }
 
     #[instrument(level = "debug", skip_all, err)]
-    pub fn handle(
+    pub async fn handle(
+        processed_args: ProcessedArgs,
+        utxos: Utxos4,
+        fee_amount: u64,
+        is_offline: bool,
+    ) -> crate::error::Result<(Txid, ArgsToSave)> {
+        task::spawn_blocking(move || handle_sync(processed_args, utxos, fee_amount, is_offline)).await?
+    }
+
+    #[instrument(level = "debug", skip_all, err)]
+    fn handle_sync(
         ProcessedArgs {
             keypair,
             dcd_arguments,
@@ -260,11 +294,7 @@ pub mod merge4 {
         )
         .map_err(|err| crate::error::CliError::DcdManager(err.to_string()))?;
 
-        if is_offline {
-            println!("{}", transaction.serialize().to_lower_hex_string());
-        } else {
-            println!("Broadcasted txid: {}", broadcast_tx_inner(&transaction)?);
-        }
+        broadcast_or_get_raw_tx(is_offline, &transaction)?;
 
         Ok((
             transaction.txid(),

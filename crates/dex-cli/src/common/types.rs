@@ -1,8 +1,6 @@
-use crate::common::derive_oracle_pubkey;
 use crate::contract_handlers::maker_init::InnerDcdInitParams;
 use clap::Args;
 use contracts_adapter::dcd::COLLATERAL_ASSET_ID;
-use simplicityhl::elements::bitcoin::secp256k1;
 use simplicityhl_core::{AssetEntropyHex, AssetIdHex};
 
 /// Represents either three asset IDs or three asset entropies as provided on the CLI.
@@ -57,9 +55,9 @@ pub struct InitOrderArgs {
     /// Settlement asset entropy as a hex string to be used for this order.
     #[arg(long = "settlement-asset-entropy")]
     settlement_asset_entropy: String,
-    /// Oracle public key to use for this init. Defaults to a locally derived key if omitted.
-    #[arg(long = "oracle-pubkey", default_value_t = derive_oracle_pubkey().unwrap())]
-    oracle_public_key: secp256k1::PublicKey,
+    /// Oracle public key to use for this init.
+    #[arg(long = "oracle-pubkey")]
+    oracle_public_key: String,
 }
 
 impl From<InitOrderArgs> for InnerDcdInitParams {

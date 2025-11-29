@@ -1,21 +1,19 @@
 use crate::common::config::AggregatedConfig;
-use crate::common::{broadcast_tx_inner, entropy_to_asset_id};
-use crate::contract_handlers::common::derive_keypair_from_config;
+use crate::common::entropy_to_asset_id;
+use crate::contract_handlers::common::{broadcast_or_get_raw_tx, derive_keypair_from_config};
 use contracts::DCDArguments;
 use contracts_adapter::dcd::{
     BaseContractContext, CreationContext, DcdInitParams, DcdInitResponse, DcdManager, FillerTokenEntropyHex,
     GrantorCollateralAssetEntropyHex, GrantorSettlementAssetEntropyHex, MakerInitContext,
 };
-use elements::bitcoin::hex::DisplayHex;
 use elements::bitcoin::secp256k1;
-use elements::hex::ToHex;
 use simplicity::elements::OutPoint;
-use simplicity::elements::pset::serialize::Serialize;
 use simplicityhl::elements::{AddressParams, Txid};
 use simplicityhl_core::{
     AssetEntropyHex, AssetIdHex, LIQUID_TESTNET_BITCOIN_ASSET, LIQUID_TESTNET_GENESIS, TaprootPubkeyGen,
     derive_public_blinder_key,
 };
+use tokio::task;
 use tracing::instrument;
 
 #[derive(Debug)]
@@ -31,7 +29,7 @@ pub struct InnerDcdInitParams {
     pub strike_price: u64,
     pub collateral_asset_id: AssetIdHex,
     pub settlement_asset_entropy: AssetEntropyHex,
-    pub oracle_public_key: secp256k1::PublicKey,
+    pub oracle_public_key: String,
 }
 
 #[derive(Debug)]
@@ -71,7 +69,10 @@ impl TryInto<DcdInitParams> for InnerDcdInitParams {
             strike_price: self.strike_price,
             collateral_asset_id: self.collateral_asset_id,
             settlement_asset_id: entropy_to_asset_id(self.settlement_asset_entropy)?.to_string(),
-            oracle_public_key: self.oracle_public_key.x_only_public_key().0.to_hex(),
+            oracle_public_key: self.oracle_public_key.clone(),
+            // TODO(Illia): replace with actual data
+            fee_script_hash: "0000000000000000000000000000000000000000000000000000000000000000".to_string(),
+            fee_basis_points: 0,
         })
     }
 }
@@ -94,7 +95,17 @@ pub fn process_args(
 }
 
 #[instrument(level = "debug", skip_all, err)]
-pub fn handle(
+pub async fn handle(
+    processed_args: ProcessedArgs,
+    utxos: Utxos,
+    fee_amount: u64,
+    is_offline: bool,
+) -> crate::error::Result<(Txid, ArgsToSave)> {
+    task::spawn_blocking(move || handle_sync(processed_args, utxos, fee_amount, is_offline)).await?
+}
+
+#[instrument(level = "debug", skip_all, err)]
+fn handle_sync(
     ProcessedArgs {
         keypair,
         dcd_init_params,
@@ -108,7 +119,7 @@ pub fn handle(
     is_offline: bool,
 ) -> crate::error::Result<(Txid, ArgsToSave)> {
     let DcdInitResponse {
-        tx,
+        tx: transaction,
         filler_token_entropy,
         grantor_collateral_token_entropy,
         grantor_settlement_token_entropy,
@@ -137,11 +148,8 @@ pub fn handle(
         filler_token_entropy, grantor_collateral_token_entropy, grantor_settlement_token_entropy, taproot_pubkey_gen
     );
 
-    if is_offline {
-        println!("{}", tx.serialize().to_lower_hex_string());
-    } else {
-        println!("Broadcasted txid: {}", broadcast_tx_inner(&tx)?);
-    }
+    broadcast_or_get_raw_tx(is_offline, &transaction)?;
+
     let args_to_save = ArgsToSave {
         filler_token_entropy,
         grantor_collateral_token_entropy,
@@ -149,7 +157,7 @@ pub fn handle(
         taproot_pubkey: taproot_pubkey_gen,
         dcd_args,
     };
-    Ok((tx.txid(), args_to_save))
+    Ok((transaction.txid(), args_to_save))
 }
 
 #[instrument(level = "debug", skip_all, err)]

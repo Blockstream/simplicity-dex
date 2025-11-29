@@ -1,9 +1,13 @@
+use crate::common::broadcast_tx_inner;
 use crate::common::config::AggregatedConfig;
 use crate::common::keys::derive_keypair_from_index;
 use crate::common::store::utils::{OrderParams, save_order_params_by_event_id};
 use crate::error::CliError;
 use dex_nostr_relay::relay_processor::RelayProcessor;
+use elements::bitcoin::hex::DisplayHex;
 use nostr::EventId;
+use simplicity::elements::Transaction;
+use simplicity::elements::pset::serialize::Serialize;
 use simplicityhl::elements::secp256k1_zkp as secp256k1;
 
 pub async fn get_order_params(
@@ -26,6 +30,18 @@ pub async fn get_order_params(
             }
         },
     )
+}
+
+/// Broadcasts created tx
+///
+/// Has to be used with blocking async context to perform properly or just use only sync context.
+pub fn broadcast_or_get_raw_tx(is_offline: bool, transaction: &Transaction) -> crate::error::Result<()> {
+    if is_offline {
+        println!("Raw Tx: {}", transaction.serialize().to_lower_hex_string());
+    } else {
+        broadcast_tx_inner(transaction)?;
+    }
+    Ok(())
 }
 
 pub fn derive_keypair_from_config(index: u32, config: &AggregatedConfig) -> crate::error::Result<secp256k1::Keypair> {

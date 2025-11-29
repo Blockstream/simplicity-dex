@@ -1,20 +1,18 @@
-use crate::common::broadcast_tx_inner;
 use crate::common::config::AggregatedConfig;
 use crate::common::store::SledError;
 use crate::common::store::utils::OrderParams;
-use crate::contract_handlers::common::{derive_keypair_from_config, get_order_params};
+use crate::contract_handlers::common::{broadcast_or_get_raw_tx, derive_keypair_from_config, get_order_params};
 use contracts::DCDArguments;
 use contracts_adapter::dcd::{
     BaseContractContext, CommonContext, DcdContractContext, DcdManager, MakerSettlementContext,
 };
 use dex_nostr_relay::relay_processor::RelayProcessor;
-use elements::bitcoin::hex::DisplayHex;
 use elements::bitcoin::secp256k1;
 use nostr::EventId;
 use simplicity::elements::OutPoint;
-use simplicity::elements::pset::serialize::Serialize;
 use simplicityhl::elements::{AddressParams, Txid};
 use simplicityhl_core::{LIQUID_TESTNET_BITCOIN_ASSET, LIQUID_TESTNET_GENESIS, TaprootPubkeyGen};
+use tokio::task;
 use tracing::instrument;
 
 #[derive(Debug)]
@@ -65,7 +63,18 @@ pub struct ArgsToSave {
 }
 
 #[instrument(level = "debug", skip_all, err)]
-pub fn handle(
+pub async fn handle(
+    processed_args: ProcessedArgs,
+    utxos: Utxos,
+    fee_amount: u64,
+    is_offline: bool,
+) -> crate::error::Result<(Txid, ArgsToSave)> {
+    // offload blocking/contracts work, like in split_utxo::handle
+    task::spawn_blocking(move || handle_sync(processed_args, utxos, fee_amount, is_offline)).await?
+}
+
+#[instrument(level = "debug", skip_all, err)]
+fn handle_sync(
     ProcessedArgs {
         keypair,
         dcd_arguments,
@@ -117,11 +126,7 @@ pub fn handle(
     )
     .map_err(|err| crate::error::CliError::DcdManager(err.to_string()))?;
 
-    if is_offline {
-        println!("{}", transaction.serialize().to_lower_hex_string());
-    } else {
-        println!("Broadcasted txid: {}", broadcast_tx_inner(&transaction)?);
-    }
+    broadcast_or_get_raw_tx(is_offline, &transaction)?;
 
     Ok((
         transaction.txid(),

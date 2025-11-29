@@ -4,6 +4,7 @@ use chrono::TimeZone;
 use contracts::DCDArguments;
 use nostr::{Event, EventId, Kind, PublicKey, Tag, TagKind, Tags, Timestamp};
 use simplicity::elements::AssetId;
+use simplicity::elements::OutPoint;
 use simplicityhl::elements::Txid;
 use std::borrow::Cow;
 use std::fmt;
@@ -27,6 +28,9 @@ pub const POW_DIFFICULTY: u8 = 1;
 pub const BLOCKSTREAM_MAKER_CONTENT: &str = "Liquid order [Maker]!";
 pub const BLOCKSTREAM_TAKER_REPLY_CONTENT: &str = "Liquid reply [Taker]!";
 pub const BLOCKSTREAM_MAKER_REPLY_CONTENT: &str = "Liquid reply [Maker]!";
+pub const BLOCKSTREAM_MERGE2_REPLY_CONTENT: &str = "Liquid merge [Merge2]!";
+pub const BLOCKSTREAM_MERGE3_REPLY_CONTENT: &str = "Liquid merge [Merge3]!";
+pub const BLOCKSTREAM_MERGE4_REPLY_CONTENT: &str = "Liquid merge [Merge4]!";
 pub const MAKER_DCD_ARG_TAG: &str = "dcd_arguments_(hex&bincode)";
 pub const MAKER_DCD_TAPROOT_TAG: &str = "dcd_taproot_pubkey_gen";
 pub const MAKER_FILLER_ASSET_ID_TAG: &str = "filler_asset_id";
@@ -39,6 +43,7 @@ pub const MAKER_FUND_TX_ID_TAG: &str = "maker_fund_tx_id";
 pub struct MakerOrderKind;
 pub struct TakerReplyOrderKind;
 pub struct MakerReplyOrderKind;
+pub struct MergeReplyOrderKind;
 
 impl CustomKind for MakerOrderKind {
     const ORDER_KIND_NUMBER: u16 = 9901;
@@ -50,6 +55,10 @@ impl CustomKind for TakerReplyOrderKind {
 
 impl CustomKind for MakerReplyOrderKind {
     const ORDER_KIND_NUMBER: u16 = 9903;
+}
+
+impl CustomKind for MergeReplyOrderKind {
+    const ORDER_KIND_NUMBER: u16 = 9904;
 }
 
 #[derive(Debug)]
@@ -66,14 +75,44 @@ pub struct MakerOrderEvent {
     pub maker_fund_tx_id: Txid,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ReplyOption {
-    TakerFund { tx_id: Txid },
-    MakerTerminationCollateral { tx_id: Txid },
-    MakerTerminationSettlement { tx_id: Txid },
-    MakerSettlement { tx_id: Txid },
-    TakerTerminationEarly { tx_id: Txid },
-    TakerSettlement { tx_id: Txid },
+    TakerFund {
+        tx_id: Txid,
+    },
+    MakerTerminationCollateral {
+        tx_id: Txid,
+    },
+    MakerTerminationSettlement {
+        tx_id: Txid,
+    },
+    MakerSettlement {
+        tx_id: Txid,
+    },
+    TakerTerminationEarly {
+        tx_id: Txid,
+    },
+    TakerSettlement {
+        tx_id: Txid,
+    },
+    Merge2 {
+        tx_id: Txid,
+        token_utxo_1: OutPoint,
+        token_utxo_2: OutPoint,
+    },
+    Merge3 {
+        tx_id: Txid,
+        token_utxo_1: OutPoint,
+        token_utxo_2: OutPoint,
+        token_utxo_3: OutPoint,
+    },
+    Merge4 {
+        tx_id: Txid,
+        token_utxo_1: OutPoint,
+        token_utxo_2: OutPoint,
+        token_utxo_3: OutPoint,
+        token_utxo_4: OutPoint,
+    },
 }
 
 #[derive(Debug)]
@@ -471,6 +510,15 @@ impl ReplyOption {
             .find(|tag| matches!(tag.kind(), TagKind::Custom(s) if s.as_ref() == "reply_type"))
             .and_then(|tag| tag.content())?;
 
+        // Helper to get OutPoint from a custom tag with given key
+        let get_outpoint = |key: &str| -> Option<OutPoint> {
+            let s = tags
+                .iter()
+                .find(|tag| matches!(tag.kind(), TagKind::Custom(k) if k.as_ref() == key))
+                .and_then(|tag| tag.content())?;
+            OutPoint::from_str(s).ok()
+        };
+
         // Match reply_type to construct the appropriate variant
         match reply_type {
             "taker_fund" => Some(ReplyOption::TakerFund { tx_id }),
@@ -479,6 +527,39 @@ impl ReplyOption {
             "maker_settlement" => Some(ReplyOption::MakerSettlement { tx_id }),
             "taker_termination_early" => Some(ReplyOption::TakerTerminationEarly { tx_id }),
             "taker_settlement" => Some(ReplyOption::TakerSettlement { tx_id }),
+            "tokens_merge2" => {
+                let token_utxo_1 = get_outpoint("token_utxo_1")?;
+                let token_utxo_2 = get_outpoint("token_utxo_2")?;
+                Some(ReplyOption::Merge2 {
+                    tx_id,
+                    token_utxo_1,
+                    token_utxo_2,
+                })
+            }
+            "tokens_merge3" => {
+                let token_utxo_1 = get_outpoint("token_utxo_1")?;
+                let token_utxo_2 = get_outpoint("token_utxo_2")?;
+                let token_utxo_3 = get_outpoint("token_utxo_3")?;
+                Some(ReplyOption::Merge3 {
+                    tx_id,
+                    token_utxo_1,
+                    token_utxo_2,
+                    token_utxo_3,
+                })
+            }
+            "tokens_merge4" => {
+                let token_utxo_1 = get_outpoint("token_utxo_1")?;
+                let token_utxo_2 = get_outpoint("token_utxo_2")?;
+                let token_utxo_3 = get_outpoint("token_utxo_3")?;
+                let token_utxo_4 = get_outpoint("token_utxo_4")?;
+                Some(ReplyOption::Merge4 {
+                    tx_id,
+                    token_utxo_1,
+                    token_utxo_2,
+                    token_utxo_3,
+                    token_utxo_4,
+                })
+            }
             _ => None,
         }
     }
@@ -492,6 +573,9 @@ impl ReplyOption {
             ReplyOption::MakerTerminationCollateral { .. }
             | ReplyOption::MakerTerminationSettlement { .. }
             | ReplyOption::MakerSettlement { .. } => MakerReplyOrderKind::get_kind(),
+            ReplyOption::Merge2 { .. } | ReplyOption::Merge3 { .. } | ReplyOption::Merge4 { .. } => {
+                MergeReplyOrderKind::get_kind()
+            }
         }
     }
 
@@ -504,9 +588,13 @@ impl ReplyOption {
             ReplyOption::MakerTerminationCollateral { .. }
             | ReplyOption::MakerTerminationSettlement { .. }
             | ReplyOption::MakerSettlement { .. } => BLOCKSTREAM_MAKER_REPLY_CONTENT.to_string(),
+            ReplyOption::Merge2 { .. } => BLOCKSTREAM_MERGE2_REPLY_CONTENT.to_string(),
+            ReplyOption::Merge3 { .. } => BLOCKSTREAM_MERGE3_REPLY_CONTENT.to_string(),
+            ReplyOption::Merge4 { .. } => BLOCKSTREAM_MERGE4_REPLY_CONTENT.to_string(),
         }
     }
 
+    #[allow(clippy::too_many_lines)]
     #[must_use]
     pub fn form_tags(&self, source_event_id: EventId, client_pubkey: PublicKey) -> Vec<Tag> {
         match self {
@@ -562,6 +650,54 @@ impl ReplyOption {
                     Tag::event(source_event_id),
                     Tag::custom(TagKind::Custom(Cow::from("tx_id")), [tx_id.to_string()]),
                     Tag::custom(TagKind::Custom(Cow::from("reply_type")), ["taker_settlement"]),
+                ]
+            }
+            ReplyOption::Merge2 {
+                tx_id,
+                token_utxo_1,
+                token_utxo_2,
+            } => {
+                vec![
+                    Tag::public_key(client_pubkey),
+                    Tag::event(source_event_id),
+                    Tag::custom(TagKind::Custom(Cow::from("tx_id")), [tx_id.to_string()]),
+                    Tag::custom(TagKind::Custom(Cow::from("reply_type")), ["tokens_merge2"]),
+                    Tag::custom(TagKind::Custom(Cow::from("token_utxo_1")), [token_utxo_1.to_string()]),
+                    Tag::custom(TagKind::Custom(Cow::from("token_utxo_2")), [token_utxo_2.to_string()]),
+                ]
+            }
+            ReplyOption::Merge3 {
+                tx_id,
+                token_utxo_1,
+                token_utxo_2,
+                token_utxo_3,
+            } => {
+                vec![
+                    Tag::public_key(client_pubkey),
+                    Tag::event(source_event_id),
+                    Tag::custom(TagKind::Custom(Cow::from("tx_id")), [tx_id.to_string()]),
+                    Tag::custom(TagKind::Custom(Cow::from("reply_type")), ["tokens_merge3"]),
+                    Tag::custom(TagKind::Custom(Cow::from("token_utxo_1")), [token_utxo_1.to_string()]),
+                    Tag::custom(TagKind::Custom(Cow::from("token_utxo_2")), [token_utxo_2.to_string()]),
+                    Tag::custom(TagKind::Custom(Cow::from("token_utxo_3")), [token_utxo_3.to_string()]),
+                ]
+            }
+            ReplyOption::Merge4 {
+                tx_id,
+                token_utxo_1,
+                token_utxo_2,
+                token_utxo_3,
+                token_utxo_4,
+            } => {
+                vec![
+                    Tag::public_key(client_pubkey),
+                    Tag::event(source_event_id),
+                    Tag::custom(TagKind::Custom(Cow::from("tx_id")), [tx_id.to_string()]),
+                    Tag::custom(TagKind::Custom(Cow::from("reply_type")), ["tokens_merge4"]),
+                    Tag::custom(TagKind::Custom(Cow::from("token_utxo_1")), [token_utxo_1.to_string()]),
+                    Tag::custom(TagKind::Custom(Cow::from("token_utxo_2")), [token_utxo_2.to_string()]),
+                    Tag::custom(TagKind::Custom(Cow::from("token_utxo_3")), [token_utxo_3.to_string()]),
+                    Tag::custom(TagKind::Custom(Cow::from("token_utxo_4")), [token_utxo_4.to_string()]),
                 ]
             }
         }

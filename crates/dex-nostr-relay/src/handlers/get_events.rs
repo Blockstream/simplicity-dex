@@ -22,7 +22,7 @@ pub mod ids {
 }
 
 pub mod order {
-    use crate::handlers::common::filter_maker_order_events;
+    use crate::handlers::common::{filter_maker_order_events, sort_maker_order_events_by_time};
     use crate::relay_client::RelayClient;
     use crate::types::MakerOrderEvent;
     use nostr::{EventId, Filter};
@@ -42,6 +42,7 @@ pub mod order {
             })
             .await?;
         let events = filter_maker_order_events(&events);
+        let events = sort_maker_order_events_by_time(events);
         Ok(events)
     }
 }

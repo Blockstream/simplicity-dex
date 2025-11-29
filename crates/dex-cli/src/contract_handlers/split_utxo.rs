@@ -1,12 +1,22 @@
-use crate::common::broadcast_tx_inner;
 use crate::common::config::AggregatedConfig;
-use crate::contract_handlers::common::derive_keypair_from_config;
-use elements::bitcoin::hex::DisplayHex;
-use simplicityhl::elements::pset::serialize::Serialize;
+use crate::contract_handlers::common::{broadcast_or_get_raw_tx, derive_keypair_from_config};
 use simplicityhl::elements::{AddressParams, OutPoint, Txid};
 use simplicityhl_core::{LIQUID_TESTNET_BITCOIN_ASSET, LIQUID_TESTNET_GENESIS, get_p2pk_address};
+use tokio::task;
 
-pub fn handle(
+pub async fn handle(
+    account_index: u32,
+    split_amount: u64,
+    fee_utxo: OutPoint,
+    fee_amount: u64,
+    is_offline: bool,
+    config: AggregatedConfig,
+) -> crate::error::Result<Txid> {
+    task::spawn_blocking(move || handle_sync(account_index, split_amount, fee_utxo, fee_amount, is_offline, &config))
+        .await?
+}
+
+fn handle_sync(
     account_index: u32,
     split_amount: u64,
     fee_utxo: OutPoint,
@@ -28,10 +38,7 @@ pub fn handle(
     )
     .map_err(|err| crate::error::CliError::DcdManager(err.to_string()))?;
 
-    if is_offline {
-        println!("{}", transaction.serialize().to_lower_hex_string());
-    } else {
-        println!("Broadcasted txid: {}", broadcast_tx_inner(&transaction)?);
-    }
+    broadcast_or_get_raw_tx(is_offline, &transaction)?;
+
     Ok(transaction.txid())
 }

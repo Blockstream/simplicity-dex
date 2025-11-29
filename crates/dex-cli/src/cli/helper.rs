@@ -55,7 +55,7 @@ pub enum HelperCommands {
         /// Fee utxo
         #[arg(long = "fee-utxo")]
         fee_utxo: OutPoint,
-        #[arg(long = "fee-amount", default_value_t = 500)]
+        #[arg(long = "fee-amount", default_value_t = 150)]
         fee_amount: u64,
         #[command(flatten)]
         common_options: CommonOrderOptions,
@@ -70,7 +70,7 @@ pub enum HelperCommands {
         settlement_height: u32,
         /// Oracle account index to derive key from `SEED_HEX`
         #[arg(long = "oracle-account-index")]
-        oracle_account_index: Option<u32>,
+        oracle_account_index: u32,
     },
     #[command(about = "Merge 2 token UTXOs into 1")]
     MergeTokens2 {

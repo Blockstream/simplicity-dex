@@ -19,7 +19,7 @@ const MAKER_EXPIRATION_TIME: u64 = 2_678_400;
 pub struct Seed(pub SeedInner);
 pub type SeedInner = [u8; 32];
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct AggregatedConfig {
     pub nostr_keypair: Option<Keys>,
     pub relays: Vec<RelayUrl>,

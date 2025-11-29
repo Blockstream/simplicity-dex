@@ -12,7 +12,7 @@ use nostr_sdk::{Client, Relay, SubscribeAutoCloseOptions};
 
 use tracing::instrument;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct RelayClient {
     client: Client,
     timeout: Duration,

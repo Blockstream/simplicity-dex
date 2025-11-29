@@ -64,10 +64,10 @@ pub enum MakerCommands {
     )]
     TerminationCollateral {
         /// UTXO containing grantor collateral tokens to be burned for early termination
-        #[arg(long = "grant-coll-utxo")]
+        #[arg(long = "grantor-collateral-utxo")]
         grantor_collateral_token_utxo: OutPoint,
         /// UTXO containing the collateral asset (e.g. LBTC) to be withdrawn by the Maker
-        #[arg(long = "coll-utxo")]
+        #[arg(long = "collateral-utxo")]
         collateral_token_utxo: OutPoint,
         /// UTXO used to pay miner fees for the early-termination collateral transaction
         #[arg(long = "fee-utxo")]
@@ -76,7 +76,7 @@ pub enum MakerCommands {
         #[arg(long = "fee-amount", default_value_t = 1500)]
         fee_amount: u64,
         /// Amount of grantor collateral tokens (in satoshis) to burn for early termination
-        #[arg(long = "grantor-coll-burn")]
+        #[arg(long = "grantor-collateral-burn")]
         grantor_collateral_amount_to_burn: u64,
         /// `EventId` of the Maker\'s original order event on Nostr
         #[arg(short = 'i', long)]
@@ -89,10 +89,10 @@ pub enum MakerCommands {
     )]
     TerminationSettlement {
         /// UTXO providing the settlement asset (e.g. LBTC) to be withdrawn by the Maker
-        #[arg(long = "settl-asset-utxo")]
+        #[arg(long = "settlement-asset-utxo")]
         settlement_asset_utxo: OutPoint,
         /// UTXO containing grantor settlement tokens to be burned for early termination
-        #[arg(long = "grant-settl-utxo")]
+        #[arg(long = "grantor-settlement-utxo")]
         grantor_settlement_token_utxo: OutPoint,
         /// UTXO used to pay miner fees for the early-termination settlement transaction
         #[arg(long = "fee-utxo")]
@@ -101,7 +101,7 @@ pub enum MakerCommands {
         #[arg(long = "fee-amount", default_value_t = 1500)]
         fee_amount: u64,
         /// Amount of grantor settlement tokens (in satoshis) to burn for early termination
-        #[arg(long = "grantor-settl-burn")]
+        #[arg(long = "grantor-settlement-amount-burn")]
         grantor_settlement_amount_to_burn: u64,
         /// `EventId` of the Maker\'s original order event on Nostr
         #[arg(short = 'i', long)]
@@ -114,10 +114,10 @@ pub enum MakerCommands {
     )]
     Settlement {
         /// UTXO containing grantor collateral tokens used in final settlement
-        #[arg(long = "grant-coll-utxo")]
+        #[arg(long = "grant-collateral-utxo")]
         grantor_collateral_token_utxo: OutPoint,
         /// UTXO containing grantor settlement tokens used in final settlement
-        #[arg(long = "grant-settl-utxo")]
+        #[arg(long = "grant-settlement-utxo")]
         grantor_settlement_token_utxo: OutPoint,
         /// UTXO providing the asset (collateral or settlement) paid out to the Maker at maturity
         #[arg(long = "asset-utxo")]
