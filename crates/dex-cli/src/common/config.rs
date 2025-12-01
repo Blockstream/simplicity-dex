@@ -1,29 +1,23 @@
 use crate::cli::{Cli, DEFAULT_CONFIG_PATH};
-use crate::error::CliError::ConfigExtended;
-
-use std::str::FromStr;
-
-use config::{Config, File, FileFormat, ValueKind};
-
-use nostr::{Keys, RelayUrl};
-
-use serde::{Deserialize, Deserializer};
-
 use crate::error::CliError;
+use crate::error::CliError::ConfigExtended;
+use config::{Config, File, FileFormat, ValueKind};
+use nostr::{Keys, RelayUrl};
+use serde::{Deserialize, Deserializer};
+use std::str::FromStr;
 use tracing::instrument;
 
 /// `MAKER_EXPIRATION_TIME` = 31 days
 const MAKER_EXPIRATION_TIME: u64 = 2_678_400;
 
 #[derive(Debug, Clone)]
-pub struct Seed(pub SeedInner);
-pub type SeedInner = [u8; 32];
+pub struct HexSeed(pub String);
 
 #[derive(Debug, Clone)]
 pub struct AggregatedConfig {
     pub nostr_keypair: Option<Keys>,
     pub relays: Vec<RelayUrl>,
-    pub seed_hex: Option<Seed>,
+    pub seed_hex: Option<HexSeed>,
     pub maker_expiration_time: u64,
 }
 
@@ -41,35 +35,49 @@ impl<'de> Deserialize<'de> for KeysWrapper {
     }
 }
 
-impl FromStr for Seed {
-    type Err = CliError;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let bytes = hex::decode(s).map_err(|err| crate::error::CliError::FromHex(err, s.to_string()))?;
+impl HexSeed {
+    /// Create a new `HexSeed` from a hex-encoded string.
+    ///
+    /// # Errors
+    ///
+    /// Returns:
+    /// - `CliError::FromHex` if the input string is not valid hexadecimal.
+    /// - `CliError::InvalidSeedLength` if the decoded bytes are not exactly 32 bytes long.
+    pub fn new(val: impl AsRef<str>) -> Result<Self, CliError> {
+        let val_str = val.as_ref();
+        let bytes = hex::decode(val_str).map_err(|err| crate::error::CliError::FromHex(err, val_str.to_string()))?;
         if bytes.len() != 32 {
             return Err(CliError::InvalidSeedLength {
                 got: bytes.len(),
                 expected: 32,
             });
         }
-        let mut inner = [0u8; 32];
-        inner.copy_from_slice(&bytes);
-        Ok(Seed(inner))
+        Ok(HexSeed(val_str.to_string()))
     }
 }
 
-impl<'de> Deserialize<'de> for Seed {
+impl FromStr for HexSeed {
+    type Err = CliError;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        tracing::debug!("HexSeed from str");
+        HexSeed::new(s)
+    }
+}
+
+impl<'de> Deserialize<'de> for HexSeed {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
+        tracing::debug!("Seed deserialize");
         let s = String::deserialize(deserializer)?;
-        Seed::from_str(&s).map_err(serde::de::Error::custom)
+        HexSeed::new(&s).map_err(serde::de::Error::custom)
     }
 }
 
-impl From<Seed> for ValueKind {
-    fn from(val: Seed) -> Self {
-        ValueKind::String(hex::encode(val.0))
+impl From<HexSeed> for ValueKind {
+    fn from(val: HexSeed) -> Self {
+        ValueKind::String(val.0)
     }
 }
 
@@ -94,7 +102,7 @@ impl AggregatedConfig {
         pub struct AggregatedConfigInner {
             pub nostr_keypair: Option<KeysWrapper>,
             pub relays: Option<Vec<RelayUrl>>,
-            pub seed_hex: Option<Seed>,
+            pub seed_hex: Option<HexSeed>,
             pub maker_expiration_time: u64,
         }
 

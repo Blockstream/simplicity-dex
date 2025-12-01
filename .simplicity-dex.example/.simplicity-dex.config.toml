@@ -4,3 +4,4 @@ relays = [
     "wss://relay.damus.io",
     "wss://nostr.wine/",
 ]
+seed_hex = "your_hex_value"

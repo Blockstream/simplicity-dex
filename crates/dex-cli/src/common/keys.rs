@@ -22,7 +22,7 @@ pub fn derive_secret_key_from_index(
     secp256k1::SecretKey::from_slice(&seed).map_err(CliError::from)
 }
 
-/// Derives a secp256k1 keypair from a 32-byte seed and index.
+/// Derives a secp256k1 keypair from a 32-byte hex seed and index.
 ///
 /// # Errors
 ///
@@ -30,29 +30,35 @@ pub fn derive_secret_key_from_index(
 /// (for example, if the derived 32-byte value is not a valid
 /// secp256k1 secret key).
 #[inline]
-pub fn derive_keypair_from_index(index: u32, seed_hex: impl AsRef<[u8]>) -> Result<secp256k1::Keypair, CliError> {
+pub fn derive_keypair_from_index(index: u32, seed_hex: impl AsRef<str>) -> Result<secp256k1::Keypair, CliError> {
+    let seed_bytes = hex::decode(seed_hex.as_ref()).map_err(|e| CliError::FromHex(e, seed_hex.as_ref().to_string()))?;
+    tracing::info!("Seed bytes: {:?}", seed_bytes.len());
     Ok(elements::bitcoin::secp256k1::Keypair::from_secret_key(
         elements::bitcoin::secp256k1::SECP256K1,
-        &derive_secret_key_from_index(index, seed_hex)?,
+        &derive_secret_key_from_index(index, seed_bytes)?,
     ))
 }
 
 #[cfg(test)]
-mod tests {    // todo fix panic and test overall
+mod tests {
     use super::*;
     use elements::hex::ToHex;
+    use global_utils::logger::{LoggerGuard, init_logger};
     use proptest::prelude::*;
     use simplicityhl::elements;
     use simplicityhl::elements::AddressParams;
     use simplicityhl_core::get_p2pk_address;
+    use std::sync::LazyLock;
+
+    pub static TEST_LOGGER: LazyLock<LoggerGuard> = LazyLock::new(init_logger);
 
     fn check_seed_hex_gen(
         index: u32,
         x_only_pubkey: &str,
         p2pk_addr: &str,
-        seed_hex: impl AsRef<[u8]>,
+        seed_hex: impl AsRef<str>,
     ) -> anyhow::Result<()> {
-        let keypair = derive_keypair_from_index(index, &seed_hex)?;
+        let keypair = derive_keypair_from_index(index, seed_hex)?;
 
         let public_key = keypair.x_only_public_key().0;
         let address = get_p2pk_address(&public_key, &AddressParams::LIQUID_TESTNET)?;
@@ -66,6 +72,7 @@ mod tests {    // todo fix panic and test overall
     fn derive_keypair_from_index_is_deterministic_for_seed() -> anyhow::Result<()> {
         const SEED_HEX: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
+        let _ = &*TEST_LOGGER;
         let expected_secrets = [
             (
                 0u32,

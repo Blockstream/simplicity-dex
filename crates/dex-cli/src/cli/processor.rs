@@ -1,6 +1,6 @@
 use crate::cli::helper::HelperCommands;
 use crate::cli::{DexCommands, MakerCommands, TakerCommands};
-use crate::common::config::{AggregatedConfig, Seed};
+use crate::common::config::{AggregatedConfig, HexSeed};
 use crate::common::{DEFAULT_CLIENT_TIMEOUT_SECS, InitOrderArgs, write_into_stdout};
 use crate::contract_handlers;
 use clap::{Parser, Subcommand};
@@ -32,7 +32,7 @@ pub struct Cli {
 
     /// Hex-encoded 32-byte seed used to derive internal wallet keys
     #[arg(short = 's', long, env = "DEX_SEED_HEX")]
-    pub(crate) seed_hex: Option<Seed>,
+    pub(crate) seed_hex: Option<HexSeed>,
 
     /// Expiration time for the maker order in seconds
     #[arg(short = 'e', long)]

@@ -46,5 +46,5 @@ pub fn broadcast_or_get_raw_tx(is_offline: bool, transaction: &Transaction) -> c
 
 pub fn derive_keypair_from_config(index: u32, config: &AggregatedConfig) -> crate::error::Result<secp256k1::Keypair> {
     let seed = config.seed_hex.as_ref().ok_or(CliError::NoSeedHex)?;
-    derive_keypair_from_index(index, seed.0)
+    derive_keypair_from_index(index, &seed.0)
 }
