@@ -1,6 +1,6 @@
 use crate::cli::helper::HelperCommands;
 use crate::cli::{DexCommands, MakerCommands, TakerCommands};
-use crate::common::config::AggregatedConfig;
+use crate::common::config::{AggregatedConfig, HexSeed};
 use crate::common::{DEFAULT_CLIENT_TIMEOUT_SECS, InitOrderArgs, write_into_stdout};
 use crate::contract_handlers;
 use clap::{Parser, Subcommand};
@@ -29,6 +29,14 @@ pub struct Cli {
     /// Path to a config file containing the list of relays and(or) nostr keypair to use
     #[arg(short = 'c', long, default_value = DEFAULT_CONFIG_PATH, env = "DEX_NOSTR_CONFIG_PATH")]
     pub(crate) nostr_config_path: PathBuf,
+
+    /// Hex-encoded 32-byte seed used to derive internal wallet keys
+    #[arg(short = 's', long, env = "DEX_SEED_HEX")]
+    pub(crate) seed_hex: Option<HexSeed>,
+
+    /// Expiration time for the maker order in seconds
+    #[arg(short = 'e', long)]
+    pub(crate) maker_expiration_time: Option<u64>,
 
     /// Command to execute
     #[command(subcommand)]
@@ -243,6 +251,7 @@ impl Cli {
                 common_options,
             } => {
                 Self::_process_maker_init_order(
+                    cli_app_context,
                     MakerInitCliContext {
                         first_lbtc_utxo,
                         second_lbtc_utxo,
@@ -358,6 +367,7 @@ impl Cli {
     }
 
     async fn _process_maker_init_order(
+        cli_app_context: &CliAppContext,
         MakerInitCliContext {
             first_lbtc_utxo,
             second_lbtc_utxo,
@@ -372,7 +382,9 @@ impl Cli {
     ) -> crate::error::Result<String> {
         use contract_handlers::maker_init::{Utxos, handle, process_args, save_args_to_cache};
 
-        let processed_args = process_args(account_index, init_order_args.into())?;
+        cli_app_context.agg_config.check_seed_hex_existence()?;
+
+        let processed_args = process_args(account_index, init_order_args.into(), &cli_app_context.agg_config)?;
         let (tx_res, args_to_save) = handle(
             processed_args,
             Utxos {
@@ -410,8 +422,9 @@ impl Cli {
         use contract_handlers::maker_funding::{Utxos, handle, process_args, save_args_to_cache};
 
         agg_config.check_nostr_keypair_existence()?;
+        agg_config.check_seed_hex_existence()?;
 
-        let processed_args = process_args(account_index, dcd_taproot_pubkey_gen)?;
+        let processed_args = process_args(account_index, dcd_taproot_pubkey_gen, agg_config)?;
         let event_to_publish = processed_args.extract_event();
         let (tx_id, args_to_save) = handle(
             processed_args,
@@ -426,7 +439,10 @@ impl Cli {
             is_offline,
         )
         .await?;
-        let res = relay_processor.place_order(event_to_publish, tx_id).await?;
+        let expiration_time = agg_config.maker_expiration_time;
+        let res = relay_processor
+            .place_order(event_to_publish, tx_id, Some(expiration_time))
+            .await?;
         save_args_to_cache(&args_to_save)?;
         Ok(format!("[Maker] Creating order, tx_id: {tx_id}, event_id: {res:#?}"))
     }
@@ -452,11 +468,13 @@ impl Cli {
         use contract_handlers::maker_termination_collateral::{Utxos, handle, save_args_to_cache};
 
         agg_config.check_nostr_keypair_existence()?;
+        agg_config.check_seed_hex_existence()?;
         let processed_args = contract_handlers::maker_termination_collateral::process_args(
             account_index,
             grantor_collateral_amount_to_burn,
             maker_order_event_id,
             relay_processor,
+            agg_config,
         )
         .await?;
         let (tx_id, args_to_save) = handle(
@@ -500,11 +518,13 @@ impl Cli {
         use contract_handlers::maker_termination_settlement::{Utxos, handle, save_args_to_cache};
 
         agg_config.check_nostr_keypair_existence()?;
+        agg_config.check_seed_hex_existence()?;
         let processed_args = contract_handlers::maker_termination_settlement::process_args(
             account_index,
             grantor_settlement_amount_to_burn,
             maker_order_event_id,
             relay_processor,
+            agg_config,
         )
         .await?;
         let (tx_id, args_to_save) = handle(
@@ -552,6 +572,7 @@ impl Cli {
         use contract_handlers::maker_settlement::{Utxos, handle, process_args, save_args_to_cache};
 
         agg_config.check_nostr_keypair_existence()?;
+        agg_config.check_seed_hex_existence()?;
         let processed_args = process_args(
             account_index,
             price_at_current_block_height,
@@ -559,6 +580,7 @@ impl Cli {
             grantor_amount_to_burn,
             maker_order_event_id,
             relay_processor,
+            agg_config,
         )
         .await?;
         let (tx_id, args_to_save) = handle(
@@ -602,11 +624,13 @@ impl Cli {
                 use contract_handlers::taker_funding::{Utxos, handle, process_args, save_args_to_cache};
 
                 agg_config.check_nostr_keypair_existence()?;
+                agg_config.check_seed_hex_existence()?;
                 let processed_args = process_args(
                     common_options.account_index,
                     collateral_amount_to_deposit,
                     maker_order_event_id,
                     relay_processor,
+                    agg_config,
                 )
                 .await?;
                 let (tx_id, args_to_save) = handle(
@@ -637,11 +661,13 @@ impl Cli {
                 use contract_handlers::taker_early_termination::{Utxos, handle, process_args, save_args_to_cache};
 
                 agg_config.check_nostr_keypair_existence()?;
+                agg_config.check_seed_hex_existence()?;
                 let processed_args = process_args(
                     common_options.account_index,
                     filler_token_amount_to_return,
                     maker_order_event_id,
                     relay_processor,
+                    agg_config,
                 )
                 .await?;
                 let (tx_id, args_to_save) = handle(
@@ -675,6 +701,7 @@ impl Cli {
                 use contract_handlers::taker_settlement::{Utxos, handle, process_args, save_args_to_cache};
 
                 agg_config.check_nostr_keypair_existence()?;
+                agg_config.check_seed_hex_existence()?;
                 let processed_args = process_args(
                     common_options.account_index,
                     price_at_current_block_height,
@@ -682,6 +709,7 @@ impl Cli {
                     oracle_signature,
                     maker_order_event_id,
                     relay_processor,
+                    agg_config,
                 )
                 .await?;
                 let (tx_id, args_to_save) = handle(
@@ -717,8 +745,15 @@ impl Cli {
                 fee_amount,
                 common_options,
             } => {
-                Self::_process_helper_faucet(fee_utxo_outpoint, asset_name, issue_amount, fee_amount, common_options)
-                    .await?
+                Self::_process_helper_faucet(
+                    cli_app_context,
+                    fee_utxo_outpoint,
+                    asset_name,
+                    issue_amount,
+                    fee_amount,
+                    common_options,
+                )
+                .await?
             }
             HelperCommands::MintTokens {
                 reissue_asset_outpoint,
@@ -729,6 +764,7 @@ impl Cli {
                 common_options,
             } => {
                 Self::_process_helper_mint_tokens(
+                    cli_app_context,
                     reissue_asset_outpoint,
                     fee_utxo_outpoint,
                     asset_name,
@@ -743,13 +779,23 @@ impl Cli {
                 fee_utxo,
                 fee_amount,
                 common_options,
-            } => Self::_process_helper_split_native_three(split_amount, fee_utxo, fee_amount, common_options).await?,
-            HelperCommands::Address { account_index: index } => Self::_process_helper_address(index)?,
+            } => {
+                Self::_process_helper_split_native_three(
+                    cli_app_context,
+                    split_amount,
+                    fee_utxo,
+                    fee_amount,
+                    common_options,
+                )
+                .await?
+            }
+            HelperCommands::Address { account_index: index } => Self::_process_helper_address(cli_app_context, index)?,
             HelperCommands::OracleSignature {
                 price_at_current_block_height,
                 settlement_height,
                 oracle_account_index,
             } => Self::_process_helper_oracle_signature(
+                cli_app_context,
                 price_at_current_block_height,
                 settlement_height,
                 oracle_account_index,
@@ -827,6 +873,7 @@ impl Cli {
     }
 
     async fn _process_helper_faucet(
+        cli_app_context: &CliAppContext,
         fee_utxo_outpoint: OutPoint,
         asset_name: String,
         issue_amount: u64,
@@ -836,6 +883,7 @@ impl Cli {
             is_offline,
         }: CommonOrderOptions,
     ) -> crate::error::Result<String> {
+        cli_app_context.agg_config.check_seed_hex_existence()?;
         let tx_id = contract_handlers::faucet::create_asset(
             account_index,
             asset_name,
@@ -843,12 +891,14 @@ impl Cli {
             fee_amount,
             issue_amount,
             is_offline,
+            cli_app_context.agg_config.clone(),
         )
         .await?;
         Ok(format!("Finish asset creation, tx_id: {tx_id}"))
     }
 
     async fn _process_helper_mint_tokens(
+        cli_app_context: &CliAppContext,
         reissue_asset_outpoint: OutPoint,
         fee_utxo_outpoint: OutPoint,
         asset_name: String,
@@ -859,6 +909,7 @@ impl Cli {
             is_offline,
         }: CommonOrderOptions,
     ) -> crate::error::Result<String> {
+        cli_app_context.agg_config.check_seed_hex_existence()?;
         let tx_id = contract_handlers::faucet::mint_asset(
             account_index,
             asset_name,
@@ -867,12 +918,14 @@ impl Cli {
             reissue_amount,
             fee_amount,
             is_offline,
+            cli_app_context.agg_config.clone(),
         )
         .await?;
         Ok(format!("Finish asset minting, tx_id: {tx_id} "))
     }
 
     async fn _process_helper_split_native_three(
+        cli_app_context: &CliAppContext,
         split_amount: u64,
         fee_utxo: OutPoint,
         fee_amount: u64,
@@ -881,26 +934,37 @@ impl Cli {
             is_offline,
         }: CommonOrderOptions,
     ) -> crate::error::Result<String> {
-        let tx_res =
-            contract_handlers::split_utxo::handle(account_index, split_amount, fee_utxo, fee_amount, is_offline)
-                .await?;
+        cli_app_context.agg_config.check_seed_hex_existence()?;
+        let tx_res = contract_handlers::split_utxo::handle(
+            account_index,
+            split_amount,
+            fee_utxo,
+            fee_amount,
+            is_offline,
+            cli_app_context.agg_config.clone(),
+        )
+        .await?;
         Ok(format!("Split utxo result tx_id: {tx_res:?}"))
     }
 
-    fn _process_helper_address(index: u32) -> crate::error::Result<String> {
-        let (x_only_pubkey, addr) = contract_handlers::address::handle(index)?;
+    fn _process_helper_address(cli_app_context: &CliAppContext, index: u32) -> crate::error::Result<String> {
+        cli_app_context.agg_config.check_seed_hex_existence()?;
+        let (x_only_pubkey, addr) = contract_handlers::address::handle(index, &cli_app_context.agg_config)?;
         Ok(format!("X Only Public Key: '{x_only_pubkey}', P2PK Address: '{addr}'"))
     }
 
     fn _process_helper_oracle_signature(
+        cli_app_context: &CliAppContext,
         price_at_current_block_height: u64,
         settlement_height: u32,
         oracle_account_index: u32,
     ) -> crate::error::Result<String> {
+        cli_app_context.agg_config.check_seed_hex_existence()?;
         let (pubkey, msg, signature) = contract_handlers::oracle_signature::handle(
             oracle_account_index,
             price_at_current_block_height,
             settlement_height,
+            &cli_app_context.agg_config,
         )?;
         Ok(format!(
             "Oracle signature for msg: '{}', signature: '{}', pubkey used: '{}'",
@@ -933,7 +997,8 @@ impl Cli {
         };
 
         agg_config.check_nostr_keypair_existence()?;
-        let processed_args = process_args(account_index, maker_order_event_id, relay_processor).await?;
+        agg_config.check_seed_hex_existence()?;
+        let processed_args = process_args(account_index, maker_order_event_id, relay_processor, agg_config).await?;
         let (tx_id, args_to_save) = handle(
             processed_args,
             Utxos2 {
@@ -985,7 +1050,8 @@ impl Cli {
         };
 
         agg_config.check_nostr_keypair_existence()?;
-        let processed_args = process_args(account_index, maker_order_event_id, relay_processor).await?;
+        agg_config.check_seed_hex_existence()?;
+        let processed_args = process_args(account_index, maker_order_event_id, relay_processor, agg_config).await?;
         let (tx_id, args_to_save) = handle(
             processed_args,
             Utxos3 {
@@ -1040,7 +1106,8 @@ impl Cli {
         };
 
         agg_config.check_nostr_keypair_existence()?;
-        let processed_args = process_args(account_index, maker_order_event_id, relay_processor).await?;
+        agg_config.check_seed_hex_existence()?;
+        let processed_args = process_args(account_index, maker_order_event_id, relay_processor, agg_config).await?;
         let (tx_id, args_to_save) = handle(
             processed_args,
             Utxos4 {

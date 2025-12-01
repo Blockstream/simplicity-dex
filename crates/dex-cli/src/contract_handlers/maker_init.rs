@@ -1,7 +1,6 @@
+use crate::common::config::AggregatedConfig;
 use crate::common::entropy_to_asset_id;
-use crate::common::keys::derive_keypair_from_index;
-use crate::common::settings::Settings;
-use crate::contract_handlers::common::broadcast_or_get_raw_tx;
+use crate::contract_handlers::common::{broadcast_or_get_raw_tx, derive_keypair_from_config};
 use contracts::DCDArguments;
 use contracts_adapter::dcd::{
     BaseContractContext, CreationContext, DcdInitParams, DcdInitResponse, DcdManager, FillerTokenEntropyHex,
@@ -79,11 +78,12 @@ impl TryInto<DcdInitParams> for InnerDcdInitParams {
 }
 
 #[instrument(level = "debug", skip_all, err)]
-pub fn process_args(account_index: u32, dcd_init_params: InnerDcdInitParams) -> crate::error::Result<ProcessedArgs> {
-    let settings = Settings::load().map_err(|err| crate::error::CliError::EnvNotSet(err.to_string()))?;
-
-    let keypair = derive_keypair_from_index(account_index, &settings.seed_hex);
-
+pub fn process_args(
+    account_index: u32,
+    dcd_init_params: InnerDcdInitParams,
+    config: &AggregatedConfig,
+) -> crate::error::Result<ProcessedArgs> {
+    let keypair = derive_keypair_from_config(account_index, config)?;
     let dcd_init_params: DcdInitParams = dcd_init_params
         .try_into()
         .map_err(|err: anyhow::Error| crate::error::CliError::InnerDcdConversion(err.to_string()))?;

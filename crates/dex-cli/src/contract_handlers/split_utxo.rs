@@ -1,6 +1,5 @@
-use crate::common::keys::derive_keypair_from_index;
-use crate::common::settings::Settings;
-use crate::contract_handlers::common::broadcast_or_get_raw_tx;
+use crate::common::config::AggregatedConfig;
+use crate::contract_handlers::common::{broadcast_or_get_raw_tx, derive_keypair_from_config};
 use simplicityhl::elements::{AddressParams, OutPoint, Txid};
 use simplicityhl_core::{LIQUID_TESTNET_BITCOIN_ASSET, LIQUID_TESTNET_GENESIS, get_p2pk_address};
 use tokio::task;
@@ -11,8 +10,10 @@ pub async fn handle(
     fee_utxo: OutPoint,
     fee_amount: u64,
     is_offline: bool,
+    config: AggregatedConfig,
 ) -> crate::error::Result<Txid> {
-    task::spawn_blocking(move || handle_sync(account_index, split_amount, fee_utxo, fee_amount, is_offline)).await?
+    task::spawn_blocking(move || handle_sync(account_index, split_amount, fee_utxo, fee_amount, is_offline, &config))
+        .await?
 }
 
 fn handle_sync(
@@ -21,10 +22,9 @@ fn handle_sync(
     fee_utxo: OutPoint,
     fee_amount: u64,
     is_offline: bool,
+    config: &AggregatedConfig,
 ) -> crate::error::Result<Txid> {
-    let settings = Settings::load().map_err(|err| crate::error::CliError::EnvNotSet(err.to_string()))?;
-    let keypair = derive_keypair_from_index(account_index, &settings.seed_hex);
-
+    let keypair = derive_keypair_from_config(account_index, config)?;
     let recipient_addr = get_p2pk_address(&keypair.x_only_public_key().0, &AddressParams::LIQUID_TESTNET).unwrap();
     let transaction = contracts_adapter::basic::split_native_three(
         &keypair,

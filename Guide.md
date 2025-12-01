@@ -1,7 +1,4 @@
-# Simplicity DEX — Developer Guide
-
-This short guide helps contributors understand, build, test and extend the project. It focuses on practical commands and
-the patterns used across crates (not exhaustive; follow Rust and crate docs for deeper dives).
+# Simplicity DEX - Guide
 
 ## Project layout
 
@@ -24,6 +21,7 @@ the patterns used across crates (not exhaustive; follow Rust and crate docs for 
     - `mv ./target/release/simplicity-dex ./demo/simplicity-dex`
     - `cp ./.simplicity-dex.example/.simplicity-dex.config.toml ./demo/.simplicity-dex.config.toml`
     - `echo SEED_HEX=ffff0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab > ./demo/.env`
+    - `cd /demo`
 3. Insert your valid nostr keypair into `.simplicity-dex.config.toml`
 
 ## Commands example execution
@@ -41,6 +39,8 @@ Maker and Taker responsible for taking such steps:
 5) Taker now can make:
    * Early termination
 6) After `settlement-height` both maker and taker can use settlement exit to receive their tokens (collateral or settlement) depending on the settlement token price, which is signed with oracle.
+
+### Example
 
 1. Create your own contract with your values. For example can be taken
 
@@ -79,9 +79,9 @@ Actual command in cli:
 ```bash
 ./simplicity-dex maker fund
   --filler-utxo <FILLER_TOKEN_UTXO>
-  --grant-coll-utxo <GRANTOR_COLLATERAL_TOKEN_UTXO>
-  --grant-settl-utxo <GRANTOR_SETTLEMENT_TOKEN_UTXO>
-  --settl-asset-utxo <SETTLEMENT_ASSET_UTXO>
+  --grantor-collateral-utxo <GRANTOR_COLLATERAL_TOKEN_UTXO>
+  --grantor-settlement-utxo <GRANTOR_SETTLEMENT_TOKEN_UTXO>
+  --settlement-asset-utxo <SETTLEMENT_ASSET_UTXO>
   --fee-utxo <FEE_UTXO>
   --taproot-pubkey-gen <DCD_TAPROOT_PUBKEY_GEN>
 ```

@@ -1,9 +1,8 @@
 use crate::common::broadcast_tx_inner;
-use crate::common::keys::derive_keypair_from_index;
-use crate::common::settings::Settings;
+use crate::common::config::AggregatedConfig;
 use crate::common::store::SledError;
 use crate::common::store::utils::OrderParams;
-use crate::contract_handlers::common::get_order_params;
+use crate::contract_handlers::common::{derive_keypair_from_config, get_order_params};
 use contracts::DCDArguments;
 use contracts_adapter::dcd::{BaseContractContext, CommonContext, DcdContractContext, DcdManager};
 use dex_nostr_relay::relay_processor::RelayProcessor;
@@ -34,10 +33,9 @@ pub async fn process_args(
     account_index: u32,
     maker_order_event_id: EventId,
     relay_processor: &RelayProcessor,
+    config: &AggregatedConfig,
 ) -> crate::error::Result<ProcessedArgs> {
-    let settings = Settings::load().map_err(|err| crate::error::CliError::EnvNotSet(err.to_string()))?;
-
-    let keypair = derive_keypair_from_index(account_index, &settings.seed_hex);
+    let keypair = derive_keypair_from_config(account_index, config)?;
 
     let order_params: OrderParams = get_order_params(maker_order_event_id, relay_processor).await?;
 

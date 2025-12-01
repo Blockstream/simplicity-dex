@@ -1,8 +1,8 @@
+use crate::common::config::AggregatedConfig;
 use crate::common::decode_hex;
-use crate::common::keys::derive_keypair_from_index;
-use crate::common::settings::Settings;
 use crate::common::store::SledError;
 use crate::contract_handlers::common::broadcast_or_get_raw_tx;
+use crate::contract_handlers::common::derive_keypair_from_config;
 use contracts::DCDArguments;
 use contracts_adapter::dcd::{
     AssetEntropyProcessed, BaseContractContext, COLLATERAL_ASSET_ID, CreationContext, DcdContractContext, DcdManager,
@@ -78,10 +78,9 @@ impl ProcessedArgs {
 pub fn process_args(
     account_index: u32,
     dcd_taproot_pubkey_gen: impl AsRef<str>,
+    config: &AggregatedConfig,
 ) -> crate::error::Result<ProcessedArgs> {
-    let settings = Settings::load().map_err(|err| crate::error::CliError::EnvNotSet(err.to_string()))?;
-
-    let keypair = derive_keypair_from_index(account_index, &settings.seed_hex);
+    let keypair = derive_keypair_from_config(account_index, config)?;
 
     let taproot_pubkey_gen = dcd_taproot_pubkey_gen.as_ref().to_string();
 

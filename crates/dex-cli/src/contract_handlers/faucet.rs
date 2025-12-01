@@ -1,7 +1,6 @@
-use crate::common::keys::derive_keypair_from_index;
-use crate::common::settings::Settings;
+use crate::common::config::AggregatedConfig;
 use crate::common::store::Store;
-use crate::contract_handlers::common::broadcast_or_get_raw_tx;
+use crate::contract_handlers::common::{broadcast_or_get_raw_tx, derive_keypair_from_config};
 use contracts_adapter::basic::{IssueAssetResponse, ReissueAssetResponse};
 use simplicity::elements::OutPoint;
 use simplicity::hashes::sha256::Midstate;
@@ -16,6 +15,7 @@ pub async fn create_asset(
     fee_amount: u64,
     issue_amount: u64,
     is_offline: bool,
+    config: AggregatedConfig,
 ) -> crate::error::Result<Txid> {
     task::spawn_blocking(move || {
         create_asset_sync(
@@ -25,6 +25,7 @@ pub async fn create_asset(
             fee_amount,
             issue_amount,
             is_offline,
+            &config,
         )
     })
     .await?
@@ -37,6 +38,7 @@ fn create_asset_sync(
     fee_amount: u64,
     issue_amount: u64,
     is_offline: bool,
+    config: &AggregatedConfig,
 ) -> crate::error::Result<Txid> {
     let store = Store::load()?;
 
@@ -44,8 +46,7 @@ fn create_asset_sync(
         return Err(crate::error::CliError::AssetNameExists { name: asset_name });
     }
 
-    let settings = Settings::load().map_err(|err| crate::error::CliError::EnvNotSet(err.to_string()))?;
-    let keypair = derive_keypair_from_index(account_index, &settings.seed_hex);
+    let keypair = derive_keypair_from_config(account_index, config)?;
     let blinding_key = derive_public_blinder_key();
 
     let IssueAssetResponse {
@@ -75,6 +76,7 @@ fn create_asset_sync(
     Ok(transaction.txid())
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn mint_asset(
     account_index: u32,
     asset_name: String,
@@ -83,6 +85,7 @@ pub async fn mint_asset(
     reissue_amount: u64,
     fee_amount: u64,
     is_offline: bool,
+    config: AggregatedConfig,
 ) -> crate::error::Result<Txid> {
     task::spawn_blocking(move || {
         mint_asset_sync(
@@ -93,12 +96,14 @@ pub async fn mint_asset(
             reissue_amount,
             fee_amount,
             is_offline,
+            &config,
         )
     })
     .await?
 }
 
-fn mint_asset_sync(
+#[allow(clippy::too_many_arguments)]
+pub fn mint_asset_sync(
     account_index: u32,
     asset_name: String,
     reissue_asset_utxo: OutPoint,
@@ -106,6 +111,7 @@ fn mint_asset_sync(
     reissue_amount: u64,
     fee_amount: u64,
     is_offline: bool,
+    config: &AggregatedConfig,
 ) -> crate::error::Result<Txid> {
     let store = Store::load()?;
 
@@ -117,9 +123,7 @@ fn mint_asset_sync(
         .map_err(|err| crate::error::CliError::Custom(format!("Failed to convert bytes to string, err: {err}")))?;
     let asset_entropy = entropy_to_midstate(&asset_entropy)?;
 
-    let settings = Settings::load().map_err(|err| crate::error::CliError::EnvNotSet(err.to_string()))?;
-    let keypair = derive_keypair_from_index(account_index, &settings.seed_hex);
-
+    let keypair = derive_keypair_from_config(account_index, config)?;
     let blinding_key = derive_public_blinder_key();
     let ReissueAssetResponse {
         tx: transaction,

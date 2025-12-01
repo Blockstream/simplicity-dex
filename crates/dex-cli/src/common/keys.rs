@@ -1,47 +1,64 @@
+use crate::error::CliError;
 use simplicityhl::elements::secp256k1_zkp as secp256k1;
 
-/// # Panics
+/// Derives a secp256k1 secret key from a 32-byte seed and index.
 ///
-/// Will panic if `SEED_HEX` is in incorrect encoding that differs from hex
-#[must_use]
-pub fn derive_secret_key_from_index(index: u32, seed_hex: impl AsRef<[u8]>) -> secp256k1::SecretKey {
-    // TODO (Oleks): fix possible panic, propagate error & move this parameter into config
-    let seed_vec = hex::decode(seed_hex).expect("SEED_HEX must be hex");
-    assert_eq!(seed_vec.len(), 32, "SEED_HEX must be 32 bytes hex");
+/// # Errors
+///
+/// Returns `CliError` if the resulting 32-byte buffer is not a valid
+/// secp256k1 secret key and `secp256k1::SecretKey::from_slice` fails.
+pub fn derive_secret_key_from_index(
+    index: u32,
+    seed_bytes: impl AsRef<[u8]>,
+) -> Result<secp256k1::SecretKey, CliError> {
+    let bytes = seed_bytes.as_ref();
 
-    let mut seed_bytes = [0u8; 32];
-    seed_bytes.copy_from_slice(&seed_vec);
+    let mut seed = [0u8; 32];
+    seed.copy_from_slice(bytes);
 
-    let mut seed = seed_bytes;
     for (i, b) in index.to_be_bytes().iter().enumerate() {
         seed[24 + i] ^= *b;
     }
-    secp256k1::SecretKey::from_slice(&seed).unwrap()
+    secp256k1::SecretKey::from_slice(&seed).map_err(CliError::from)
 }
 
-pub fn derive_keypair_from_index(index: u32, seed_hex: impl AsRef<[u8]>) -> secp256k1::Keypair {
-    elements::bitcoin::secp256k1::Keypair::from_secret_key(
+/// Derives a secp256k1 keypair from a 32-byte hex seed and index.
+///
+/// # Errors
+///
+/// Returns `CliError` if the underlying secret key derivation fails
+/// (for example, if the derived 32-byte value is not a valid
+/// secp256k1 secret key).
+#[inline]
+pub fn derive_keypair_from_index(index: u32, seed_hex: impl AsRef<str>) -> Result<secp256k1::Keypair, CliError> {
+    let seed_bytes = hex::decode(seed_hex.as_ref()).map_err(|e| CliError::FromHex(e, seed_hex.as_ref().to_string()))?;
+    tracing::info!("Seed bytes: {:?}", seed_bytes.len());
+    Ok(elements::bitcoin::secp256k1::Keypair::from_secret_key(
         elements::bitcoin::secp256k1::SECP256K1,
-        &derive_secret_key_from_index(index, seed_hex),
-    )
+        &derive_secret_key_from_index(index, seed_bytes)?,
+    ))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use elements::hex::ToHex;
+    use global_utils::logger::{LoggerGuard, init_logger};
     use proptest::prelude::*;
     use simplicityhl::elements;
     use simplicityhl::elements::AddressParams;
     use simplicityhl_core::get_p2pk_address;
+    use std::sync::LazyLock;
+
+    pub static TEST_LOGGER: LazyLock<LoggerGuard> = LazyLock::new(init_logger);
 
     fn check_seed_hex_gen(
         index: u32,
         x_only_pubkey: &str,
         p2pk_addr: &str,
-        seed_hex: impl AsRef<[u8]>,
+        seed_hex: impl AsRef<str>,
     ) -> anyhow::Result<()> {
-        let keypair = derive_keypair_from_index(index, &seed_hex);
+        let keypair = derive_keypair_from_index(index, seed_hex)?;
 
         let public_key = keypair.x_only_public_key().0;
         let address = get_p2pk_address(&public_key, &AddressParams::LIQUID_TESTNET)?;
@@ -55,6 +72,7 @@ mod tests {
     fn derive_keypair_from_index_is_deterministic_for_seed() -> anyhow::Result<()> {
         const SEED_HEX: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
+        let _ = &*TEST_LOGGER;
         let expected_secrets = [
             (
                 0u32,
@@ -89,8 +107,8 @@ mod tests {
         fn prop_keypair_determinism(index in 0u32..u32::MAX, seed in any::<[u8; 32]>()) {
             let seed_hex = seed.to_hex();
 
-            let kp1 = derive_keypair_from_index(index, &seed_hex);
-            let kp2 = derive_keypair_from_index(index, &seed_hex);
+            let kp1 = derive_keypair_from_index(index, &seed_hex).unwrap();
+            let kp2 = derive_keypair_from_index(index, &seed_hex).unwrap();
 
             prop_assert_eq!(kp1.secret_bytes(), kp2.secret_bytes());
         }

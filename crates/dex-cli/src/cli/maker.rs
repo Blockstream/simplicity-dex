@@ -39,13 +39,13 @@ pub enum MakerCommands {
         #[arg(long = "filler-utxo")]
         filler_token_utxo: OutPoint,
         /// UTXO containing Maker grantor collateral tokens to be locked or burned
-        #[arg(long = "grant-coll-utxo")]
+        #[arg(long = "grantor-collateral-utxo")]
         grantor_collateral_token_utxo: OutPoint,
         /// UTXO containing Maker grantor settlement tokens to be locked or burned
-        #[arg(long = "grant-settl-utxo")]
+        #[arg(long = "grantor-settlement-utxo")]
         grantor_settlement_token_utxo: OutPoint,
         /// UTXO providing the settlement asset (e.g. LBTC) for the DCD contract
-        #[arg(long = "settl-asset-utxo")]
+        #[arg(long = "settlement-asset-utxo")]
         settlement_asset_utxo: OutPoint,
         /// UTXO used to pay miner fees for the Maker funding transaction
         #[arg(long = "fee-utxo")]

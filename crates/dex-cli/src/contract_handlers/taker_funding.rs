@@ -1,8 +1,7 @@
-use crate::common::keys::derive_keypair_from_index;
-use crate::common::settings::Settings;
+use crate::common::config::AggregatedConfig;
 use crate::common::store::SledError;
 use crate::common::store::utils::OrderParams;
-use crate::contract_handlers::common::{broadcast_or_get_raw_tx, get_order_params};
+use crate::contract_handlers::common::{broadcast_or_get_raw_tx, derive_keypair_from_config, get_order_params};
 use contracts::DCDArguments;
 use contracts_adapter::dcd::{BaseContractContext, CommonContext, DcdContractContext, DcdManager, TakerFundingContext};
 use dex_nostr_relay::relay_processor::RelayProcessor;
@@ -39,10 +38,9 @@ pub async fn process_args(
     collateral_amount_to_deposit: u64,
     maker_order_event_id: EventId,
     relay_processor: &RelayProcessor,
+    config: &AggregatedConfig,
 ) -> crate::error::Result<ProcessedArgs> {
-    let settings = Settings::load().map_err(|err| crate::error::CliError::EnvNotSet(err.to_string()))?;
-
-    let keypair = derive_keypair_from_index(account_index, &settings.seed_hex);
+    let keypair = derive_keypair_from_config(account_index, config)?;
 
     let order_params: OrderParams = get_order_params(maker_order_event_id, relay_processor).await?;
 
