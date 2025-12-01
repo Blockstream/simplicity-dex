@@ -13,6 +13,15 @@ pub enum NostrRelayError {
     NostrClientFailure(#[from] nostr_sdk::client::Error),
     #[error("Relay Client requires for operation signature, add key to the Client")]
     MissingSigner,
+    #[error("No events found by filter: '{0}'")]
+    NoEventsFound(String),
+    #[error("Found many events, but required to be only one with filter: '{0}'")]
+    NotOnlyOneEventFound(String),
+    #[error("Failed to encode '{struct_to_encode}', err: `{err}`")]
+    BincodeEncoding {
+        err: bincode::error::EncodeError,
+        struct_to_encode: String,
+    },
 }
 
 pub type Result<T> = std::result::Result<T, NostrRelayError>;

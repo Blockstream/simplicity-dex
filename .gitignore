@@ -39,3 +39,8 @@ dist/
 
 # Logs
 logs/*
+
+/.simplicity-dex.config.toml
+/.cache
+taker/
+simplicity-dex

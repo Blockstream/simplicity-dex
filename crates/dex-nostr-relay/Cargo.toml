@@ -1,5 +1,8 @@
 [package]
 name = "dex-nostr-relay"
+description = "Dex Nostr Relay communicator implementation"
+license = "MIT OR Apache-2.0"
+
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -8,9 +11,20 @@ readme.workspace = true
 
 [dependencies]
 anyhow = { workspace = true }
-tokio = { workspace = true }
+bincode = { workspace = true }
+chrono = { workspace = true }
 global-utils = { workspace = true }
-nostr-sdk = { workspace = true }
+hex = { workspace = true }
 nostr = { workspace = true }
-tracing = { workspace = true }
+nostr-sdk = { workspace = true }
+contracts-adapter = { workspace = true }
+contracts = { workspace = true }
+simplicity-lang = { workspace = true }
+simplicityhl = { workspace = true }
+simplicityhl-core = { workspace = true }
 thiserror = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+dotenvy = { workspace = true }

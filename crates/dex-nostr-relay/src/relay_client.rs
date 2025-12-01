@@ -12,7 +12,7 @@ use nostr_sdk::{Client, Relay, SubscribeAutoCloseOptions};
 
 use tracing::instrument;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct RelayClient {
     client: Client,
     timeout: Duration,
@@ -24,6 +24,12 @@ pub struct ClientConfig {
 }
 
 impl RelayClient {
+    /// Connect to one or more Nostr relays and return a configured `RelayClient`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a relay URL cannot be converted or if adding a relay
+    /// to the underlying `nostr_sdk::Client` fails.
     #[instrument(skip_all, level = "debug", err)]
     pub async fn connect(
         relay_urls: impl IntoIterator<Item = impl TryIntoUrl>,
@@ -45,7 +51,7 @@ impl RelayClient {
             let url = url
                 .try_into_url()
                 .map_err(|err| NostrRelayError::FailedToConvertRelayUrl {
-                    err_msg: format!("{:?}", err),
+                    err_msg: format!("{err:?}"),
                 })?;
 
             client.add_relay(url).await?;
@@ -59,6 +65,11 @@ impl RelayClient {
         })
     }
 
+    /// Request events from connected relays using the provided filter.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if fetching events from the underlying client fails.
     #[instrument(skip_all, level = "debug", ret)]
     pub async fn req_and_wait(&self, filter: Filter) -> crate::error::Result<Events> {
         tracing::debug!(filter = ?filter, "Requesting events with filter");
@@ -66,6 +77,12 @@ impl RelayClient {
         Ok(self.client.fetch_combined_events(filter, self.timeout).await?)
     }
 
+    /// Return the configured signer for this relay client.
+    ///
+    /// # Errors
+    ///
+    /// Returns `NostrRelayError::MissingSigner` if no signer is configured,
+    /// or an error if obtaining the signer from the underlying client fails.
     #[instrument(skip_all, level = "debug", ret)]
     pub async fn get_signer(&self) -> crate::error::Result<Arc<dyn NostrSigner>> {
         if !self.client.has_signer().await {
@@ -80,6 +97,12 @@ impl RelayClient {
         self.client.relays().await
     }
 
+    /// Publish a signed event to connected relays and return its `EventId`.
+    ///
+    /// # Errors
+    ///
+    /// Returns `NostrRelayError::MissingSigner` if no signer is configured,
+    /// or an error if sending the event to the underlying client fails.
     #[instrument(skip_all, level = "debug", ret)]
     pub async fn publish_event(&self, event: &Event) -> crate::error::Result<EventId> {
         if !self.client.has_signer().await {
@@ -92,6 +115,11 @@ impl RelayClient {
         Ok(event_id)
     }
 
+    /// Subscribe to events matching the given filter.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if subscribing via the underlying client fails.
     #[instrument(skip(self), level = "debug")]
     pub async fn subscribe(
         &self,
@@ -106,13 +134,23 @@ impl RelayClient {
         self.client.unsubscribe(subscription_id).await;
     }
 
+    /// Disconnect from all configured relays.
+    ///
+    /// # Errors
+    ///
+    /// Currently does not report errors and always returns `Ok(())`.
     #[instrument(skip_all, level = "debug", ret)]
     pub async fn disconnect(&self) -> crate::error::Result<()> {
         self.client.disconnect().await;
-
         Ok(())
     }
 
+    /// Handle the output from a relay operation.
+    ///
+    /// # Errors
+    ///
+    /// Currently does not report errors and always returns `Ok(output.val)`.
+    /// This may change if error handling for relay outputs is extended.
     /// TODO: handle error
     #[instrument(level = "debug")]
     fn handle_relay_output<T: Debug>(output: Output<T>) -> crate::error::Result<T> {

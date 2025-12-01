@@ -1,29 +1,18 @@
 use crate::relay_client::RelayClient;
 use crate::relay_processor::OrderPlaceEventTags;
-use crate::types::{BLOCKSTREAM_MAKER_CONTENT, CustomKind, MAKER_EXPIRATION_TIME, MakerOrderKind};
+use crate::types::{BLOCKSTREAM_MAKER_CONTENT, CustomKind, MakerOrderEvent, MakerOrderKind};
+use nostr::{EventBuilder, EventId, Timestamp};
+use simplicity::elements::Txid;
 
-use std::borrow::Cow;
-
-use nostr::{EventBuilder, EventId, Tag, TagKind, Timestamp};
-
-pub async fn handle(client: &RelayClient, tags: OrderPlaceEventTags) -> crate::error::Result<EventId> {
+pub async fn handle(client: &RelayClient, tags: OrderPlaceEventTags, tx_id: Txid) -> crate::error::Result<EventId> {
     let client_signer = client.get_signer().await?;
     let client_pubkey = client_signer.get_public_key().await?;
 
     let timestamp_now = Timestamp::now();
 
+    let tags = MakerOrderEvent::form_tags(tags, tx_id, client_pubkey)?;
     let maker_order = EventBuilder::new(MakerOrderKind::get_kind(), BLOCKSTREAM_MAKER_CONTENT)
-        .tags([
-            Tag::public_key(client_pubkey),
-            Tag::expiration(Timestamp::from(timestamp_now.as_u64() + MAKER_EXPIRATION_TIME)),
-            Tag::custom(
-                TagKind::Custom(Cow::from("compiler")),
-                [tags.compiler_name, tags.compiler_build_hash],
-            ),
-            Tag::custom(TagKind::Custom(Cow::from("asset_to_buy")), [tags.asset_to_buy]),
-            Tag::custom(TagKind::Custom(Cow::from("asset_to_sell")), [tags.asset_to_sell]),
-            Tag::custom(TagKind::Custom(Cow::from("price")), [tags.price.to_string()]),
-        ])
+        .tags(tags)
         .custom_created_at(timestamp_now);
 
     let text_note = maker_order.build(client_pubkey);

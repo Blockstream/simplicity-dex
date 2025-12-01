@@ -1,5 +1,9 @@
 [package]
 name = "global-utils"
+description = "Simplicity dex utils"
+license = "MIT OR Apache-2.0"
+publish = false
+
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

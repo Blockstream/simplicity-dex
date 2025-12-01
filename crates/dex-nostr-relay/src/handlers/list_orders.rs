@@ -1,27 +1,18 @@
-use crate::types::{CustomKind, MakerOrderKind};
-
+use crate::handlers::common::filter_maker_order_events;
 use crate::relay_client::RelayClient;
-
-use std::collections::{BTreeMap, BTreeSet};
-
-use nostr::{Filter, Timestamp};
+use crate::relay_processor::ListOrdersEventFilter;
+use crate::types::{MakerOrderEvent, MakerOrderSummary};
+use nostr::Timestamp;
 use nostr_sdk::prelude::Events;
 
-pub async fn handle(client: &RelayClient) -> crate::error::Result<Events> {
-    let events = client
-        .req_and_wait(Filter {
-            ids: None,
-            authors: None,
-            kinds: Some(BTreeSet::from([MakerOrderKind::get_kind()])),
-            search: None,
-            since: None,
-            until: None,
-            limit: None,
-            generic_tags: BTreeMap::default(),
-        })
-        .await?;
-
+pub async fn handle(
+    client: &RelayClient,
+    filter: ListOrdersEventFilter,
+) -> crate::error::Result<Vec<MakerOrderSummary>> {
+    let events = client.req_and_wait(filter.to_filter()).await?;
     let events = filter_expired_events(events);
+    let events = filter_maker_order_events(&events);
+    let events = events.iter().map(MakerOrderEvent::summary).collect();
     Ok(events)
 }
 
@@ -31,7 +22,7 @@ fn filter_expired_events(events_to_filter: Events) -> Events {
     events_to_filter
         .into_iter()
         .filter(|x| match x.tags.expiration() {
-            None => false,
+            None => true,
             Some(t) => t.as_u64() > time_now.as_u64(),
         })
         .collect()
