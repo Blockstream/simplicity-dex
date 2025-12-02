@@ -89,7 +89,6 @@ pub enum Command {
 #[derive(Debug, Clone)]
 struct CliAppContext {
     agg_config: AggregatedConfig,
-    relay_processor: RelayProcessor,
 }
 
 struct MakerSettlementCliContext {
@@ -167,28 +166,14 @@ struct MergeTokens4CliContext {
     maker_order_event_id: EventId,
 }
 
-impl Cli {
-    /// Initialize aggregated CLI configuration from CLI args, config file and env.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if building or validating the aggregated configuration
-    /// (including loading the config file or environment overrides) fails.
-    pub fn init_config(&self) -> crate::error::Result<AggregatedConfig> {
-        AggregatedConfig::new(self)
-    }
-
+impl CliAppContext {
     /// Initialize the relay processor using the provided relays and optional keypair.
     ///
     /// # Errors
     ///
     /// Returns an error if creating or configuring the underlying Nostr relay
     /// client fails, or if connecting to the specified relays fails.
-    pub async fn init_relays(
-        &self,
-        relays: &[RelayUrl],
-        keypair: Option<Keys>,
-    ) -> crate::error::Result<RelayProcessor> {
+    pub async fn init_relays(relays: &[RelayUrl], keypair: Option<Keys>) -> crate::error::Result<RelayProcessor> {
         let relay_processor = RelayProcessor::try_from_config(
             relays,
             keypair,
@@ -198,6 +183,18 @@ impl Cli {
         )
         .await?;
         Ok(relay_processor)
+    }
+}
+
+impl Cli {
+    /// Initialize aggregated CLI configuration from CLI args, config file and env.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if building or validating the aggregated configuration
+    /// (including loading the config file or environment overrides) fails.
+    pub fn init_config(&self) -> crate::error::Result<AggregatedConfig> {
+        AggregatedConfig::new(self)
     }
 
     /// Process the CLI command and execute the selected action.
@@ -213,14 +210,7 @@ impl Cli {
     pub async fn process(self) -> crate::error::Result<()> {
         let agg_config = self.init_config()?;
 
-        let relay_processor = self
-            .init_relays(&agg_config.relays, agg_config.nostr_keypair.clone())
-            .await?;
-
-        let cli_app_context = CliAppContext {
-            agg_config,
-            relay_processor,
-        };
+        let cli_app_context = CliAppContext { agg_config };
         let msg = {
             match self.command {
                 Command::ShowConfig => {
@@ -401,10 +391,7 @@ impl Cli {
     }
 
     async fn _process_maker_fund(
-        CliAppContext {
-            agg_config,
-            relay_processor,
-        }: &CliAppContext,
+        CliAppContext { agg_config, .. }: &CliAppContext,
         MakerFundCliContext {
             filler_token_utxo,
             grantor_collateral_token_utxo,
@@ -423,6 +410,8 @@ impl Cli {
 
         agg_config.check_nostr_keypair_existence()?;
         agg_config.check_seed_hex_existence()?;
+
+        let relay_processor = CliAppContext::init_relays(&agg_config.relays, agg_config.nostr_keypair.clone()).await?;
 
         let processed_args = process_args(account_index, dcd_taproot_pubkey_gen, agg_config)?;
         let event_to_publish = processed_args.extract_event();
@@ -448,10 +437,7 @@ impl Cli {
     }
 
     async fn _process_maker_termination_collateral(
-        CliAppContext {
-            agg_config,
-            relay_processor,
-        }: &CliAppContext,
+        CliAppContext { agg_config, .. }: &CliAppContext,
         MakerCollateralTerminationCliContext {
             grantor_collateral_token_utxo,
             fee_utxo,
@@ -469,11 +455,14 @@ impl Cli {
 
         agg_config.check_nostr_keypair_existence()?;
         agg_config.check_seed_hex_existence()?;
+
+        let relay_processor = CliAppContext::init_relays(&agg_config.relays, agg_config.nostr_keypair.clone()).await?;
+
         let processed_args = contract_handlers::maker_termination_collateral::process_args(
             account_index,
             grantor_collateral_amount_to_burn,
             maker_order_event_id,
-            relay_processor,
+            &relay_processor,
             agg_config,
         )
         .await?;
@@ -498,10 +487,7 @@ impl Cli {
     }
 
     async fn _process_maker_termination_settlement(
-        CliAppContext {
-            agg_config,
-            relay_processor,
-        }: &CliAppContext,
+        CliAppContext { agg_config, .. }: &CliAppContext,
         MakerSettlementTerminationCliContext {
             fee_utxo,
             settlement_asset_utxo,
@@ -519,11 +505,14 @@ impl Cli {
 
         agg_config.check_nostr_keypair_existence()?;
         agg_config.check_seed_hex_existence()?;
+
+        let relay_processor = CliAppContext::init_relays(&agg_config.relays, agg_config.nostr_keypair.clone()).await?;
+
         let processed_args = contract_handlers::maker_termination_settlement::process_args(
             account_index,
             grantor_settlement_amount_to_burn,
             maker_order_event_id,
-            relay_processor,
+            &relay_processor,
             agg_config,
         )
         .await?;
@@ -549,10 +538,7 @@ impl Cli {
 
     #[allow(clippy::too_many_lines)]
     async fn _process_maker_settlement(
-        CliAppContext {
-            agg_config,
-            relay_processor,
-        }: &CliAppContext,
+        CliAppContext { agg_config, .. }: &CliAppContext,
         MakerSettlementCliContext {
             grantor_collateral_token_utxo,
             grantor_settlement_token_utxo,
@@ -573,13 +559,16 @@ impl Cli {
 
         agg_config.check_nostr_keypair_existence()?;
         agg_config.check_seed_hex_existence()?;
+
+        let relay_processor = CliAppContext::init_relays(&agg_config.relays, agg_config.nostr_keypair.clone()).await?;
+
         let processed_args = process_args(
             account_index,
             price_at_current_block_height,
             oracle_signature,
             grantor_amount_to_burn,
             maker_order_event_id,
-            relay_processor,
+            &relay_processor,
             agg_config,
         )
         .await?;
@@ -606,10 +595,7 @@ impl Cli {
 
     #[allow(clippy::too_many_lines)]
     async fn process_taker_commands(
-        CliAppContext {
-            agg_config,
-            relay_processor,
-        }: &CliAppContext,
+        CliAppContext { agg_config, .. }: &CliAppContext,
         action: TakerCommands,
     ) -> crate::error::Result<String> {
         Ok(match action {
@@ -625,11 +611,15 @@ impl Cli {
 
                 agg_config.check_nostr_keypair_existence()?;
                 agg_config.check_seed_hex_existence()?;
+
+                let relay_processor =
+                    CliAppContext::init_relays(&agg_config.relays, agg_config.nostr_keypair.clone()).await?;
+
                 let processed_args = process_args(
                     common_options.account_index,
                     collateral_amount_to_deposit,
                     maker_order_event_id,
-                    relay_processor,
+                    &relay_processor,
                     agg_config,
                 )
                 .await?;
@@ -662,11 +652,15 @@ impl Cli {
 
                 agg_config.check_nostr_keypair_existence()?;
                 agg_config.check_seed_hex_existence()?;
+
+                let relay_processor =
+                    CliAppContext::init_relays(&agg_config.relays, agg_config.nostr_keypair.clone()).await?;
+
                 let processed_args = process_args(
                     common_options.account_index,
                     filler_token_amount_to_return,
                     maker_order_event_id,
-                    relay_processor,
+                    &relay_processor,
                     agg_config,
                 )
                 .await?;
@@ -702,13 +696,17 @@ impl Cli {
 
                 agg_config.check_nostr_keypair_existence()?;
                 agg_config.check_seed_hex_existence()?;
+
+                let relay_processor =
+                    CliAppContext::init_relays(&agg_config.relays, agg_config.nostr_keypair.clone()).await?;
+
                 let processed_args = process_args(
                     common_options.account_index,
                     price_at_current_block_height,
                     filler_amount_to_burn,
                     oracle_signature,
                     maker_order_event_id,
-                    relay_processor,
+                    &relay_processor,
                     agg_config,
                 )
                 .await?;
@@ -975,10 +973,7 @@ impl Cli {
     }
 
     async fn _process_helper_merge_tokens2(
-        CliAppContext {
-            agg_config,
-            relay_processor,
-        }: &CliAppContext,
+        CliAppContext { agg_config, .. }: &CliAppContext,
         MergeTokens2CliContext {
             token_utxo_1,
             token_utxo_2,
@@ -998,7 +993,10 @@ impl Cli {
 
         agg_config.check_nostr_keypair_existence()?;
         agg_config.check_seed_hex_existence()?;
-        let processed_args = process_args(account_index, maker_order_event_id, relay_processor, agg_config).await?;
+
+        let relay_processor = CliAppContext::init_relays(&agg_config.relays, agg_config.nostr_keypair.clone()).await?;
+
+        let processed_args = process_args(account_index, maker_order_event_id, &relay_processor, agg_config).await?;
         let (tx_id, args_to_save) = handle(
             processed_args,
             Utxos2 {
@@ -1027,10 +1025,7 @@ impl Cli {
     }
 
     async fn _process_helper_merge_tokens3(
-        CliAppContext {
-            agg_config,
-            relay_processor,
-        }: &CliAppContext,
+        CliAppContext { agg_config, .. }: &CliAppContext,
         MergeTokens3CliContext {
             token_utxo_1,
             token_utxo_2,
@@ -1051,7 +1046,10 @@ impl Cli {
 
         agg_config.check_nostr_keypair_existence()?;
         agg_config.check_seed_hex_existence()?;
-        let processed_args = process_args(account_index, maker_order_event_id, relay_processor, agg_config).await?;
+
+        let relay_processor = CliAppContext::init_relays(&agg_config.relays, agg_config.nostr_keypair.clone()).await?;
+
+        let processed_args = process_args(account_index, maker_order_event_id, &relay_processor, agg_config).await?;
         let (tx_id, args_to_save) = handle(
             processed_args,
             Utxos3 {
@@ -1082,10 +1080,7 @@ impl Cli {
     }
 
     async fn _process_helper_merge_tokens4(
-        CliAppContext {
-            agg_config,
-            relay_processor,
-        }: &CliAppContext,
+        CliAppContext { agg_config, .. }: &CliAppContext,
         MergeTokens4CliContext {
             token_utxo_1,
             token_utxo_2,
@@ -1107,7 +1102,10 @@ impl Cli {
 
         agg_config.check_nostr_keypair_existence()?;
         agg_config.check_seed_hex_existence()?;
-        let processed_args = process_args(account_index, maker_order_event_id, relay_processor, agg_config).await?;
+
+        let relay_processor = CliAppContext::init_relays(&agg_config.relays, agg_config.nostr_keypair.clone()).await?;
+
+        let processed_args = process_args(account_index, maker_order_event_id, &relay_processor, agg_config).await?;
         let (tx_id, args_to_save) = handle(
             processed_args,
             Utxos4 {
@@ -1140,9 +1138,11 @@ impl Cli {
     }
 
     async fn process_dex_commands(
-        CliAppContext { relay_processor, .. }: &CliAppContext,
+        CliAppContext { agg_config, .. }: &CliAppContext,
         action: DexCommands,
     ) -> crate::error::Result<String> {
+        let relay_processor = CliAppContext::init_relays(&agg_config.relays, agg_config.nostr_keypair.clone()).await?;
+
         Ok(match action {
             DexCommands::GetOrderReplies { event_id } => {
                 let res = relay_processor.get_order_replies(event_id).await?;
