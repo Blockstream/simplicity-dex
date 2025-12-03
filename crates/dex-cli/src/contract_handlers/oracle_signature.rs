@@ -12,7 +12,7 @@ pub fn handle(
     settlement_height: u32,
 ) -> crate::error::Result<(PublicKey, Message, Signature)> {
     let settings = Settings::load()?;
-    let keypair = derive_keypair_from_index(index, &settings.seed_hex);
+    let keypair = derive_keypair_from_index(index, &settings.seed_hex)?;
     let pubkey = keypair.public_key();
     let msg = secp256k1::Message::from_digest_slice(&oracle_msg(settlement_height, price_at_current_block_height))?;
     let sig = secp256k1::SECP256K1.sign_schnorr(&msg, &keypair);

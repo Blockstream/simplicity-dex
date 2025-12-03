@@ -37,8 +37,10 @@ simplicity-lang = { version = "0.6.0" }
 simplicityhl = { version = "0.2.0" }
 simplicityhl-core = { git = "https://github.com/BlockstreamResearch/simplicity-contracts.git", rev = "baa8ab7", package = "simplicityhl-core", features = ["encoding"] }
 sled = { version = "0.34.7" }
+tempfile = { version = "3.23.0" }
 thiserror = { version = "2.0.17" }
 tokio = { version = "1.48.0", features = ["macros", "test-util", "rt", "rt-multi-thread", "tracing" ] }
+toml = { version = "0.9.8" }
 tracing = { version = "0.1.41" }
 tracing-appender = { version = "0.2.3" }
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }

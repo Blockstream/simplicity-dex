@@ -23,7 +23,7 @@ fn handle_sync(
     is_offline: bool,
 ) -> crate::error::Result<Txid> {
     let settings = Settings::load().map_err(|err| crate::error::CliError::EnvNotSet(err.to_string()))?;
-    let keypair = derive_keypair_from_index(account_index, &settings.seed_hex);
+    let keypair = derive_keypair_from_index(account_index, &settings.seed_hex)?;
 
     let recipient_addr = get_p2pk_address(&keypair.x_only_public_key().0, &AddressParams::LIQUID_TESTNET).unwrap();
     let transaction = contracts_adapter::basic::split_native_three(

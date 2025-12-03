@@ -45,7 +45,7 @@ fn create_asset_sync(
     }
 
     let settings = Settings::load().map_err(|err| crate::error::CliError::EnvNotSet(err.to_string()))?;
-    let keypair = derive_keypair_from_index(account_index, &settings.seed_hex);
+    let keypair = derive_keypair_from_index(account_index, &settings.seed_hex)?;
     let blinding_key = derive_public_blinder_key();
 
     let IssueAssetResponse {
@@ -118,7 +118,7 @@ fn mint_asset_sync(
     let asset_entropy = entropy_to_midstate(&asset_entropy)?;
 
     let settings = Settings::load().map_err(|err| crate::error::CliError::EnvNotSet(err.to_string()))?;
-    let keypair = derive_keypair_from_index(account_index, &settings.seed_hex);
+    let keypair = derive_keypair_from_index(account_index, &settings.seed_hex)?;
 
     let blinding_key = derive_public_blinder_key();
     let ReissueAssetResponse {

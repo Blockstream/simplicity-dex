@@ -50,7 +50,7 @@ pub async fn process_args(
 ) -> crate::error::Result<ProcessedArgs> {
     let settings = Settings::load().map_err(|err| crate::error::CliError::EnvNotSet(err.to_string()))?;
 
-    let keypair = derive_keypair_from_index(account_index, &settings.seed_hex);
+    let keypair = derive_keypair_from_index(account_index, &settings.seed_hex)?;
 
     let order_params: OrderParams = get_order_params(maker_order_event_id, relay_processor).await?;
 

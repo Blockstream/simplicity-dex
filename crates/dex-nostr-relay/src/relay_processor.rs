@@ -1,6 +1,8 @@
 use crate::handlers;
 use crate::relay_client::{ClientConfig, RelayClient};
-use crate::types::{CustomKind, MakerOrderEvent, MakerOrderSummary, OrderReplyEvent, ReplyOption};
+use crate::types::{
+    CustomKind, DEFAULT_EXPIRATION_TIME, MakerOrderEvent, MakerOrderSummary, OrderReplyEvent, ReplyOption,
+};
 use contracts::DCDArguments;
 use nostr::prelude::IntoNostrSigner;
 use nostr::{EventId, PublicKey, TryIntoUrl};
@@ -84,7 +86,8 @@ impl RelayProcessor {
     /// Returns an error if constructing or publishing the order event fails,
     /// or if the relay client encounters an error while sending the event.
     pub async fn place_order(&self, tags: OrderPlaceEventTags, tx_id: Txid) -> crate::error::Result<EventId> {
-        let event_id = handlers::place_order::handle(&self.relay_client, tags, tx_id).await?;
+        let event_id =
+            handlers::place_order::handle(&self.relay_client, tags, tx_id, Some(DEFAULT_EXPIRATION_TIME)).await?;
         Ok(event_id)
     }
 

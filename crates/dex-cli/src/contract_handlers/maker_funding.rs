@@ -81,7 +81,7 @@ pub fn process_args(
 ) -> crate::error::Result<ProcessedArgs> {
     let settings = Settings::load().map_err(|err| crate::error::CliError::EnvNotSet(err.to_string()))?;
 
-    let keypair = derive_keypair_from_index(account_index, &settings.seed_hex);
+    let keypair = derive_keypair_from_index(account_index, &settings.seed_hex)?;
 
     let taproot_pubkey_gen = dcd_taproot_pubkey_gen.as_ref().to_string();
 

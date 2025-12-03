@@ -82,7 +82,7 @@ impl TryInto<DcdInitParams> for InnerDcdInitParams {
 pub fn process_args(account_index: u32, dcd_init_params: InnerDcdInitParams) -> crate::error::Result<ProcessedArgs> {
     let settings = Settings::load().map_err(|err| crate::error::CliError::EnvNotSet(err.to_string()))?;
 
-    let keypair = derive_keypair_from_index(account_index, &settings.seed_hex);
+    let keypair = derive_keypair_from_index(account_index, &settings.seed_hex)?;
 
     let dcd_init_params: DcdInitParams = dcd_init_params
         .try_into()
