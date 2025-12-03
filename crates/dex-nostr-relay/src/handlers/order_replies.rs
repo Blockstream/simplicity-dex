@@ -11,7 +11,7 @@ pub async fn handle(client: &RelayClient, event_id: EventId) -> crate::error::Re
         .req_and_wait(Filter {
             ids: None,
             authors: None,
-            kinds: Some(BTreeSet::from([TakerReplyOrderKind::get_kind()])),
+            kinds: None,
             search: None,
             since: None,
             until: None,
