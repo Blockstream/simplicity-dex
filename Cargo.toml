@@ -21,6 +21,7 @@ clap = { version = "4.5.49", features = ["derive"] }
 config = { version = "0.15.18" }
 contracts = { git = "https://github.com/BlockstreamResearch/simplicity-contracts.git", rev = "baa8ab7", package = "contracts" }
 contracts-adapter = { git = "https://github.com/BlockstreamResearch/simplicity-contracts.git", rev = "baa8ab7", package = "contracts-adapter" }
+coin-selection = { path = "./crate/coin-selection" }
 dex-nostr-relay = { path = "./crates/dex-nostr-relay" }
 dirs = { version = "6.0.0" }
 dotenvy = { version = "0.15.7" }

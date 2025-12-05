@@ -44,3 +44,7 @@ logs/*
 /.cache
 taker/
 simplicity-dex
+
+# DB
+**/dcd_cache.db
+/db
