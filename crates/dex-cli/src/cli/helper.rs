@@ -2,6 +2,7 @@ use crate::cli::CommonOrderOptions;
 use clap::Subcommand;
 use nostr::EventId;
 use simplicity::elements::OutPoint;
+use simplicityhl::elements::Txid;
 
 #[derive(Debug, Subcommand)]
 pub enum HelperCommands {
@@ -140,5 +141,10 @@ pub enum HelperCommands {
         maker_order_event_id: EventId,
         #[command(flatten)]
         common_options: CommonOrderOptions,
+    },
+    #[command(about = "Merge 4 token UTXOs into 1")]
+    AddOutsToSqliteCache {
+        #[arg(long = "tx-id")]
+        tx_id: Txid,
     },
 }

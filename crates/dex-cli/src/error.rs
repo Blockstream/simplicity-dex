@@ -48,6 +48,8 @@ pub enum CliError {
     NoNostrKeypairListed,
     #[error("Failed to join task, err: '{0}'")]
     TokioJoinError(#[from] JoinError),
+    #[error("Occurred error with SqLite cache, err: '{0}'")]
+    SqliteCache(String),
     #[error("Occurred error with msg: '{0}'")]
     Custom(String),
 }

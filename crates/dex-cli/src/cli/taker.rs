@@ -12,10 +12,10 @@ pub enum TakerCommands {
     FundOrder {
         /// UTXO containing filler tokens provided by the Taker to fund the contract
         #[arg(long = "filler-utxo")]
-        filler_token_utxo: OutPoint,
+        filler_token_utxo: Option<OutPoint>,
         /// UTXO containing collateral asset that the Taker locks into the DCD contract
         #[arg(long = "collateral-utxo")]
-        collateral_token_utxo: OutPoint,
+        collateral_token_utxo: Option<OutPoint>,
         /// Miner fee in satoshis (LBTC) for the Taker funding transaction
         #[arg(long = "fee-amount", default_value_t = 1500)]
         fee_amount: u64,

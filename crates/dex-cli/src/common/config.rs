@@ -16,6 +16,7 @@ use tracing::instrument;
 pub struct AggregatedConfig {
     pub nostr_keypair: Option<Keys>,
     pub relays: Vec<RelayUrl>,
+    pub sql_url: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -53,12 +54,14 @@ impl AggregatedConfig {
         pub struct AggregatedConfigInner {
             pub nostr_keypair: Option<KeysWrapper>,
             pub relays: Option<Vec<RelayUrl>>,
+            pub sqlite_url: Option<String>,
         }
 
         let Cli {
             nostr_key,
             relays_list,
             nostr_config_path,
+            sqlite_url,
             ..
         } = cli;
 
@@ -72,6 +75,11 @@ impl AggregatedConfig {
             tracing::debug!("Adding keypair value from CLI");
             config_builder =
                 config_builder.set_override_option("nostr_keypair", Some(KeysWrapper(nostr_key.clone())))?;
+        }
+
+        if let Some(sqlite_url) = sqlite_url {
+            tracing::debug!("Adding sqlite url value from CLI");
+            config_builder = config_builder.set_override_option("sqlite_url", Some(sqlite_url.clone()))?;
         }
 
         if let Some(relays) = relays_list {
@@ -107,6 +115,7 @@ impl AggregatedConfig {
         let aggregated_config = AggregatedConfig {
             nostr_keypair: config.nostr_keypair.map(|x| x.0),
             relays,
+            sql_url: config.sqlite_url,
         };
 
         tracing::debug!("Config gathered: '{:?}'", aggregated_config);

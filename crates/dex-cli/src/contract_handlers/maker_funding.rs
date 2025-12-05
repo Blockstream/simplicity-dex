@@ -30,8 +30,8 @@ pub struct ProcessedArgs {
 
 #[derive(Debug)]
 pub struct ArgsToSave {
-    taproot_pubkey_gen: TaprootPubkeyGen,
-    dcd_arguments: DCDArguments,
+    pub taproot_pubkey_gen: TaprootPubkeyGen,
+    pub dcd_arguments: DCDArguments,
 }
 
 #[derive(Debug)]

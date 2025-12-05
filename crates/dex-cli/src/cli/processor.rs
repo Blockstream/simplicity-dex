@@ -3,7 +3,10 @@ use crate::cli::{DexCommands, MakerCommands, TakerCommands};
 use crate::common::config::AggregatedConfig;
 use crate::common::{DEFAULT_CLIENT_TIMEOUT_SECS, InitOrderArgs, write_into_stdout};
 use crate::contract_handlers;
+use crate::error::CliError;
 use clap::{Parser, Subcommand};
+use coin_selection::sqlite_db::SqliteRepo;
+use coin_selection::types::{CoinSelector, DcdParamsStorage, TransactionOption};
 use dex_nostr_relay::relay_client::ClientConfig;
 use dex_nostr_relay::relay_processor::{ListOrdersEventFilter, RelayProcessor};
 use dex_nostr_relay::types::ReplyOption;
@@ -29,6 +32,10 @@ pub struct Cli {
     /// Path to a config file containing the list of relays and(or) nostr keypair to use
     #[arg(short = 'c', long, default_value = DEFAULT_CONFIG_PATH, env = "DEX_NOSTR_CONFIG_PATH")]
     pub(crate) nostr_config_path: PathBuf,
+
+    /// Path to a config file containing the list of relays and(or) nostr keypair to use
+    #[arg(short = 's', long, env = "DEX_SQLITE_URL")]
+    pub(crate) sqlite_url: Option<String>,
 
     /// Command to execute
     #[command(subcommand)]
@@ -205,6 +212,13 @@ impl Cli {
     pub async fn process(self) -> crate::error::Result<()> {
         let agg_config = self.init_config()?;
 
+        // TODO: add generic type for sqlite storage
+        let sqlite_cache = match self.sqlite_url.as_ref() {
+            None => SqliteRepo::new().await,
+            Some(url) => SqliteRepo::from_url(&url).await,
+        }
+        .map_err(|err| crate::error::CliError::SqliteCache(err.to_string()))?;
+
         let relay_processor = self
             .init_relays(&agg_config.relays, agg_config.nostr_keypair.clone())
             .await?;
@@ -218,9 +232,15 @@ impl Cli {
                 Command::ShowConfig => {
                     format!("Config: {:#?}", cli_app_context.agg_config)
                 }
-                Command::Maker { action } => Self::process_maker_commands(&cli_app_context, action).await?,
-                Command::Taker { action } => Self::process_taker_commands(&cli_app_context, action).await?,
-                Command::Helpers { action } => Self::process_helper_commands(&cli_app_context, action).await?,
+                Command::Maker { action } => {
+                    Self::process_maker_commands(&cli_app_context, action, &sqlite_cache).await?
+                }
+                Command::Taker { action } => {
+                    Self::process_taker_commands(&cli_app_context, action, &sqlite_cache).await?
+                }
+                Command::Helpers { action } => {
+                    Self::process_helper_commands(&cli_app_context, action, &sqlite_cache).await?
+                }
                 Command::Dex { action } => Self::process_dex_commands(&cli_app_context, action).await?,
             }
         };
@@ -232,6 +252,7 @@ impl Cli {
     async fn process_maker_commands(
         cli_app_context: &CliAppContext,
         action: MakerCommands,
+        sqlite_cache: &SqliteRepo,
     ) -> crate::error::Result<String> {
         Ok(match action {
             MakerCommands::InitOrder {
@@ -276,6 +297,7 @@ impl Cli {
                         dcd_taproot_pubkey_gen,
                     },
                     common_options,
+                    sqlite_cache,
                 )
                 .await?
             }
@@ -406,6 +428,7 @@ impl Cli {
             account_index,
             is_offline,
         }: CommonOrderOptions,
+        sqlite_repo: &SqliteRepo,
     ) -> crate::error::Result<String> {
         use contract_handlers::maker_funding::{Utxos, handle, process_args, save_args_to_cache};
 
@@ -428,6 +451,25 @@ impl Cli {
         .await?;
         let res = relay_processor.place_order(event_to_publish, tx_id).await?;
         save_args_to_cache(&args_to_save)?;
+
+        println!("[Pre defined msg Maker] Creating order, tx_id: {tx_id}, event_id: {res:#?}");
+
+        tracing::info!("Sleeping before writing into db");
+        tokio::time::sleep(tokio::time::Duration::from_secs(30)).await;
+
+        tracing::info!("Writing in db");
+        sqlite_repo
+            .add_dcd_params(
+                &args_to_save.taproot_pubkey_gen.to_string(),
+                &args_to_save.dcd_arguments,
+            )
+            .await
+            .map_err(|err| CliError::SqliteCache(err.to_string()))?;
+        sqlite_repo
+            .add_outputs(TransactionOption::MakerFund(tx_id))
+            .await
+            .map_err(|err| CliError::SqliteCache(err.to_string()))?;
+
         Ok(format!("[Maker] Creating order, tx_id: {tx_id}, event_id: {res:#?}"))
     }
 
@@ -589,6 +631,7 @@ impl Cli {
             relay_processor,
         }: &CliAppContext,
         action: TakerCommands,
+        sqlite_repo: &SqliteRepo,
     ) -> crate::error::Result<String> {
         Ok(match action {
             TakerCommands::FundOrder {
@@ -599,9 +642,10 @@ impl Cli {
                 common_options,
                 maker_order_event_id,
             } => {
-                use contract_handlers::taker_funding::{Utxos, handle, process_args, save_args_to_cache};
+                use contract_handlers::taker_funding::{handle, merge_utxos, process_args, save_args_to_cache};
 
                 agg_config.check_nostr_keypair_existence()?;
+
                 let processed_args = process_args(
                     common_options.account_index,
                     collateral_amount_to_deposit,
@@ -609,16 +653,19 @@ impl Cli {
                     relay_processor,
                 )
                 .await?;
-                let (tx_id, args_to_save) = handle(
-                    processed_args,
-                    Utxos {
-                        filler_token_utxo,
-                        collateral_token_utxo,
-                    },
-                    fee_amount,
-                    common_options.is_offline,
+
+                let utxos = merge_utxos(
+                    sqlite_repo,
+                    &processed_args.dcd_taproot_pubkey_gen,
+                    filler_token_utxo,
+                    collateral_token_utxo,
+                    &processed_args.keypair,
                 )
                 .await?;
+                tracing::info!("Chosen utxos: {utxos:#?}");
+
+                let (tx_id, args_to_save) =
+                    handle(processed_args, utxos, fee_amount, common_options.is_offline).await?;
                 let reply_event_id = relay_processor
                     .reply_order(maker_order_event_id, ReplyOption::TakerFund { tx_id })
                     .await?;
@@ -708,6 +755,7 @@ impl Cli {
     async fn process_helper_commands(
         cli_app_context: &CliAppContext,
         action: HelperCommands,
+        sqlite_repo: &SqliteRepo,
     ) -> crate::error::Result<String> {
         Ok(match action {
             HelperCommands::Faucet {
@@ -822,6 +870,13 @@ impl Cli {
                     common_options,
                 )
                 .await?
+            }
+            HelperCommands::AddOutsToSqliteCache { tx_id } => {
+                sqlite_repo
+                    .add_outputs(TransactionOption::MakerFund(tx_id))
+                    .await
+                    .map_err(|err| CliError::SqliteCache(err.to_string()))?;
+                format!("[Add outs] Successfully added outs to sqlite cache, tx_id: {tx_id}")
             }
         })
     }

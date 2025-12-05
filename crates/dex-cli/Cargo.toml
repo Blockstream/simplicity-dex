@@ -19,6 +19,7 @@ clap = { workspace = true, features = ["env"] }
 config = { workspace = true }
 contracts = { workspace = true }
 contracts-adapter = { workspace = true }
+coin-selection = { workspace = true }
 dex-nostr-relay = { workspace = true }
 dotenvy = { workspace = true }
 elements = { workspace = true }
