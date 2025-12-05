@@ -32,92 +32,99 @@ pub trait EntropyStorage: Send + Sync {
     ) -> Result<Option<DcdContractTokenEntropies>>;
 }
 
+#[derive(Clone, Debug)]
+pub enum TransactionOption {
+    TakerFundOrder(Txid),
+    TakerTerminationEarly(Txid),
+    TakerSettlement(Txid),
+    MakerFund(Txid),
+    MakerTerminationCollateral(Txid),
+    MakerTerminationSettlement(Txid),
+    MakerSettlement(Txid),
+}
+
+#[derive(Clone, Debug)]
+pub enum TransactionInputsOption {
+    TakerFundOrder(TakerFundInputs),
+    TakerTerminationEarly(TakerTerminationEarlyInputs),
+    TakerSettlement(TakerSettlementInputs),
+    MakerFund(MakerFundInputs),
+    MakerTerminationCollateral(MakerTerminationCollateralInputs),
+    MakerTerminationSettlement(MakerTerminationSettlmentInputs),
+    MakerSettlement(MakerSettlementInputs),
+}
+
+#[derive(Clone, Debug)]
+pub enum TransactionInputs {
+    TakerFundOrder,
+    TakerTerminationEarly,
+    TakerSettlement(GetSettlementFilter),
+    MakerFund,
+    MakerTerminationCollateral,
+    MakerTerminationSettlement,
+    MakerSettlement(GetSettlementFilter),
+}
+
 #[async_trait]
 pub trait CoinSelector: Send + Sync + CoinSelectionStorage + DcdParamsStorage + EntropyStorage {
-    async fn add_taker_fund_order_outputs(&self, _tx_id: Txid) -> Result<()> {
+    async fn add_outputs(&self, option: TransactionOption) -> Result<()> {
+        match option {
+            TransactionOption::TakerFundOrder(_) => {}
+            TransactionOption::TakerTerminationEarly(_) => {}
+            TransactionOption::TakerSettlement(_) => {}
+            TransactionOption::MakerFund(_) => {}
+            TransactionOption::MakerTerminationCollateral(_) => {}
+            TransactionOption::MakerTerminationSettlement(_) => {}
+            TransactionOption::MakerSettlement(_) => {}
+        }
         Ok(())
     }
-    async fn add_taker_termination_early_outputs(&self, _tx_id: Txid) -> Result<()> {
-        //todo: add inputs of transaction, mark the mas spent and
-        //todo: add implementation
-        Ok(())
-    }
-    async fn add_taker_settlement_outputs(&self, _tx_id: Txid) -> Result<()> {
-        //todo: add inputs of transaction, mark the mas spent and
-        //todo: add implementation
-        Ok(())
-    }
-    async fn add_maker_fund_outputs(&self, _tx_id: Txid) -> Result<()> {
-        //todo: add inputs of transaction, mark the mas spent and
-        //todo: add implementation
-        Ok(())
-    }
-    async fn add_maker_termination_collateral_outputs(&self, _tx_id: Txid) -> Result<()> {
-        //todo: add inputs of transaction, mark the mas spent and
-        //todo: add implementation
-        Ok(())
-    }
-    async fn add_maker_termination_settlement_outputs(&self, _tx_id: Txid) -> Result<()> {
-        //todo: add inputs of transaction, mark the mas spent and
-        //todo: add implementation
-        Ok(())
-    }
-    async fn add_maker_settlement_outputs(&self, _tx_id: Txid) -> Result<()> {
-        //todo: add inputs of transaction, mark the mas spent and
-        //todo: add implementation
-        Ok(())
-    }
-    async fn get_taker_fund_order_inputs(&self) -> Result<TakerFundInputs> {
-        //todo: add implementation
-        Ok(TakerFundInputs {
-            filler_token: None,
-            collateral_token: None,
-        })
-    }
-    async fn get_taker_termination_early_inputs(&self) -> Result<TakerTerminationEarlyInputs> {
-        //todo: add implementation
-        Ok(TakerTerminationEarlyInputs {
-            filler_token: None,
-            collateral_token: None,
-        })
-    }
-    async fn get_taker_settlement_inputs(&self, _filter: GetSettlementFilter) -> Result<TakerSettlementInputs> {
-        //todo: add implementation
-        Ok(TakerSettlementInputs {
-            filler_token: None,
-            asset_token: None,
-        })
-    }
-    async fn get_maker_fund_inputs(&self) -> Result<MakerFundInputs> {
-        //todo: add implementation
-        Ok(MakerFundInputs {
-            filler_reissuance_tx: None,
-            grantor_collateral_reissuance_tx: None,
-            grantor_settlement_reissuance_tx: None,
-            asset_settlement_tx: None,
-        })
-    }
-    async fn get_maker_termination_collateral_inputs(&self) -> Result<MakerTerminationCollateralInputs> {
-        //todo: add implementation
-        Ok(MakerTerminationCollateralInputs {
-            collateral_token_utxo: None,
-            grantor_collateral_token_utxo: None,
-        })
-    }
-    async fn get_maker_termination_settlement_inputs(&self) -> Result<MakerTerminationSettlmentInputs> {
-        //todo: add implementation
-        Ok(MakerTerminationSettlmentInputs {
-            settlement_asset_utxo: None,
-            grantor_settlement_token_utxo: None,
-        })
-    }
-    async fn get_maker_settlement_inputs(&self, _filter: GetSettlementFilter) -> Result<MakerSettlementInputs> {
-        //todo: add implementation
-        Ok(MakerSettlementInputs {
-            asset_utxo: None,
-            grantor_collateral_token_utxo: None,
-            grantor_settlement_token_utxo: None,
-        })
+
+    async fn get_inputs(&self, option: TransactionInputs) -> Result<TransactionInputsOption> {
+        let res = match option {
+            TransactionInputs::TakerFundOrder => TransactionInputsOption::TakerFundOrder(TakerFundInputs {
+                filler_token: None,
+                collateral_token: None,
+            }),
+            TransactionInputs::TakerTerminationEarly => {
+                TransactionInputsOption::TakerTerminationEarly(TakerTerminationEarlyInputs {
+                    filler_token: None,
+                    collateral_token: None,
+                })
+            }
+            TransactionInputs::TakerSettlement(_filter) => {
+                TransactionInputsOption::TakerSettlement(TakerSettlementInputs {
+                    filler_token: None,
+                    asset_token: None,
+                })
+            }
+            TransactionInputs::MakerFund => TransactionInputsOption::MakerFund(MakerFundInputs {
+                filler_reissuance_tx: None,
+                grantor_collateral_reissuance_tx: None,
+                grantor_settlement_reissuance_tx: None,
+                asset_settlement_tx: None,
+            }),
+            TransactionInputs::MakerTerminationCollateral => {
+                TransactionInputsOption::MakerTerminationCollateral(MakerTerminationCollateralInputs {
+                    collateral_token_utxo: None,
+                    grantor_collateral_token_utxo: None,
+                })
+            }
+            TransactionInputs::MakerTerminationSettlement => {
+                TransactionInputsOption::MakerTerminationSettlement(MakerTerminationSettlmentInputs {
+                    settlement_asset_utxo: None,
+                    grantor_settlement_token_utxo: None,
+                })
+            }
+            TransactionInputs::MakerSettlement(_filter) => {
+                TransactionInputsOption::MakerSettlement(MakerSettlementInputs {
+                    asset_utxo: None,
+                    grantor_collateral_token_utxo: None,
+                    grantor_settlement_token_utxo: None,
+                })
+            }
+        };
+        Ok(res)
     }
 }
 
@@ -160,7 +167,7 @@ pub struct GetTokenFilter {
     pub asset_id: Option<String>,
     /// Whether transaction is spent or not according to db or not
     pub spent: Option<bool>,
-    /// Owner of
+    /// Owner of token
     pub owner: Option<String>,
 }
 
