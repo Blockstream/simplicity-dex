@@ -13,14 +13,15 @@ bincode = { workspace = true }
 contracts = { workspace = true }
 contracts-adapter = { workspace = true }
 global-utils = { workspace = true }
+hex = { workspace = true }
+reqwest = { workspace = true }
 serde = { workspace = true }
 simplicity-lang = { workspace = true }
 simplicityhl = { workspace = true }
 simplicityhl-core = { workspace = true }
 sqlx = { workspace = true }
 tokio = { workspace = true }
-reqwest = { workspace = true }
-hex = { workspace = true }
+tracing = { workspace = true }
 
 [dev-dependencies]
 dotenvy = { workspace = true }

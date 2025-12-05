@@ -6,6 +6,7 @@ use contracts::DCDArguments;
 use simplicityhl::elements::OutPoint;
 use sqlx::{Connection, Sqlite, SqlitePool, migrate::MigrateDatabase};
 use std::path::PathBuf;
+use tracing::instrument;
 
 const CARGO_MANIFEST_DIR: &str = env!("CARGO_MANIFEST_DIR");
 
@@ -76,7 +77,10 @@ impl SqliteRepo {
 
 #[async_trait]
 impl CoinSelectionStorage for SqliteRepo {
+    #[instrument(level = "debug", skip_all, err)]
     async fn mark_outpoints_spent(&self, outpoints: &[OutPoint]) -> Result<()> {
+        tracing::debug!("Input params, outpoints: {outpoints:?}");
+
         // mark given outpoints as spent in a single transaction
         let mut tx = self.pool.begin().await?;
         for op in outpoints {
@@ -96,7 +100,10 @@ impl CoinSelectionStorage for SqliteRepo {
         Ok(())
     }
 
+    #[instrument(level = "debug", skip_all, err)]
     async fn add_outpoint(&self, info: OutPointInfo) -> Result<()> {
+        tracing::debug!("Input params, info: {info:?}");
+
         sqlx::query(
             r#"
             INSERT INTO outpoints (tx_id, vout, owner_script_pubkey, asset_id, spent)
@@ -118,7 +125,10 @@ impl CoinSelectionStorage for SqliteRepo {
         Ok(())
     }
 
+    #[instrument(level = "debug", skip_all, err)]
     async fn get_token_outpoints(&self, filter: GetTokenFilter) -> Result<Vec<OutPointInfoRaw>> {
+        tracing::debug!("Input params, filter: {filter:?}");
+
         let base = "SELECT id, tx_id, vout, owner_script_pubkey, asset_id, spent FROM outpoints";
         let where_clause = filter.get_sql_filter();
         let query = format!("{base}{where_clause}");
@@ -158,7 +168,9 @@ impl CoinSelectionStorage for SqliteRepo {
 
 #[async_trait]
 impl DcdParamsStorage for SqliteRepo {
+    #[instrument(level = "debug", skip_all, err)]
     async fn add_dcd_params(&self, taproot_pubkey_gen: &str, dcd_args: &DCDArguments) -> Result<()> {
+        tracing::debug!("Input params, taproot: {taproot_pubkey_gen}, dcd_args: {dcd_args:?}");
         let serialized = bincode::encode_to_vec(dcd_args, bincode::config::standard())?;
 
         sqlx::query(
@@ -174,7 +186,9 @@ impl DcdParamsStorage for SqliteRepo {
         Ok(())
     }
 
+    #[instrument(level = "debug", skip_all, err)]
     async fn get_dcd_params(&self, taproot_pubkey_gen: &str) -> Result<Option<DCDArguments>> {
+        tracing::debug!("Input params, taproot: {taproot_pubkey_gen}");
         let row = sqlx::query_as::<_, (Vec<u8>,)>("SELECT dcd_args_blob FROM dcd_params WHERE taproot_pubkey_gen = ?")
             .bind(taproot_pubkey_gen)
             .fetch_optional(&self.pool)
@@ -192,6 +206,7 @@ impl DcdParamsStorage for SqliteRepo {
 
 #[async_trait]
 impl EntropyStorage for SqliteRepo {
+    #[instrument(level = "debug", skip_all, err)]
     async fn add_dcd_contract_token_entropies(
         &self,
         taproot_pubkey_gen: &str,
@@ -212,6 +227,7 @@ impl EntropyStorage for SqliteRepo {
         Ok(())
     }
 
+    #[instrument(level = "debug", skip_all, err)]
     async fn get_dcd_contract_token_entropies(
         &self,
         taproot_pubkey_gen: &str,

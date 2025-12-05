@@ -94,6 +94,7 @@ pub trait CoinSelector: Send + Sync + CoinSelectionStorage + DcdParamsStorage + 
             TransactionOption::TakerTerminationEarly(_) => {}
             TransactionOption::TakerSettlement(_) => {}
             TransactionOption::MakerFund(order) => {
+                // TODO: add fetching of only needed outs - not all
                 let fetched_transaction = fetch_tx(order).await?;
                 let mut outpoints_to_add =
                     Vec::with_capacity(fetched_transaction.input.len() + fetched_transaction.output.len());
@@ -103,6 +104,10 @@ pub trait CoinSelector: Send + Sync + CoinSelectionStorage + DcdParamsStorage + 
                 for (i, tx_out) in fetched_transaction.output.into_iter().enumerate() {
                     outpoints_to_add
                         .push(extract_outpoint_info_from_tx_out(OutPoint::new(order, i as u32), tx_out).await?);
+                }
+                for outpoint in outpoints_to_add {
+                    tracing::debug!("[Coinselector] Adding outpoint {:?}", outpoint);
+                    self.add_outpoint(outpoint).await?;
                 }
             }
             TransactionOption::MakerTerminationCollateral(_) => {}
