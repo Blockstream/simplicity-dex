@@ -3,7 +3,7 @@
 -- tex1p9988q8kfq33m0y6wlsra683rur32k9vx58kqc6cceeks7tccu5yqhkjv7n dcd
 
 -- FILLER_ASSET_ID
-insert into outpoints (vout, owner_address, asset_id, spent, tx_id)
+insert into outpoints (vout, owner_script_pubkey, asset_id, spent, tx_id)
 values (1, 'tex1p3tzxsj4cs64a6qwpcc68aev4xx38mcqmrya9r3587jy49sk40z3qk6d9el',
         '2c3aa8ae0e199f9609e2e4b60a97a1f4b52c5d76d916b0a51e18ecded3d057b1', true,
         '1b993898b41c31cd88781e68ab9b2f6856c1c7d68921c74ef347412feac8ad6c'),
@@ -19,7 +19,7 @@ values (1, 'tex1p3tzxsj4cs64a6qwpcc68aev4xx38mcqmrya9r3587jy49sk40z3qk6d9el',
 on conflict DO NOTHING;
 
 -- GRANTOR_COLLATERAL_ASSET_ID
-insert into outpoints (vout, owner_address, asset_id, spent, tx_id)
+insert into outpoints (vout, owner_script_pubkey, asset_id, spent, tx_id)
 values (6, 'tex1pyzkfajdprt6gl6288z54c6m4lrg3vp32cajmqrh5kfaegydyrv0qtcg6lm',
         'ba817efa46ffb5dd5b985d2c6657376ceaf748eedfda3f88e273260c18538d73', true,
         'cd1e4aa43251fa1ebbf32e8f9b2e66358b746a32d6bcc0420a0a2e24e0393f4e'),
@@ -38,7 +38,7 @@ values (6, 'tex1pyzkfajdprt6gl6288z54c6m4lrg3vp32cajmqrh5kfaegydyrv0qtcg6lm',
 on conflict DO NOTHING;
 
 -- GRANTOR_SETTLEMENT_ASSET_ID
-insert into outpoints (vout, owner_address, asset_id, spent, tx_id)
+insert into outpoints (vout, owner_script_pubkey, asset_id, spent, tx_id)
 values (7, 'tex1pyzkfajdprt6gl6288z54c6m4lrg3vp32cajmqrh5kfaegydyrv0qtcg6lm',
         '82b7bba397cafbf1918cc8fee11aa636eba97ee4c88a6efe954b90e8a85806ea', false,
         'cd1e4aa43251fa1ebbf32e8f9b2e66358b746a32d6bcc0420a0a2e24e0393f4e'),
@@ -57,7 +57,7 @@ values (7, 'tex1pyzkfajdprt6gl6288z54c6m4lrg3vp32cajmqrh5kfaegydyrv0qtcg6lm',
 on conflict DO NOTHING;
 
 -- SETTLEMENT_ASSET_ID
-insert into outpoints (vout, owner_address, asset_id, spent, tx_id)
+insert into outpoints (vout, owner_script_pubkey, asset_id, spent, tx_id)
 values (4, 'tex1p9988q8kfq33m0y6wlsra683rur32k9vx58kqc6cceeks7tccu5yqhkjv7n',
         '420561859e4217f0def578911bbf68d7d3f75d664b978de39083269994eecd4b', false,
         '403c9bca043cbfb692bfad8ff7ea09634a838ae833f9a62aa043d2ffa4458387'),
@@ -70,7 +70,7 @@ values (4, 'tex1p9988q8kfq33m0y6wlsra683rur32k9vx58kqc6cceeks7tccu5yqhkjv7n',
 on conflict DO NOTHING;
 
 -- COLLATERAL_ASSET_ID
-insert into outpoints (vout, owner_address, asset_id, spent, tx_id)
+insert into outpoints (vout, owner_script_pubkey, asset_id, spent, tx_id)
 values (0, 'tex1p9988q8kfq33m0y6wlsra683rur32k9vx58kqc6cceeks7tccu5yqhkjv7n',
         '144c654344aa716d6f3abcc1ca90e5641e4e2a7f633bc09fe3baf64585819a49', false,
         '1eb9bed5e3954d0556de572ea12c73d6b4d7f62a4d11646cf1a07d943c2cb50e'),

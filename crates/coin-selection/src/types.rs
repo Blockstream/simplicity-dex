@@ -1,7 +1,7 @@
+use crate::utils::{extract_outpoint_info_from_tx_in, extract_outpoint_info_from_tx_out, fetch_tx};
 use async_trait::async_trait;
 use contracts::DCDArguments;
-use simplicity::bitcoin::Txid;
-use simplicityhl::elements::bitcoin::OutPoint;
+use simplicityhl::elements::{OutPoint, Txid};
 use simplicityhl_core::AssetEntropyHex;
 
 pub type Result<T> = anyhow::Result<T>;
@@ -56,13 +56,34 @@ pub enum TransactionInputsOption {
 
 #[derive(Clone, Debug)]
 pub enum TransactionInputs {
-    TakerFundOrder,
-    TakerTerminationEarly,
-    TakerSettlement(GetSettlementFilter),
-    MakerFund,
-    MakerTerminationCollateral,
-    MakerTerminationSettlement,
-    MakerSettlement(GetSettlementFilter),
+    MakerFund {
+        taproot_pubkey_gen: String,
+        script_pubkey: String,
+    },
+    TakerFundOrder {
+        taproot_pubkey_gen: String,
+    },
+    TakerTerminationEarly {
+        taproot_pubkey_gen: String,
+    },
+    TakerSettlement {
+        taproot_pubkey_gen: String,
+        filter: GetSettlementFilter,
+    },
+    MakerTerminationCollateral {
+        taproot_pubkey_gen: String,
+    },
+    MakerTerminationSettlement {
+        taproot_pubkey_gen: String,
+    },
+    MakerSettlement {
+        taproot_pubkey_gen: String,
+        filter: GetSettlementFilter,
+    },
+}
+
+fn extract_one_value_from_vec<T: Clone>(vec: Vec<T>) -> Option<T> {
+    if vec.is_empty() { None } else { Some(vec[0].clone()) }
 }
 
 #[async_trait]
@@ -72,7 +93,18 @@ pub trait CoinSelector: Send + Sync + CoinSelectionStorage + DcdParamsStorage + 
             TransactionOption::TakerFundOrder(_) => {}
             TransactionOption::TakerTerminationEarly(_) => {}
             TransactionOption::TakerSettlement(_) => {}
-            TransactionOption::MakerFund(_) => {}
+            TransactionOption::MakerFund(order) => {
+                let fetched_transaction = fetch_tx(order).await?;
+                let mut outpoints_to_add =
+                    Vec::with_capacity(fetched_transaction.input.len() + fetched_transaction.output.len());
+                for tx_in in fetched_transaction.input {
+                    outpoints_to_add.push(extract_outpoint_info_from_tx_in(tx_in).await?);
+                }
+                for (i, tx_out) in fetched_transaction.output.into_iter().enumerate() {
+                    outpoints_to_add
+                        .push(extract_outpoint_info_from_tx_out(OutPoint::new(order, i as u32), tx_out).await?);
+                }
+            }
             TransactionOption::MakerTerminationCollateral(_) => {}
             TransactionOption::MakerTerminationSettlement(_) => {}
             TransactionOption::MakerSettlement(_) => {}
@@ -82,41 +114,60 @@ pub trait CoinSelector: Send + Sync + CoinSelectionStorage + DcdParamsStorage + 
 
     async fn get_inputs(&self, option: TransactionInputs) -> Result<TransactionInputsOption> {
         let res = match option {
-            TransactionInputs::TakerFundOrder => TransactionInputsOption::TakerFundOrder(TakerFundInputs {
+            TransactionInputs::MakerFund {
+                taproot_pubkey_gen,
+                script_pubkey,
+            } => {
+                let dcd_params = self
+                    .get_dcd_params(&taproot_pubkey_gen)
+                    .await?
+                    .ok_or_else(|| anyhow::anyhow!("No dcd params found, taproot_pubkey_gen: {taproot_pubkey_gen}"))?;
+
+                let filler = extract_one_value_from_vec(
+                    self.get_token_outpoints(GetTokenFilter {
+                        asset_id: Some(dcd_params.filler_token_asset_id_hex_le),
+                        spent: Some(false),
+                        owner: Some(script_pubkey),
+                    })
+                    .await?,
+                );
+
+                TransactionInputsOption::MakerFund(MakerFundInputs {
+                    filler_reissuance_tx: filler,
+                    grantor_collateral_reissuance_tx: None,
+                    grantor_settlement_reissuance_tx: None,
+                    asset_settlement_tx: None,
+                })
+            }
+            TransactionInputs::TakerFundOrder { .. } => TransactionInputsOption::TakerFundOrder(TakerFundInputs {
                 filler_token: None,
                 collateral_token: None,
             }),
-            TransactionInputs::TakerTerminationEarly => {
+            TransactionInputs::TakerTerminationEarly { .. } => {
                 TransactionInputsOption::TakerTerminationEarly(TakerTerminationEarlyInputs {
                     filler_token: None,
                     collateral_token: None,
                 })
             }
-            TransactionInputs::TakerSettlement(_filter) => {
+            TransactionInputs::TakerSettlement { .. } => {
                 TransactionInputsOption::TakerSettlement(TakerSettlementInputs {
                     filler_token: None,
                     asset_token: None,
                 })
             }
-            TransactionInputs::MakerFund => TransactionInputsOption::MakerFund(MakerFundInputs {
-                filler_reissuance_tx: None,
-                grantor_collateral_reissuance_tx: None,
-                grantor_settlement_reissuance_tx: None,
-                asset_settlement_tx: None,
-            }),
-            TransactionInputs::MakerTerminationCollateral => {
+            TransactionInputs::MakerTerminationCollateral { .. } => {
                 TransactionInputsOption::MakerTerminationCollateral(MakerTerminationCollateralInputs {
                     collateral_token_utxo: None,
                     grantor_collateral_token_utxo: None,
                 })
             }
-            TransactionInputs::MakerTerminationSettlement => {
+            TransactionInputs::MakerTerminationSettlement { .. } => {
                 TransactionInputsOption::MakerTerminationSettlement(MakerTerminationSettlmentInputs {
                     settlement_asset_utxo: None,
                     grantor_settlement_token_utxo: None,
                 })
             }
-            TransactionInputs::MakerSettlement(_filter) => {
+            TransactionInputs::MakerSettlement { .. } => {
                 TransactionInputsOption::MakerSettlement(MakerSettlementInputs {
                     asset_utxo: None,
                     grantor_collateral_token_utxo: None,
@@ -147,7 +198,7 @@ pub struct GetSettlementFilter {
 #[derive(Debug, Clone)]
 pub struct OutPointInfo {
     pub outpoint: OutPoint,
-    pub owner_addr: String,
+    pub owner_script_pubkey: String,
     pub asset_id: String,
     pub spent: bool,
 }
@@ -156,7 +207,7 @@ pub struct OutPointInfo {
 pub struct OutPointInfoRaw {
     pub id: u64,
     pub outpoint: OutPoint,
-    pub owner_address: String,
+    pub owner_script_pubkey: String,
     pub asset_id: String,
     pub spent: bool,
 }
@@ -195,10 +246,10 @@ pub struct TakerSettlementInputs {
 #[expect(dead_code)]
 #[derive(Debug, Clone)]
 pub struct MakerFundInputs {
-    filler_reissuance_tx: Option<OutPoint>,
-    grantor_collateral_reissuance_tx: Option<OutPoint>,
-    grantor_settlement_reissuance_tx: Option<OutPoint>,
-    asset_settlement_tx: Option<OutPoint>,
+    filler_reissuance_tx: Option<OutPointInfoRaw>,
+    grantor_collateral_reissuance_tx: Option<OutPointInfoRaw>,
+    grantor_settlement_reissuance_tx: Option<OutPointInfoRaw>,
+    asset_settlement_tx: Option<OutPointInfoRaw>,
 }
 
 #[expect(dead_code)]
@@ -234,7 +285,7 @@ impl GetTokenFilter {
             query.push_str(" AND spent = ?");
         }
         if self.owner.is_some() {
-            query.push_str(" AND owner_address = ?");
+            query.push_str(" AND owner_script_pubkey = ?");
         }
 
         if !query.is_empty() {

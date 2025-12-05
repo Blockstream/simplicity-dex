@@ -4,7 +4,7 @@ mod utils;
 mod tests {
     use coin_selection::sqlite_db::SqliteRepo;
     use coin_selection::types::{CoinSelectionStorage, GetTokenFilter, OutPointInfo};
-    use simplicity::bitcoin::{OutPoint, Txid};
+    use simplicityhl::elements::{OutPoint, Txid};
     use sqlx::SqlitePool;
     use std::str::FromStr;
 
@@ -79,7 +79,7 @@ mod tests {
             assert!(
                 outpoints
                     .iter()
-                    .all(|op| op.owner_address == TAKER_TOKEN_ADDRESS && op.asset_id == FILLER_ASSET_ID)
+                    .all(|op| op.owner_script_pubkey == TAKER_TOKEN_ADDRESS && op.asset_id == FILLER_ASSET_ID)
             );
 
             Ok(())
@@ -100,11 +100,9 @@ mod tests {
             let outpoints = repo.get_token_outpoints(filter).await?;
             println!("outpoints: {:#?}", outpoints);
             assert_eq!(outpoints.len(), 5);
-            assert!(
-                outpoints.iter().all(|op| {
-                    op.owner_address == MAKER_TOKEN_ADDRESS && op.asset_id == GRANTOR_COLLATERAL_ASSET_ID
-                })
-            );
+            assert!(outpoints.iter().all(|op| {
+                op.owner_script_pubkey == MAKER_TOKEN_ADDRESS && op.asset_id == GRANTOR_COLLATERAL_ASSET_ID
+            }));
 
             Ok(())
         }
@@ -125,7 +123,7 @@ mod tests {
             let outpoints = repo.get_token_outpoints(filter).await?;
             assert_eq!(outpoints.len(), 1);
             assert_eq!(outpoints[0].outpoint.vout, 0);
-            assert_eq!(outpoints[0].owner_address, DCD_TOKEN_ADDRESS);
+            assert_eq!(outpoints[0].owner_script_pubkey, DCD_TOKEN_ADDRESS);
             assert_eq!(outpoints[0].asset_id, COLLATERAL_ASSET_ID);
 
             Ok(())
@@ -145,11 +143,9 @@ mod tests {
             };
             let before = repo.get_token_outpoints(filter.clone()).await?;
             assert!(!before.is_empty());
-            assert!(
-                before.iter().all(|op| {
-                    op.owner_address == MAKER_TOKEN_ADDRESS && op.asset_id == GRANTOR_COLLATERAL_ASSET_ID
-                })
-            );
+            assert!(before.iter().all(|op| {
+                op.owner_script_pubkey == MAKER_TOKEN_ADDRESS && op.asset_id == GRANTOR_COLLATERAL_ASSET_ID
+            }));
 
             repo.mark_outpoints_spent(&before.iter().map(|x| x.outpoint).collect::<Vec<OutPoint>>())
                 .await?;
@@ -176,7 +172,7 @@ mod tests {
             let outpoints = repo.get_token_outpoints(filter).await?;
             assert_eq!(outpoints.len(), 1);
             // assert_eq!(outpoints[0].vout, 3);
-            assert_eq!(outpoints[0].owner_address, TAKER_TOKEN_ADDRESS);
+            assert_eq!(outpoints[0].owner_script_pubkey, TAKER_TOKEN_ADDRESS);
             assert_eq!(outpoints[0].asset_id, SETTLEMENT_ASSET_ID);
 
             Ok(())
@@ -215,7 +211,7 @@ mod tests {
 
             let info = OutPointInfo {
                 outpoint: op,
-                owner_addr: MAKER_TOKEN_ADDRESS.to_string(),
+                owner_script_pubkey: MAKER_TOKEN_ADDRESS.to_string(),
                 asset_id: FILLER_ASSET_ID.to_string(),
                 spent: false,
             };
@@ -231,7 +227,7 @@ mod tests {
 
             assert_eq!(outpoints.len(), 1);
             assert_eq!(outpoints[0].outpoint, op);
-            assert_eq!(outpoints[0].owner_address, MAKER_TOKEN_ADDRESS);
+            assert_eq!(outpoints[0].owner_script_pubkey, MAKER_TOKEN_ADDRESS);
             assert_eq!(outpoints[0].asset_id, FILLER_ASSET_ID);
 
             Ok(())
@@ -268,7 +264,7 @@ mod tests {
             for (tx, vout, owner, asset) in ops {
                 let info = OutPointInfo {
                     outpoint: OutPoint { txid: txid(tx), vout },
-                    owner_addr: owner.to_string(),
+                    owner_script_pubkey: owner.to_string(),
                     asset_id: asset.to_string(),
                     spent: false,
                 };
@@ -282,7 +278,7 @@ mod tests {
             };
             let r1 = repo.get_token_outpoints(filter1).await?;
             assert_eq!(r1.len(), 1);
-            assert_eq!(r1[0].owner_address, MAKER_TOKEN_ADDRESS);
+            assert_eq!(r1[0].owner_script_pubkey, MAKER_TOKEN_ADDRESS);
             assert_eq!(r1[0].asset_id, SETTLEMENT_ASSET_ID);
 
             let filter2 = GetTokenFilter {
@@ -292,7 +288,7 @@ mod tests {
             };
             let r2 = repo.get_token_outpoints(filter2).await?;
             assert_eq!(r2.len(), 1);
-            assert_eq!(r2[0].owner_address, TAKER_TOKEN_ADDRESS);
+            assert_eq!(r2[0].owner_script_pubkey, TAKER_TOKEN_ADDRESS);
             assert_eq!(r2[0].asset_id, COLLATERAL_ASSET_ID);
 
             let filter3 = GetTokenFilter {
@@ -302,7 +298,7 @@ mod tests {
             };
             let r3 = repo.get_token_outpoints(filter3).await?;
             assert_eq!(r3.len(), 1);
-            assert_eq!(r3[0].owner_address, DCD_TOKEN_ADDRESS);
+            assert_eq!(r3[0].owner_script_pubkey, DCD_TOKEN_ADDRESS);
             assert_eq!(r3[0].asset_id, GRANTOR_SETTLEMENT_ASSET_ID);
 
             Ok(())
@@ -322,7 +318,7 @@ mod tests {
 
             let info = OutPointInfo {
                 outpoint: op,
-                owner_addr: TAKER_TOKEN_ADDRESS.to_string(),
+                owner_script_pubkey: TAKER_TOKEN_ADDRESS.to_string(),
                 asset_id: FILLER_ASSET_ID.to_string(),
                 spent: false,
             };
@@ -338,7 +334,7 @@ mod tests {
             assert!(
                 unspent_before
                     .iter()
-                    .all(|p| { p.owner_address == TAKER_TOKEN_ADDRESS && p.asset_id == FILLER_ASSET_ID })
+                    .all(|p| { p.owner_script_pubkey == TAKER_TOKEN_ADDRESS && p.asset_id == FILLER_ASSET_ID })
             );
 
             repo.mark_outpoints_spent(&unspent_before.iter().map(|x| x.outpoint).collect::<Vec<OutPoint>>())
@@ -354,7 +350,7 @@ mod tests {
             };
             let spent_after = repo.get_token_outpoints(filter_spent).await?;
             assert_eq!(spent_after.len(), 1);
-            assert_eq!(spent_after[0].owner_address, TAKER_TOKEN_ADDRESS);
+            assert_eq!(spent_after[0].owner_script_pubkey, TAKER_TOKEN_ADDRESS);
             assert_eq!(spent_after[0].asset_id, FILLER_ASSET_ID);
 
             Ok(())

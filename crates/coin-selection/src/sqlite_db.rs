@@ -3,7 +3,7 @@ use crate::types::{DcdParamsStorage, EntropyStorage, Result};
 use anyhow::{Context, anyhow};
 use async_trait::async_trait;
 use contracts::DCDArguments;
-use simplicity::bitcoin::OutPoint;
+use simplicityhl::elements::OutPoint;
 use sqlx::{Connection, Sqlite, SqlitePool, migrate::MigrateDatabase};
 use std::path::PathBuf;
 
@@ -99,17 +99,17 @@ impl CoinSelectionStorage for SqliteRepo {
     async fn add_outpoint(&self, info: OutPointInfo) -> Result<()> {
         sqlx::query(
             r#"
-            INSERT INTO outpoints (tx_id, vout, owner_address, asset_id, spent)
+            INSERT INTO outpoints (tx_id, vout, owner_script_pubkey, asset_id, spent)
             VALUES (?, ?, ?, ?, ?)
             ON CONFLICT(tx_id, vout) DO UPDATE
-            SET owner_address = excluded.owner_address,
+            SET owner_script_pubkey = excluded.owner_script_pubkey,
                 asset_id      = excluded.asset_id,
                 spent         = excluded.spent
             "#,
         )
         .bind(info.outpoint.txid.to_string())
         .bind(info.outpoint.vout as i64)
-        .bind(info.owner_addr)
+        .bind(info.owner_script_pubkey)
         .bind(info.asset_id)
         .bind(info.spent)
         .execute(&self.pool)
@@ -119,7 +119,7 @@ impl CoinSelectionStorage for SqliteRepo {
     }
 
     async fn get_token_outpoints(&self, filter: GetTokenFilter) -> Result<Vec<OutPointInfoRaw>> {
-        let base = "SELECT id, tx_id, vout, owner_address, asset_id, spent FROM outpoints";
+        let base = "SELECT id, tx_id, vout, owner_script_pubkey, asset_id, spent FROM outpoints";
         let where_clause = filter.get_sql_filter();
         let query = format!("{base}{where_clause}");
 
@@ -139,13 +139,13 @@ impl CoinSelectionStorage for SqliteRepo {
 
         let outpoints = rows
             .into_iter()
-            .filter_map(|(id, tx_id, vout, owner_address, asset_id, spent)| {
+            .filter_map(|(id, tx_id, vout, owner_script_pubkey, asset_id, spent)| {
                 let tx_id = tx_id.parse().ok()?;
                 let vout = vout as u32;
                 Some(OutPointInfoRaw {
                     id: id as u64,
                     outpoint: OutPoint::new(tx_id, vout),
-                    owner_address,
+                    owner_script_pubkey,
                     asset_id,
                     spent,
                 })

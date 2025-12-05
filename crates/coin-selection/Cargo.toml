@@ -19,6 +19,8 @@ simplicityhl = { workspace = true }
 simplicityhl-core = { workspace = true }
 sqlx = { workspace = true }
 tokio = { workspace = true }
+reqwest = { workspace = true }
+hex = { workspace = true }
 
 [dev-dependencies]
 dotenvy = { workspace = true }
