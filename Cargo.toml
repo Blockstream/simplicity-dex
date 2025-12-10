@@ -42,3 +42,7 @@ tokio = { version = "1.48.0", features = ["macros", "test-util", "rt", "rt-multi
 tracing = { version = "0.1.41" }
 tracing-appender = { version = "0.2.3" }
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
+
+lwk_wollet = { version = "0.12.0" }
+lwk_signer = { version = "0.12.0" }
+lwk_common = { version = "0.12.0" }
