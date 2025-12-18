@@ -9,7 +9,7 @@ version = "0.1.0"
 edition = "2024"
 rust-version = "1.91.0"
 authors = ["Blockstream"]
-readme = "Readme.md"
+readme = "README.md"
 
 
 [workspace.dependencies]
