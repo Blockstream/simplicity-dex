@@ -179,7 +179,8 @@ async fn test_issue_custom2_p2pk() -> anyhow::Result<()> {
         regtest_policy_asset(),
     )
     .await?;
-    println!("txid on p2pk address: '{msg}'");
+    println!("txid on p2pk address: '{}', addr: {p2pk_address}", msg.0);
+    wollet.apply_transaction(msg.1)?;
     println!("Utxos4: {:?}", wollet.utxos()?);
 
     let utxos = wollet.utxos()?;
@@ -199,15 +200,13 @@ async fn test_issue_custom2_p2pk() -> anyhow::Result<()> {
 
     // retrieve utxos from pt2tr wallet
 
-    let blinding_key = derive_public_blinder_key();
-    let view_key = blinding_key.secret_bytes().to_hex();
-    // let pk = signer_keypair.public_key().to_hex();
-    let pk = "020202020202020202020202020202020202020202020202020202020202020202";
-    let pubkey = PublicKey::from_str(pk).unwrap().to_x_only_pubkey();
+    let view_key = view_key;
+    let pk = signer_keypair.public_key().to_hex();
+    let pubkey = PublicKey::from_str(&pk)?.to_x_only_pubkey();
     let p2pk_address = simplicityhl_core::get_p2pk_address(&pubkey, &AddressParams::ELEMENTS)?;
-    println!("pk for p2pk_address: {}, p2pk addr: {}", pk, p2pk_address);
+    println!("pk for p2pk_address: {}, p2pk addr: {}", pubkey, p2pk_address);
 
-    let desc = format!("ct({view_key},elwpkh({pk}))");
+    let desc = format!("ct({view_key},elwpkh({pubkey}))");
     println!("desc: {}", desc);
 
     let descriptor: WolletDescriptor = desc.parse()?;
@@ -220,20 +219,8 @@ async fn test_issue_custom2_p2pk() -> anyhow::Result<()> {
 
     println!("Utxos p2pk1: {:?}", p2pk_wollet.utxos()?);
 
-    //
-    // w.fund_btc(&env);
-    // let balance = w.balance_btc();
-    // assert!(balance > 0);
-    // let utxos = w.wollet.utxos().unwrap();
-    // assert_eq!(utxos.len(), 1);
-    //
-    // // Receive unconfidential / explicit
-    // let satoshi = 5_000;
-    // w.fund_explicit(&env, satoshi, None, None);
-    // assert_eq!(w.balance_btc(), balance);
-    //
-    // let explicit_utxos = w.wollet.explicit_utxos().unwrap();
-    // assert_eq!(explicit_utxos.len(), 1);
+    assert!(p2pk_wollet.utxos().is_ok());
+    assert_eq!(p2pk_wollet.utxos().unwrap().len(), 1);
 
     Ok(())
 }

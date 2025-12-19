@@ -3,6 +3,7 @@ use lwk_common::Signer;
 use lwk_wollet::Wollet;
 use lwk_wollet::asyncr::EsploraClient;
 use simplicity::elements::{Address, AssetId};
+use simplicityhl::elements::{Transaction, Txid};
 
 pub async fn faucet_p2pk_asset(
     client: &mut EsploraClient,
@@ -11,7 +12,7 @@ pub async fn faucet_p2pk_asset(
     recipient_address: &Address,
     amount: u64,
     asset: AssetId,
-) -> anyhow::Result<String> {
+) -> anyhow::Result<(Txid, Transaction)> {
     let update = client
         .full_scan(wollet)
         .await
@@ -57,8 +58,5 @@ pub async fn faucet_p2pk_asset(
         .await
         .map_err(|e| anyhow!("Failed to broadcast transaction: {e:?}"))?;
 
-    Ok(format!(
-        "Sent {} sats to address {} with transaction {}.",
-        amount, recipient_address, txid
-    ))
+    Ok((txid, finalized_pset))
 }
