@@ -2,7 +2,7 @@
 
 use clap::Parser;
 
-use global_utils::logger::init_logger;
+use dex_cli::logger::init_logger;
 
 use dex_cli::cli::Cli;
 

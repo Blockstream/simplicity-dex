@@ -11,34 +11,12 @@ rust-version = "1.91.0"
 authors = ["Blockstream"]
 readme = "README.md"
 
-
 [workspace.dependencies]
 anyhow = { version = "1.0.100" }
-bincode = { version = "2.0.1" }
-chrono = { version = "0.4.42" }
-clap = { version = "4.5.49", features = ["derive"] }
-config = { version = "0.15.18" }
-contracts = { git = "https://github.com/BlockstreamResearch/simplicity-contracts.git", rev = "baa8ab7", package = "contracts" }
-contracts-adapter = { git = "https://github.com/BlockstreamResearch/simplicity-contracts.git", rev = "baa8ab7", package = "contracts-adapter" }
-dex-nostr-relay = { path = "./crates/dex-nostr-relay" }
-dirs = { version = "6.0.0" }
-dotenvy = { version = "0.15.7" }
-elements = { version = "0.26.1" }
-futures-util = { version = "0.3.31" }
-global-utils = { path = "./crates/global-utils" }
-hex = { version = "0.4.3" }
-humantime = { version = "2.3.0" }
-nostr = { version = "0.43.1", features = ["std"] }
-nostr-sdk = { version = "0.43.0" }
-proptest = { version = "1.9.0" }
-serde = { version = "1.0.228" }
-serde_json = { version = "1.0.145" }
-simplicity-lang = { version = "0.6.0" }
-simplicityhl = { version = "0.2.0" }
-simplicityhl-core = { git = "https://github.com/BlockstreamResearch/simplicity-contracts.git", rev = "baa8ab7", package = "simplicityhl-core", features = ["encoding"] }
-sled = { version = "0.34.7" }
-thiserror = { version = "2.0.17" }
-tokio = { version = "1.48.0", features = ["macros", "test-util", "rt", "rt-multi-thread", "tracing" ] }
+
 tracing = { version = "0.1.41" }
-tracing-appender = { version = "0.2.3" }
-tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
+
+contracts = { git = "https://github.com/BlockstreamResearch/simplicity-contracts.git", rev = "35449ea", package = "contracts" }
+simplicityhl-core = { version = "0.2.1", features = ["encoding"] }
+
+simplicityhl = { version = "0.4.0" }

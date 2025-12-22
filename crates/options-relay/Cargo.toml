@@ -1,0 +1,26 @@
+[package]
+name = "options-relay"
+description = "NOSTR Relay library for Simplicity Options trading"
+license = "MIT OR Apache-2.0"
+
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+
+[dependencies]
+nostr = { version = "0.44.2" }
+nostr-sdk = { version = "0.44.1" }
+
+thiserror = "2"
+
+contracts = { workspace = true }
+simplicityhl-core = { workspace = true }
+simplicityhl = { workspace = true }
+
+tracing = { workspace = true }
+
+[dev-dependencies]
+anyhow = "1"
+hex = "0.4"
+

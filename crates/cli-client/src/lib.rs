@@ -4,3 +4,4 @@ pub mod cli;
 pub mod common;
 mod contract_handlers;
 pub mod error;
+pub mod logger;
