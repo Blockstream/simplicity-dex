@@ -102,7 +102,7 @@ impl ReadOnlyClient {
         &self.client
     }
 
-    pub(crate) async fn set_signer(&mut self, signer: impl IntoNostrSigner) {
+    pub(crate) async fn set_signer(&self, signer: impl IntoNostrSigner) {
         self.client.automatic_authentication(true);
 
         self.client.set_signer(signer).await;

@@ -10,6 +10,9 @@ edition = "2024"
 rust-version = "1.91.0"
 authors = ["Blockstream"]
 readme = "README.md"
+repository = "https://github.com/Blockstream/simplicity-dex"
+keywords = ["liquid", "bitcoin", "options", "simplicity"]
+categories = ["cryptography::cryptocurrencies"]
 
 [workspace.dependencies]
 anyhow = { version = "1.0.100" }

@@ -76,9 +76,13 @@ impl Store {
         outpoint: &OutPoint,
         txout: &TxOut,
         blinder_key: Option<[u8; 32]>,
-    ) -> Result<(AssetId, u64, bool), StoreError> {
+    ) -> Result<(AssetId, i64, bool), StoreError> {
         if let (Some(asset), Some(value)) = (txout.asset.explicit(), txout.value.explicit()) {
-            return Ok((asset, value, false));
+            return Ok((
+                asset,
+                i64::try_from(value).expect("UTXO values never exceed i64 max (9.2e18 vs max BTC supply ~2.1e15 sats)"),
+                false,
+            ));
         }
 
         let Some(key) = blinder_key else {
@@ -87,7 +91,12 @@ impl Store {
 
         let secret_key = SecretKey::from_slice(&key)?;
         let secrets = txout.unblind(secp256k1::SECP256K1, secret_key)?;
-        Ok((secrets.asset, secrets.value, true))
+        Ok((
+            secrets.asset,
+            i64::try_from(secrets.value)
+                .expect("UTXO values never exceed i64 max (9.2e18 vs max BTC supply ~2.1e15 sats)"),
+            true,
+        ))
     }
 
     async fn internal_insert(
@@ -101,11 +110,6 @@ impl Store {
 
         let txid: &[u8] = outpoint.txid.as_ref();
         let vout = i64::from(outpoint.vout);
-        let script_pubkey = txout.script_pubkey.as_bytes();
-        let asset_bytes = asset_id.into_inner().0.to_vec();
-        let value_i64 = value as i64;
-        let serialized = encode::serialize(&txout);
-        let is_conf_i64 = i64::from(is_confidential);
 
         sqlx::query(
             "INSERT INTO utxos (txid, vout, script_pubkey, asset_id, value, serialized, is_confidential) 
@@ -113,11 +117,11 @@ impl Store {
         )
         .bind(txid)
         .bind(vout)
-        .bind(script_pubkey)
-        .bind(asset_bytes.as_slice())
-        .bind(value_i64)
-        .bind(&serialized)
-        .bind(is_conf_i64)
+        .bind(txout.script_pubkey.as_bytes())
+        .bind(asset_id.into_inner().0.as_slice())
+        .bind(value)
+        .bind(encode::serialize(&txout))
+        .bind(i64::from(is_confidential))
         .execute(&mut *tx)
         .await?;
 
@@ -206,8 +210,12 @@ impl Store {
     /// Fetches UTXOs in batches until the required value is met (early termination).
     /// This avoids loading all matching UTXOs when only a subset is needed.
     async fn query_until_sufficient(&self, filter: &Filter) -> Result<QueryResult, StoreError> {
-        let required = filter.required_value.unwrap();
+        let Some(required) = filter.required_value else {
+            return Ok(QueryResult::Empty);
+        };
+
         let mut entries = Vec::new();
+
         let mut total_value: u64 = 0;
         let mut offset: i64 = 0;
 
@@ -219,9 +227,9 @@ impl Store {
             }
 
             for row in rows {
-                total_value = total_value.saturating_add(row.value as u64);
-                let entry = row.into_entry()?;
-                entries.push(entry);
+                total_value = total_value.checked_add(row.value).ok_or(StoreError::ValueOverflow)?;
+
+                entries.push(row.into_entry()?);
 
                 // Early termination: we have enough value
                 if total_value >= required {
@@ -285,8 +293,7 @@ impl Store {
 
     /// Fetches all matching UTXOs (used when no `required_value` optimization applies).
     async fn query_all(&self, filter: &Filter) -> Result<QueryResult, StoreError> {
-        let limit = filter.limit.map(|l| l as i64);
-        let rows = self.fetch_rows(filter, limit, None).await?;
+        let rows = self.fetch_rows(filter, filter.limit, None).await?;
 
         if rows.is_empty() {
             return Ok(QueryResult::Empty);
@@ -296,7 +303,7 @@ impl Store {
         let mut total_value: u64 = 0;
 
         for row in rows {
-            total_value = total_value.saturating_add(row.value as u64);
+            total_value = total_value.saturating_add(row.value);
 
             entries.push(row.into_entry()?);
         }
@@ -319,10 +326,10 @@ impl Store {
 #[derive(sqlx::FromRow)]
 struct UtxoRow {
     txid: Vec<u8>,
-    vout: i64,
+    vout: u32,
     serialized: Vec<u8>,
     is_confidential: i64,
-    value: i64,
+    value: u64,
     blinding_key: Option<Vec<u8>>,
 }
 
@@ -334,7 +341,7 @@ impl UtxoRow {
             .map_err(|_| sqlx::Error::Decode("Invalid txid length".into()))?;
 
         let txid = Txid::from_byte_array(txid_array);
-        let outpoint = OutPoint::new(txid, self.vout as u32);
+        let outpoint = OutPoint::new(txid, self.vout);
 
         let txout: TxOut = encode::deserialize(&self.serialized)?;
 
@@ -556,7 +563,7 @@ mod tests {
             .unwrap();
 
         let filter = Filter::new().asset_id(asset);
-        let results = store.query(&[filter.clone()]).await.unwrap();
+        let results = store.query(std::slice::from_ref(&filter)).await.unwrap();
         assert!(matches!(&results[0], QueryResult::Found(e) if e.len() == 1));
 
         store

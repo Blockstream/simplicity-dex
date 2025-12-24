@@ -37,4 +37,7 @@ pub enum StoreError {
 
     #[error("Migration error")]
     Migration(#[from] sqlx::migrate::MigrateError),
+
+    #[error("Value overflow during calculation")]
+    ValueOverflow,
 }

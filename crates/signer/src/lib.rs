@@ -43,7 +43,6 @@ impl Signer {
         self.keypair.x_only_public_key().0
     }
 
-    #[must_use]
     pub fn p2pk_address(&self, params: &'static AddressParams) -> Result<Address, SignerError> {
         let public_key = self.keypair.x_only_public_key().0;
         let address = get_p2pk_address(&public_key, params)?;
@@ -51,7 +50,6 @@ impl Signer {
         Ok(address)
     }
 
-    #[must_use]
     pub fn p2pk_script_hash(&self, params: &'static AddressParams) -> Result<[u8; 32], SignerError> {
         let address = self.p2pk_address(params)?;
 
@@ -61,7 +59,6 @@ impl Signer {
         Ok(script_hash)
     }
 
-    #[must_use]
     pub fn print_details(&self) -> Result<(), SignerError> {
         let public_key = self.public_key();
         let address = self.p2pk_address(&AddressParams::LIQUID_TESTNET)?;
