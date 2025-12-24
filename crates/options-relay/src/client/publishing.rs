@@ -20,7 +20,7 @@ impl PublishingClient {
     #[instrument(skip_all, level = "debug", err)]
     pub async fn connect(config: RelayConfig, signer: impl IntoNostrSigner) -> Result<Self, RelayError> {
         let mut reader = ReadOnlyClient::connect(config).await?;
-       
+
         reader.set_signer(signer).await;
 
         Ok(Self { reader })
@@ -68,28 +68,19 @@ impl PublishingClient {
         Ok(output.val)
     }
 
-    pub async fn publish_option_created(
-        &self,
-        event: &OptionCreatedEvent,
-    ) -> Result<EventId, RelayError> {
+    pub async fn publish_option_created(&self, event: &OptionCreatedEvent) -> Result<EventId, RelayError> {
         let pubkey = self.public_key().await?;
         let builder = event.to_event_builder(pubkey)?;
         self.publish(builder).await
     }
 
-    pub async fn publish_swap_created(
-        &self,
-        event: &SwapCreatedEvent,
-    ) -> Result<EventId, RelayError> {
+    pub async fn publish_swap_created(&self, event: &SwapCreatedEvent) -> Result<EventId, RelayError> {
         let pubkey = self.public_key().await?;
         let builder = event.to_event_builder(pubkey)?;
         self.publish(builder).await
     }
 
-    pub async fn publish_action_completed(
-        &self,
-        event: &ActionCompletedEvent,
-    ) -> Result<EventId, RelayError> {
+    pub async fn publish_action_completed(&self, event: &ActionCompletedEvent) -> Result<EventId, RelayError> {
         let pubkey = self.public_key().await?;
         let builder = event.to_event_builder(pubkey);
         self.publish(builder).await
@@ -137,12 +128,12 @@ impl PublishingClient {
     }
 
     #[must_use]
-    pub fn config(&self) -> &RelayConfig {
+    pub const fn config(&self) -> &RelayConfig {
         self.reader.config()
     }
 
     #[must_use]
-    pub fn as_reader(&self) -> &ReadOnlyClient {
+    pub const fn as_reader(&self) -> &ReadOnlyClient {
         &self.reader
     }
 }

@@ -1,7 +1,7 @@
 use crate::error::ParseError;
 use crate::events::kinds::{
-    ACTION_COMPLETED, ACTION_OPTION_EXERCISED, ACTION_OPTION_EXPIRED, ACTION_SETTLEMENT_CLAIMED,
-    ACTION_SWAP_EXERCISED, TAG_ACTION, TAG_OUTPOINT,
+    ACTION_COMPLETED, ACTION_OPTION_EXERCISED, ACTION_OPTION_EXPIRED, ACTION_SETTLEMENT_CLAIMED, ACTION_SWAP_EXERCISED,
+    TAG_ACTION, TAG_OUTPOINT,
 };
 
 use std::str::FromStr;
@@ -19,7 +19,7 @@ pub enum ActionType {
 
 impl ActionType {
     #[must_use]
-    pub fn as_str(&self) -> &'static str {
+    pub const fn as_str(&self) -> &'static str {
         match self {
             Self::SwapExercised => ACTION_SWAP_EXERCISED,
             Self::OptionExercised => ACTION_OPTION_EXERCISED,
@@ -71,14 +71,8 @@ impl ActionCompletedEvent {
         EventBuilder::new(ACTION_COMPLETED, "")
             .tag(Tag::public_key(creator_pubkey))
             .tag(Tag::event(self.original_event_id))
-            .tag(Tag::custom(
-                TagKind::custom(TAG_ACTION),
-                [self.action.as_str()],
-            ))
-            .tag(Tag::custom(
-                TagKind::custom(TAG_OUTPOINT),
-                [self.outpoint.to_string()],
-            ))
+            .tag(Tag::custom(TagKind::custom(TAG_ACTION), [self.action.as_str()]))
+            .tag(Tag::custom(TagKind::custom(TAG_OUTPOINT), [self.outpoint.to_string()]))
     }
 
     pub fn from_event(event: &Event) -> Result<Self, ParseError> {
@@ -103,9 +97,7 @@ impl ActionCompletedEvent {
             .and_then(|t| t.content())
             .ok_or(ParseError::MissingTag(TAG_ACTION))?;
 
-        let action: ActionType = action_str
-            .parse()
-            .map_err(|()| ParseError::InvalidAction)?;
+        let action: ActionType = action_str.parse().map_err(|()| ParseError::InvalidAction)?;
 
         let outpoint_str = event
             .tags
@@ -158,11 +150,7 @@ mod tests {
         let keys = Keys::generate();
         let original_event_id = EventId::all_zeros();
 
-        let event = ActionCompletedEvent::new(
-            original_event_id,
-            ActionType::OptionExercised,
-            dummy_outpoint(),
-        );
+        let event = ActionCompletedEvent::new(original_event_id, ActionType::OptionExercised, dummy_outpoint());
 
         let builder = event.to_event_builder(keys.public_key());
         let built_event = builder.sign_with_keys(&keys)?;
@@ -176,4 +164,3 @@ mod tests {
         Ok(())
     }
 }
-

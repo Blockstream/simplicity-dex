@@ -1,0 +1,76 @@
+#![warn(clippy::all, clippy::pedantic)]
+#![allow(clippy::missing_errors_doc)]
+
+use simplicityhl::elements::secp256k1_zkp::{self as secp256k1, Keypair, Message, schnorr::Signature};
+use simplicityhl::elements::{Address, AddressParams};
+use simplicityhl::simplicity::bitcoin::XOnlyPublicKey;
+use simplicityhl_core::{ProgramError, get_p2pk_address, hash_script_pubkey};
+
+#[derive(thiserror::Error, Debug)]
+pub enum SignerError {
+    #[error("Invalid seed length: expected 32 bytes, got {0}")]
+    InvalidSeedLength(usize),
+
+    #[error("Invalid secret key")]
+    InvalidSecretKey(#[from] secp256k1::UpstreamError),
+
+    #[error("Program error")]
+    Address(#[from] ProgramError),
+}
+
+pub struct Signer {
+    keypair: Keypair,
+}
+
+impl Signer {
+    pub fn from_seed(seed: &[u8; 32]) -> Result<Self, SignerError> {
+        let secp = secp256k1::Secp256k1::new();
+
+        let secret_key = secp256k1::SecretKey::from_slice(seed)?;
+
+        let keypair = Keypair::from_secret_key(&secp, &secret_key);
+
+        Ok(Self { keypair })
+    }
+
+    #[must_use]
+    pub fn sign(&self, message: Message) -> Signature {
+        self.keypair.sign_schnorr(message)
+    }
+
+    #[must_use]
+    pub fn public_key(&self) -> XOnlyPublicKey {
+        self.keypair.x_only_public_key().0
+    }
+
+    #[must_use]
+    pub fn p2pk_address(&self, params: &'static AddressParams) -> Result<Address, SignerError> {
+        let public_key = self.keypair.x_only_public_key().0;
+        let address = get_p2pk_address(&public_key, params)?;
+
+        Ok(address)
+    }
+
+    #[must_use]
+    pub fn p2pk_script_hash(&self, params: &'static AddressParams) -> Result<[u8; 32], SignerError> {
+        let address = self.p2pk_address(params)?;
+
+        let mut script_hash: [u8; 32] = hash_script_pubkey(&address);
+        script_hash.reverse();
+
+        Ok(script_hash)
+    }
+
+    #[must_use]
+    pub fn print_details(&self) -> Result<(), SignerError> {
+        let public_key = self.public_key();
+        let address = self.p2pk_address(&AddressParams::LIQUID_TESTNET)?;
+        let script_hash = self.p2pk_script_hash(&AddressParams::LIQUID_TESTNET)?;
+
+        println!("X Only Public Key: {public_key}");
+        println!("P2PK Address: {address}");
+        println!("Script hash: {}", hex::encode(script_hash));
+
+        Ok(())
+    }
+}

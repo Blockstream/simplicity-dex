@@ -16,4 +16,3 @@ pub const ACTION_SWAP_EXERCISED: &str = "swap_exercised";
 pub const ACTION_OPTION_EXERCISED: &str = "option_exercised";
 pub const ACTION_SETTLEMENT_CLAIMED: &str = "settlement_claimed";
 pub const ACTION_OPTION_EXPIRED: &str = "option_expired";
-

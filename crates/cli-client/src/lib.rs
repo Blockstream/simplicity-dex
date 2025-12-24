@@ -1,7 +1,7 @@
 #![warn(clippy::all, clippy::pedantic)]
+#![allow(clippy::missing_errors_doc, clippy::missing_panics_doc)]
 
 pub mod cli;
-pub mod common;
-mod contract_handlers;
+pub mod config;
 pub mod error;
-pub mod logger;
+pub mod wallet;

@@ -1,7 +1,7 @@
 use contracts::error::TaprootPubkeyGenError;
 
-use nostr::prelude::url;
 use nostr::SignerError;
+use nostr::prelude::url;
 
 use simplicityhl::elements::bitcoin::blockdata::transaction::ParseOutPointError;
 use simplicityhl_core::EncodingError;

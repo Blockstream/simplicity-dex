@@ -19,11 +19,7 @@ pub struct SwapCreatedEvent {
 
 impl SwapCreatedEvent {
     #[must_use]
-    pub fn new(
-        swap_args: SwapWithChangeArguments,
-        utxo: OutPoint,
-        taproot_pubkey_gen: TaprootPubkeyGen,
-    ) -> Self {
+    pub fn new(swap_args: SwapWithChangeArguments, utxo: OutPoint, taproot_pubkey_gen: TaprootPubkeyGen) -> Self {
         Self {
             event_id: EventId::all_zeros(),
             pubkey: PublicKey::from_slice(&[1; 32]).unwrap(),
@@ -39,24 +35,15 @@ impl SwapCreatedEvent {
 
         Ok(EventBuilder::new(SWAP_CREATED, "")
             .tag(Tag::public_key(creator_pubkey))
-            .tag(Tag::custom(
-                TagKind::custom(TAG_SWAP_ARGS),
-                [args_hex],
-            ))
-            .tag(Tag::custom(
-                TagKind::custom(TAG_SWAP_UTXO),
-                [self.utxo.to_string()],
-            ))
+            .tag(Tag::custom(TagKind::custom(TAG_SWAP_ARGS), [args_hex]))
+            .tag(Tag::custom(TagKind::custom(TAG_SWAP_UTXO), [self.utxo.to_string()]))
             .tag(Tag::custom(
                 TagKind::custom(TAG_TAPROOT_GEN),
                 [self.taproot_pubkey_gen.to_string()],
             )))
     }
 
-    pub fn from_event(
-        event: &Event,
-        params: &'static AddressParams,
-    ) -> Result<Self, ParseError> {
+    pub fn from_event(event: &Event, params: &'static AddressParams) -> Result<Self, ParseError> {
         event.verify()?;
 
         if event.kind != SWAP_CREATED {
@@ -88,12 +75,8 @@ impl SwapCreatedEvent {
             .and_then(|t| t.content())
             .ok_or(ParseError::MissingTag(TAG_TAPROOT_GEN))?;
 
-        let taproot_pubkey_gen = TaprootPubkeyGen::build_from_str(
-            taproot_str,
-            &swap_args,
-            params,
-            &get_swap_with_change_address,
-        )?;
+        let taproot_pubkey_gen =
+            TaprootPubkeyGen::build_from_str(taproot_str, &swap_args, params, &get_swap_with_change_address)?;
 
         Ok(Self {
             event_id: event.id,
@@ -116,8 +99,7 @@ mod tests {
     use simplicityhl_core::{LIQUID_TESTNET_BITCOIN_ASSET, LIQUID_TESTNET_TEST_ASSET_ID_STR};
 
     fn get_mocked_data() -> anyhow::Result<(SwapWithChangeArguments, TaprootPubkeyGen)> {
-        let settlement_asset_id =
-            AssetId::from_slice(&hex::decode(LIQUID_TESTNET_TEST_ASSET_ID_STR)?)?;
+        let settlement_asset_id = AssetId::from_slice(&hex::decode(LIQUID_TESTNET_TEST_ASSET_ID_STR)?)?;
 
         let args = SwapWithChangeArguments {
             collateral_asset_id: LIQUID_TESTNET_BITCOIN_ASSET.into_inner().0,
@@ -127,11 +109,8 @@ mod tests {
             user_pubkey: [1; 32],
         };
 
-        let taproot_pubkey_gen = TaprootPubkeyGen::from(
-            &args,
-            &AddressParams::LIQUID_TESTNET,
-            &get_swap_with_change_address,
-        )?;
+        let taproot_pubkey_gen =
+            TaprootPubkeyGen::from(&args, &AddressParams::LIQUID_TESTNET, &get_swap_with_change_address)?;
 
         Ok((args, taproot_pubkey_gen))
     }
@@ -156,4 +135,3 @@ mod tests {
         Ok(())
     }
 }
-

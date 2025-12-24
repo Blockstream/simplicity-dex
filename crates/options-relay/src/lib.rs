@@ -10,6 +10,6 @@ pub use client::{PublishingClient, ReadOnlyClient};
 pub use config::RelayConfig;
 pub use error::{ParseError, RelayError};
 pub use events::{
-    ActionCompletedEvent, ActionType, OptionCreatedEvent, SwapCreatedEvent,
-    ACTION_COMPLETED, OPTION_CREATED, SWAP_CREATED,
+    ACTION_COMPLETED, ActionCompletedEvent, ActionType, OPTION_CREATED, OptionCreatedEvent, SWAP_CREATED,
+    SwapCreatedEvent,
 };

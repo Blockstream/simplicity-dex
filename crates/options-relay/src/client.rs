@@ -1,6 +1,5 @@
-mod read_only;
 mod publishing;
+mod read_only;
 
-pub use read_only::ReadOnlyClient;
 pub use publishing::PublishingClient;
-
+pub use read_only::ReadOnlyClient;

@@ -1,16 +1,39 @@
 [package]
 name = "cli-client"
-version = "0.1.0"
-edition = "2024"
-description = ""
+description = "CLI client for Simplicity Options trading on Liquid"
 license = "MIT OR Apache-2.0"
-readme = "README.md"
-publish = false
 
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
 
 [[bin]]
 name = "simplicity-dex"
 path = "src/bin/main.rs"
 
 [dependencies]
+signer = { path = "../signer" }
+coin-store = { path = "../coin-store" }
+options-relay = { path = "../options-relay" }
+
+contracts = { workspace = true }
+cli-helper = { workspace = true }
+simplicityhl = { workspace = true }
+simplicityhl-core = { workspace = true }
+
+clap = { version = "4", features = ["derive", "env"] }
+
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+
+thiserror = "2"
+anyhow = { workspace = true }
+
+tracing = { workspace = true }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+serde = { version = "1", features = ["derive"] }
+toml = "0.8"
+hex = "0.4"
+dotenvy = "0.15"
 

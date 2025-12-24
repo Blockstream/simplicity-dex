@@ -1,12 +1,10 @@
 use crate::config::RelayConfig;
 use crate::error::{ParseError, RelayError};
-use crate::events::{
-    filters, ActionCompletedEvent, OptionCreatedEvent, SwapCreatedEvent,
-};
+use crate::events::{ActionCompletedEvent, OptionCreatedEvent, SwapCreatedEvent, filters};
 
 use nostr::prelude::*;
-use nostr_sdk::prelude::Events;
 use nostr_sdk::Client;
+use nostr_sdk::prelude::Events;
 use simplicityhl::elements::AddressParams;
 use tracing::instrument;
 
@@ -30,9 +28,7 @@ impl ReadOnlyClient {
         for url in config.all_relays() {
             let relay_url = Url::parse(url)?;
 
-            client
-                .add_relay(relay_url)
-                .await?;
+            client.add_relay(relay_url).await?;
         }
 
         client.connect().await;
@@ -44,10 +40,7 @@ impl ReadOnlyClient {
     pub async fn fetch_events(&self, filter: Filter) -> Result<Events, RelayError> {
         tracing::debug!(?filter, "Fetching events");
 
-        Ok(self
-            .client
-            .fetch_combined_events(filter, self.config.timeout())
-            .await?)
+        Ok(self.client.fetch_combined_events(filter, self.config.timeout()).await?)
     }
 
     pub async fn fetch_options(
@@ -55,7 +48,10 @@ impl ReadOnlyClient {
         params: &'static AddressParams,
     ) -> Result<Vec<Result<OptionCreatedEvent, ParseError>>, RelayError> {
         let events = self.fetch_events(filters::option_created()).await?;
-        Ok(events.iter().map(|e| OptionCreatedEvent::from_event(e, params)).collect())
+        Ok(events
+            .iter()
+            .map(|e| OptionCreatedEvent::from_event(e, params))
+            .collect())
     }
 
     pub async fn fetch_swaps(
@@ -70,7 +66,9 @@ impl ReadOnlyClient {
         &self,
         original_event_id: EventId,
     ) -> Result<Vec<Result<ActionCompletedEvent, ParseError>>, RelayError> {
-        let events = self.fetch_events(filters::action_completed_for_event(original_event_id)).await?;
+        let events = self
+            .fetch_events(filters::action_completed_for_event(original_event_id))
+            .await?;
         Ok(events.iter().map(ActionCompletedEvent::from_event).collect())
     }
 
@@ -96,11 +94,11 @@ impl ReadOnlyClient {
     }
 
     #[must_use]
-    pub fn config(&self) -> &RelayConfig {
+    pub const fn config(&self) -> &RelayConfig {
         &self.config
     }
 
-    pub(crate) fn inner_client(&self) -> &Client {
+    pub(crate) const fn inner_client(&self) -> &Client {
         &self.client
     }
 

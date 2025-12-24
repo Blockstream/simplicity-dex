@@ -29,13 +29,10 @@ pub fn action_completed() -> Filter {
 
 #[must_use]
 pub fn action_completed_for_event(original_event_id: nostr::EventId) -> Filter {
-    Filter::new()
-        .kind(ACTION_COMPLETED)
-        .event(original_event_id)
+    Filter::new().kind(ACTION_COMPLETED).event(original_event_id)
 }
 
 #[must_use]
 pub fn all_option_events() -> Filter {
     Filter::new().kinds([OPTION_CREATED, SWAP_CREATED, ACTION_COMPLETED])
 }
-

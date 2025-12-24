@@ -29,23 +29,19 @@ impl RelayConfig {
     }
 
     #[must_use]
-    pub fn add_backup_relays(
-        mut self,
-        relay_urls: impl IntoIterator<Item = impl Into<String>>,
-    ) -> Self {
-        self.backup_relays
-            .extend(relay_urls.into_iter().map(Into::into));
+    pub fn add_backup_relays(mut self, relay_urls: impl IntoIterator<Item = impl Into<String>>) -> Self {
+        self.backup_relays.extend(relay_urls.into_iter().map(Into::into));
         self
     }
 
     #[must_use]
-    pub fn with_timeout(mut self, timeout: Duration) -> Self {
+    pub const fn with_timeout(mut self, timeout: Duration) -> Self {
         self.timeout = timeout;
         self
     }
 
     #[must_use]
-    pub fn with_retry_count(mut self, count: u32) -> Self {
+    pub const fn with_retry_count(mut self, count: u32) -> Self {
         self.retry_count = count;
         self
     }
@@ -63,12 +59,12 @@ impl RelayConfig {
     }
 
     #[must_use]
-    pub fn timeout(&self) -> Duration {
+    pub const fn timeout(&self) -> Duration {
         self.timeout
     }
 
     #[must_use]
-    pub fn retry_count(&self) -> u32 {
+    pub const fn retry_count(&self) -> u32 {
         self.retry_count
     }
 }

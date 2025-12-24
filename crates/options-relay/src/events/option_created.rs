@@ -19,11 +19,7 @@ pub struct OptionCreatedEvent {
 
 impl OptionCreatedEvent {
     #[must_use]
-    pub fn new(
-        options_args: OptionsArguments,
-        utxo: OutPoint,
-        taproot_pubkey_gen: TaprootPubkeyGen,
-    ) -> Self {
+    pub fn new(options_args: OptionsArguments, utxo: OutPoint, taproot_pubkey_gen: TaprootPubkeyGen) -> Self {
         Self {
             event_id: EventId::all_zeros(),
             pubkey: PublicKey::from_slice(&[1; 32]).unwrap(),
@@ -39,24 +35,15 @@ impl OptionCreatedEvent {
 
         Ok(EventBuilder::new(OPTION_CREATED, "")
             .tag(Tag::public_key(creator_pubkey))
-            .tag(Tag::custom(
-                TagKind::custom(TAG_OPTIONS_ARGS),
-                [args_hex],
-            ))
-            .tag(Tag::custom(
-                TagKind::custom(TAG_OPTIONS_UTXO),
-                [self.utxo.to_string()],
-            ))
+            .tag(Tag::custom(TagKind::custom(TAG_OPTIONS_ARGS), [args_hex]))
+            .tag(Tag::custom(TagKind::custom(TAG_OPTIONS_UTXO), [self.utxo.to_string()]))
             .tag(Tag::custom(
                 TagKind::custom(TAG_TAPROOT_GEN),
                 [self.taproot_pubkey_gen.to_string()],
             )))
     }
 
-    pub fn from_event(
-        event: &Event,
-        params: &'static AddressParams,
-    ) -> Result<Self, ParseError> {
+    pub fn from_event(event: &Event, params: &'static AddressParams) -> Result<Self, ParseError> {
         event.verify()?;
 
         if event.kind != OPTION_CREATED {
@@ -105,17 +92,16 @@ impl OptionCreatedEvent {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     use nostr::{Keys, hashes::Hash};
-    
+
     use contracts::sdk::taproot_pubkey_gen::get_random_seed;
-    
+
     use simplicityhl::elements::{AssetId, Txid};
     use simplicityhl_core::{LIQUID_TESTNET_BITCOIN_ASSET, LIQUID_TESTNET_TEST_ASSET_ID_STR};
 
     fn get_mocked_data() -> anyhow::Result<(OptionsArguments, TaprootPubkeyGen)> {
-        let settlement_asset_id =
-            AssetId::from_slice(&hex::decode(LIQUID_TESTNET_TEST_ASSET_ID_STR)?)?;
+        let settlement_asset_id = AssetId::from_slice(&hex::decode(LIQUID_TESTNET_TEST_ASSET_ID_STR)?)?;
 
         let args = OptionsArguments {
             start_time: 10,
@@ -128,8 +114,7 @@ mod tests {
             grantor_token_entropy: get_random_seed(),
         };
 
-        let taproot_pubkey_gen =
-            TaprootPubkeyGen::from(&args, &AddressParams::LIQUID_TESTNET, &get_options_address)?;
+        let taproot_pubkey_gen = TaprootPubkeyGen::from(&args, &AddressParams::LIQUID_TESTNET, &get_options_address)?;
 
         Ok((args, taproot_pubkey_gen))
     }
@@ -154,4 +139,3 @@ mod tests {
         Ok(())
     }
 }
-
