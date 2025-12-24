@@ -163,13 +163,7 @@ impl Store {
         self.internal_insert(tx, outpoint, txout, blinder_key).await
     }
 
-    pub async fn mark_as_spent(
-        &self,
-        prev_outpoint: OutPoint,
-        new_outpoint: OutPoint,
-        txout: TxOut,
-        blinder_key: Option<[u8; 32]>,
-    ) -> Result<(), StoreError> {
+    pub async fn mark_as_spent(&self, prev_outpoint: OutPoint) -> Result<(), StoreError> {
         let prev_txid: &[u8] = prev_outpoint.txid.as_ref();
         let prev_vout = i64::from(prev_outpoint.vout);
 
@@ -191,7 +185,9 @@ impl Store {
             .execute(&mut *tx)
             .await?;
 
-        self.internal_insert(tx, new_outpoint, txout, blinder_key).await
+        tx.commit().await?;
+
+        Ok(())
     }
 }
 
@@ -555,7 +551,6 @@ mod tests {
 
         let asset = test_asset_id();
         let outpoint1 = OutPoint::new(Txid::from_byte_array([1; 32]), 0);
-        let outpoint2 = OutPoint::new(Txid::from_byte_array([2; 32]), 0);
 
         store
             .insert(outpoint1, make_explicit_txout(asset, 1000), None)
@@ -566,18 +561,12 @@ mod tests {
         let results = store.query(std::slice::from_ref(&filter)).await.unwrap();
         assert!(matches!(&results[0], QueryResult::Found(e) if e.len() == 1));
 
-        store
-            .mark_as_spent(outpoint1, outpoint2, make_explicit_txout(asset, 900), None)
-            .await
-            .unwrap();
+        store.mark_as_spent(outpoint1).await.unwrap();
 
-        let results = store.query(&[filter]).await.unwrap();
+        let results = store.query(std::slice::from_ref(&filter)).await.unwrap();
         match &results[0] {
-            QueryResult::Found(entries) => {
-                assert_eq!(entries.len(), 1);
-                assert_eq!(entries[0].outpoint(), &outpoint2);
-            }
-            _ => panic!("Expected Found result"),
+            QueryResult::Empty => {}
+            _ => panic!("Expected non-Empty result"),
         }
 
         let _ = fs::remove_file(path);

@@ -2,9 +2,10 @@
 #![allow(clippy::missing_errors_doc)]
 
 use simplicityhl::elements::secp256k1_zkp::{self as secp256k1, Keypair, Message, schnorr::Signature};
-use simplicityhl::elements::{Address, AddressParams};
+use simplicityhl::elements::{Address, AddressParams, BlockHash, Transaction, TxOut};
 use simplicityhl::simplicity::bitcoin::XOnlyPublicKey;
-use simplicityhl_core::{ProgramError, get_p2pk_address, hash_script_pubkey};
+use simplicityhl::simplicity::hashes::Hash as _;
+use simplicityhl_core::{ProgramError, get_and_verify_env, get_p2pk_address, get_p2pk_program, hash_script_pubkey};
 
 #[derive(thiserror::Error, Debug)]
 pub enum SignerError {
@@ -69,5 +70,31 @@ impl Signer {
         println!("Script hash: {}", hex::encode(script_hash));
 
         Ok(())
+    }
+
+    pub fn sign_p2pk(
+        &self,
+        tx: &Transaction,
+        utxos: &[TxOut],
+        input_index: usize,
+        params: &'static AddressParams,
+        genesis_hash: BlockHash,
+    ) -> Result<Signature, SignerError> {
+        let x_only_public_key = self.keypair.x_only_public_key().0;
+        let p2pk_program = get_p2pk_program(&x_only_public_key)?;
+
+        let env = get_and_verify_env(
+            tx,
+            &p2pk_program,
+            &x_only_public_key,
+            utxos,
+            params,
+            genesis_hash,
+            input_index,
+        )?;
+
+        let sighash_all = Message::from_digest(env.c_tx_env().sighash_all().to_byte_array());
+
+        Ok(self.keypair.sign_schnorr(sighash_all))
     }
 }

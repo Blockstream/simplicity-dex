@@ -1,5 +1,6 @@
 use simplicityhl::elements::{OutPoint, TxOut, TxOutSecrets};
 
+#[derive(Debug)]
 pub enum UtxoEntry {
     Confidential {
         outpoint: OutPoint,
@@ -36,6 +37,7 @@ impl UtxoEntry {
     }
 }
 
+#[derive(Debug)]
 pub enum QueryResult {
     Found(Vec<UtxoEntry>),
     InsufficientValue(Vec<UtxoEntry>),
