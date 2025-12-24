@@ -5,7 +5,7 @@ pub struct Filter {
     pub(crate) asset_id: Option<AssetId>,
     pub(crate) script_pubkey: Option<Script>,
     pub(crate) required_value: Option<u64>,
-    pub(crate) limit: Option<usize>,
+    pub(crate) limit: Option<i64>,
     pub(crate) include_spent: bool,
 }
 
@@ -34,7 +34,7 @@ impl Filter {
     }
 
     #[must_use]
-    pub const fn limit(mut self, limit: usize) -> Self {
+    pub const fn limit(mut self, limit: i64) -> Self {
         self.limit = Some(limit);
         self
     }

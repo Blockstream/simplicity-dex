@@ -19,7 +19,7 @@ pub struct PublishingClient {
 impl PublishingClient {
     #[instrument(skip_all, level = "debug", err)]
     pub async fn connect(config: RelayConfig, signer: impl IntoNostrSigner) -> Result<Self, RelayError> {
-        let mut reader = ReadOnlyClient::connect(config).await?;
+        let reader = ReadOnlyClient::connect(config).await?;
 
         reader.set_signer(signer).await;
 
