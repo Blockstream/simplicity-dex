@@ -1,15 +1,22 @@
-use simplicityhl::elements::{AssetId, Script};
+use contracts::sdk::taproot_pubkey_gen::TaprootPubkeyGen;
+use simplicityhl::{
+    elements::{AssetId, Script},
+    simplicity::Cmr,
+};
 
 #[derive(Clone, Default)]
-pub struct Filter {
-    pub(crate) asset_id: Option<AssetId>,
-    pub(crate) script_pubkey: Option<Script>,
-    pub(crate) required_value: Option<u64>,
-    pub(crate) limit: Option<i64>,
-    pub(crate) include_spent: bool,
+pub struct UtxoFilter {
+    pub asset_id: Option<AssetId>,
+    pub script_pubkey: Option<Script>,
+    pub required_value: Option<u64>,
+    pub limit: Option<i64>,
+    pub include_spent: bool,
+    pub cmr: Option<Cmr>,
+    pub taproot_pubkey_gen: Option<TaprootPubkeyGen>,
+    pub source: Option<String>,
 }
 
-impl Filter {
+impl UtxoFilter {
     #[must_use]
     pub fn new() -> Self {
         Self::default()
@@ -43,5 +50,28 @@ impl Filter {
     pub const fn include_spent(mut self) -> Self {
         self.include_spent = true;
         self
+    }
+
+    #[must_use]
+    pub const fn cmr(mut self, cmr: Cmr) -> Self {
+        self.cmr = Some(cmr);
+        self
+    }
+
+    #[must_use]
+    pub fn taproot_pubkey_gen(mut self, tpg: TaprootPubkeyGen) -> Self {
+        self.taproot_pubkey_gen = Some(tpg);
+        self
+    }
+
+    #[must_use]
+    pub fn source(mut self, source: String) -> Self {
+        self.source = Some(source);
+        self
+    }
+
+    #[must_use]
+    pub(crate) const fn is_contract_join(&self) -> bool {
+        self.cmr.is_some() || self.taproot_pubkey_gen.is_some() || self.source.is_some()
     }
 }

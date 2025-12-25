@@ -3,6 +3,9 @@ resolver = "3"
 members = [
     "crates/*"
 ]
+exclude = [
+    "crates/cli-client"
+]
 
 [workspace.package]
 version = "0.1.0"
@@ -19,8 +22,8 @@ anyhow = { version = "1.0.100" }
 
 tracing = { version = "0.1.41" }
 
-contracts = { git = "https://github.com/BlockstreamResearch/simplicity-contracts.git", rev = "6a53bf7", package = "contracts" }
-cli-helper = { git = "https://github.com/BlockstreamResearch/simplicity-contracts.git", rev = "6a53bf7", package = "cli" }
-simplicityhl-core = { version = "0.3.0", features = ["encoding"] }
+contracts = { git = "https://github.com/BlockstreamResearch/simplicity-contracts.git", rev = "b3d1ae9", package = "contracts" }
+cli-helper = { git = "https://github.com/BlockstreamResearch/simplicity-contracts.git", rev = "b3d1ae9", package = "cli" }
+simplicityhl-core = { version = "0.3.1", features = ["encoding"] }
 
 simplicityhl = { version = "0.4.0" }

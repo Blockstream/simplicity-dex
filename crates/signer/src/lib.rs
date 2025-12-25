@@ -24,7 +24,9 @@ pub struct Signer {
 }
 
 impl Signer {
-    pub fn from_seed(seed: &[u8; 32]) -> Result<Self, SignerError> {
+    pub const SEED_LEN: usize = secp256k1::constants::SECRET_KEY_SIZE;
+
+    pub fn from_seed(seed: &[u8; Self::SEED_LEN]) -> Result<Self, SignerError> {
         let secp = secp256k1::Secp256k1::new();
 
         let secret_key = secp256k1::SecretKey::from_slice(seed)?;

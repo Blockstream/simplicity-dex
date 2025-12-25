@@ -14,10 +14,20 @@ categories.workspace = true
 
 [dependencies]
 simplicityhl = { workspace = true }
+simplicityhl-core = { workspace = true }
+contracts = { workspace = true }
 
-futures = "0.3"
+sha2 = { version = "0.10.9" }
 
-thiserror = "2"
+futures = { version = "0.3" }
 
+thiserror = { version = "2" }
+
+async-trait = { version = "0.1.89" }
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
 sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite", "migrate"] }
+
+bincode = { version = "2.0.1", features = ["alloc", "derive", "serde"] }
+
+[dev-dependencies]
+hex = { version = "0.4.3" }

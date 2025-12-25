@@ -2,6 +2,8 @@ use crate::cli::{Cli, HelperCommand};
 use crate::config::Config;
 use crate::error::Error;
 use crate::wallet::Wallet;
+use coin_store::utxo_store::UtxoStore;
+use simplicityhl::elements::bitcoin::secp256k1;
 
 impl Cli {
     pub(crate) async fn run_helper(&self, config: Config, command: &HelperCommand) -> Result<(), Error> {
@@ -26,14 +28,14 @@ impl Cli {
             HelperCommand::Balance => {
                 let wallet = self.get_wallet(&config).await?;
 
-                let filter = coin_store::Filter::new()
+                let filter = coin_store::UtxoFilter::new()
                     .script_pubkey(wallet.signer().p2pk_address(config.address_params())?.script_pubkey());
-                let results = wallet.store().query(&[filter]).await?;
+                let results = <_ as UtxoStore>::query_utxos(wallet.store(), &[filter]).await?;
 
                 let mut balances: std::collections::HashMap<simplicityhl::elements::AssetId, u64> =
                     std::collections::HashMap::new();
 
-                if let Some(coin_store::QueryResult::Found(entries)) = results.into_iter().next() {
+                if let Some(coin_store::UtxoQueryResult::Found(entries)) = results.into_iter().next() {
                     for entry in entries {
                         let (asset, value) = match entry {
                             coin_store::UtxoEntry::Confidential { secrets, .. } => (secrets.asset, secrets.value),
@@ -59,10 +61,10 @@ impl Cli {
             HelperCommand::Utxos => {
                 let wallet = self.get_wallet(&config).await?;
 
-                let filter = coin_store::Filter::new();
-                let results = wallet.store().query(&[filter]).await?;
+                let filter = coin_store::UtxoFilter::new();
+                let results = wallet.store().query_utxos(&[filter]).await?;
 
-                if let Some(coin_store::QueryResult::Found(entries)) = results.into_iter().next() {
+                if let Some(coin_store::UtxoQueryResult::Found(entries)) = results.into_iter().next() {
                     for entry in &entries {
                         let outpoint = entry.outpoint();
                         let (asset, value) = match entry {
@@ -88,7 +90,7 @@ impl Cli {
 
                 let blinder = match blinding_key {
                     Some(key_hex) => {
-                        let bytes: [u8; 32] = hex::decode(key_hex)
+                        let bytes: [u8; secp256k1::constants::SECRET_KEY_SIZE] = hex::decode(key_hex)
                             .map_err(|e| Error::Config(format!("Invalid blinding key hex: {e}")))?
                             .try_into()
                             .map_err(|_| Error::Config("Blinding key must be 32 bytes".to_string()))?;

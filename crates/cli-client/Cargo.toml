@@ -37,7 +37,6 @@ tracing = { workspace = true }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 serde = { version = "1", features = ["derive"] }
-toml = "0.8"
-hex = "0.4"
-dotenvy = "0.15"
-
+toml = { version =  "0.8" }
+hex = { version =  "0.4" }
+dotenvy = { version =  "0.15" }
