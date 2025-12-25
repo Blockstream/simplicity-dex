@@ -1,3 +1,5 @@
+use simplicityhl::simplicity::hex::HexToArrayError;
+
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     #[error("Configuration error: {0}")]
@@ -29,4 +31,7 @@ pub enum Error {
 
     #[error("Hex error: {0}")]
     Hex(#[from] hex::FromHexError),
+
+    #[error("Hex to array error: {0}")]
+    HexToArray(#[from] HexToArrayError),
 }

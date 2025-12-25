@@ -1,5 +1,5 @@
 use clap::Subcommand;
-use simplicityhl::elements::OutPoint;
+use simplicityhl::elements::{Address, OutPoint};
 
 #[derive(Debug, Subcommand)]
 pub enum Command {
@@ -75,7 +75,7 @@ pub enum HelperCommand {
     /// Show wallet balance
     Balance,
 
-    /// List UTXOs
+    /// List all UTXOs stored in wallet
     Utxos,
 
     /// Import a UTXO into the wallet
@@ -96,7 +96,7 @@ pub enum BasicCommand {
     TransferNative {
         /// Recipient address
         #[arg(long)]
-        to: String,
+        to: Address,
         /// Amount to send in satoshis
         #[arg(long)]
         amount: u64,
@@ -128,7 +128,7 @@ pub enum BasicCommand {
         asset: String,
         /// Recipient address
         #[arg(long)]
-        to: String,
+        to: Address,
         /// Amount to send
         #[arg(long)]
         amount: u64,

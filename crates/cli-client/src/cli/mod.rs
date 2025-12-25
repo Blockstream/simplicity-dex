@@ -1,6 +1,9 @@
 mod basic;
 mod commands;
+mod common;
 mod helper;
+mod maker;
+mod taker;
 
 use std::path::PathBuf;
 
@@ -8,9 +11,10 @@ use clap::Parser;
 
 use crate::config::{Config, default_config_path};
 use crate::error::Error;
+pub use commands::{BasicCommand, Command, HelperCommand, MakerCommand, TakerCommand};
+use signer::Signer;
 
 use crate::wallet::Wallet;
-pub use commands::{BasicCommand, Command, HelperCommand, MakerCommand, TakerCommand};
 
 #[derive(Debug, Parser)]
 #[command(name = "simplicity-dex")]
@@ -32,7 +36,7 @@ impl Cli {
         Config::load_or_default(&self.config)
     }
 
-    fn parse_seed(&self) -> Result<[u8; 32], Error> {
+    fn parse_seed(&self) -> Result<[u8; Signer::SEED_LEN], Error> {
         let seed_hex = self
             .seed
             .as_ref()
@@ -40,9 +44,13 @@ impl Cli {
 
         let bytes = hex::decode(seed_hex).map_err(|e| Error::Config(format!("Invalid seed hex: {e}")))?;
 
-        bytes
-            .try_into()
-            .map_err(|_| Error::Config("Seed must be exactly 32 bytes (64 hex chars)".to_string()))
+        bytes.try_into().map_err(|_| {
+            Error::Config(format!(
+                "Seed must be exactly {} bytes ({} hex chars)",
+                Signer::SEED_LEN,
+                Signer::SEED_LEN * 2
+            ))
+        })
     }
 
     async fn get_wallet(&self, config: &Config) -> Result<Wallet, Error> {
@@ -57,8 +65,8 @@ impl Cli {
 
         match &self.command {
             Command::Basic { command } => self.run_basic(config, command).await,
-            Command::Maker { command: _ } => todo!(),
-            Command::Taker { command: _ } => todo!(),
+            Command::Maker { command } => self.run_maker(config, command).await,
+            Command::Taker { command } => self.run_taker(config, command).await,
             Command::Helper { command } => self.run_helper(config, command).await,
             Command::Config => {
                 println!("{config:#?}");

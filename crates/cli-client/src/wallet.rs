@@ -14,7 +14,7 @@ pub struct Wallet {
 
 impl Wallet {
     pub async fn create(
-        seed: &[u8; 32],
+        seed: &[u8; Signer::SEED_LEN],
         db_path: impl AsRef<Path>,
         params: &'static AddressParams,
     ) -> Result<Self, Error> {
@@ -25,7 +25,7 @@ impl Wallet {
     }
 
     pub async fn open(
-        seed: &[u8; 32],
+        seed: &[u8; Signer::SEED_LEN],
         db_path: impl AsRef<Path>,
         params: &'static AddressParams,
     ) -> Result<Self, Error> {
