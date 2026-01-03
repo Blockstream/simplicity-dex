@@ -2,7 +2,8 @@ use crate::cli::{Cli, HelperCommand};
 use crate::config::Config;
 use crate::error::Error;
 use crate::wallet::Wallet;
-use coin_store::utxo_store::UtxoStore;
+
+use coin_store::UtxoStore;
 use simplicityhl::elements::bitcoin::secp256k1;
 
 impl Cli {
@@ -35,17 +36,9 @@ impl Cli {
                 let mut balances: std::collections::HashMap<simplicityhl::elements::AssetId, u64> =
                     std::collections::HashMap::new();
 
-                if let Some(coin_store::UtxoQueryResult::Found(entries)) = results.into_iter().next() {
+                if let Some(coin_store::UtxoQueryResult::Found(entries, _)) = results.into_iter().next() {
                     for entry in entries {
-                        let (asset, value) = match entry {
-                            coin_store::UtxoEntry::Confidential { secrets, .. } => (secrets.asset, secrets.value),
-                            coin_store::UtxoEntry::Explicit { txout, .. } => {
-                                let asset = txout.asset.explicit().unwrap();
-                                let value = txout.value.explicit().unwrap();
-                                (asset, value)
-                            }
-                        };
-                        *balances.entry(asset).or_insert(0) += value;
+                        *balances.entry(entry.asset()).or_insert(0) += entry.value();
                     }
                 }
 
@@ -64,19 +57,11 @@ impl Cli {
                 let filter = coin_store::UtxoFilter::new();
                 let results = wallet.store().query_utxos(&[filter]).await?;
 
-                if let Some(coin_store::UtxoQueryResult::Found(entries)) = results.into_iter().next() {
+                if let Some(coin_store::UtxoQueryResult::Found(entries, _)) = results.into_iter().next() {
                     for entry in &entries {
-                        let outpoint = entry.outpoint();
-                        let (asset, value) = match entry {
-                            coin_store::UtxoEntry::Confidential { secrets, .. } => (secrets.asset, secrets.value),
-                            coin_store::UtxoEntry::Explicit { txout, .. } => {
-                                let asset = txout.asset.explicit().unwrap();
-                                let value = txout.value.explicit().unwrap();
-                                (asset, value)
-                            }
-                        };
-                        println!("{outpoint} | {asset} | {value}");
+                        println!("{} | {} | {}", entry.outpoint(), entry.asset(), entry.value());
                     }
+
                     println!("Total: {} UTXOs", entries.len());
                 } else {
                     println!("No UTXOs found");

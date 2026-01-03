@@ -32,6 +32,16 @@ CREATE TABLE simplicity_contracts
     PRIMARY KEY (taproot_pubkey_gen)
 );
 
+CREATE TABLE asset_entropy
+(
+    asset_id BLOB NOT NULL,
+    token_id BLOB NOT NULL,
+    entropy  BLOB NOT NULL,
+    
+    PRIMARY KEY (asset_id),
+    FOREIGN KEY (asset_id) REFERENCES utxos (asset_id)
+);
+
 CREATE INDEX idx_utxos_asset_id ON utxos (asset_id);
 CREATE INDEX idx_utxos_is_spent ON utxos (is_spent);
 CREATE INDEX idx_utxos_script_pubkey ON utxos (script_pubkey);
@@ -39,3 +49,5 @@ CREATE INDEX idx_utxos_asset_spent_value ON utxos (asset_id, is_spent, value DES
 
 CREATE INDEX idx_contracts_cmr ON simplicity_contracts (cmr);
 CREATE INDEX idx_contracts_script_pubkey ON simplicity_contracts (script_pubkey);
+
+CREATE INDEX idx_asset_entropy_token_id ON asset_entropy (token_id);

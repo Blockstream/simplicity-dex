@@ -14,7 +14,7 @@ categories.workspace = true
 
 [[bin]]
 name = "simplicity-dex"
-path = "src/bin/main.rs"
+path = "src/main.rs"
 
 [dependencies]
 signer = { path = "../signer" }

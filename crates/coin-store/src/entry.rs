@@ -3,7 +3,7 @@ use std::collections::hash_map::Entry;
 use std::sync::Arc;
 
 use sha2::{Digest, Sha256};
-use simplicityhl::elements::{OutPoint, TxOut, TxOutSecrets};
+use simplicityhl::elements::{AssetId, OutPoint, TxOut, TxOutSecrets};
 use simplicityhl::{Arguments, CompiledProgram};
 
 use crate::StoreError;
@@ -131,6 +131,26 @@ impl UtxoEntry {
     #[must_use]
     pub const fn txout(&self) -> &TxOut {
         &self.txout
+    }
+
+    #[must_use]
+    pub fn asset(&self) -> AssetId {
+        if let Some(secrets) = self.secrets.as_ref() {
+            return secrets.asset;
+        }
+
+        // SAFE: due to the internal logic of the executor, asset MUST exist at that point pf time
+        self.txout.asset.explicit().unwrap()
+    }
+
+    #[must_use]
+    pub fn value(&self) -> u64 {
+        if let Some(secrets) = self.secrets.as_ref() {
+            return secrets.value;
+        }
+
+        // SAFE: due to the internal logic of the executor, value MUST exist at that point pf time
+        self.txout.value.explicit().unwrap()
     }
 
     #[must_use]

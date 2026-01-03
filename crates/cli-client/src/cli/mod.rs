@@ -1,9 +1,6 @@
 mod basic;
 mod commands;
-mod common;
 mod helper;
-mod maker;
-mod taker;
 
 use std::path::PathBuf;
 
@@ -11,7 +8,7 @@ use clap::Parser;
 
 use crate::config::{Config, default_config_path};
 use crate::error::Error;
-pub use commands::{BasicCommand, Command, HelperCommand, MakerCommand, TakerCommand};
+pub use commands::{BasicCommand, Command, HelperCommand};
 use signer::Signer;
 
 use crate::wallet::Wallet;
@@ -42,7 +39,7 @@ impl Cli {
             .as_ref()
             .ok_or_else(|| Error::Config("Seed is required. Use --seed or SIMPLICITY_DEX_SEED".to_string()))?;
 
-        let bytes = hex::decode(seed_hex).map_err(|e| Error::Config(format!("Invalid seed hex: {e}")))?;
+        let bytes = hex::decode(seed_hex)?;
 
         bytes.try_into().map_err(|_| {
             Error::Config(format!(
@@ -65,8 +62,8 @@ impl Cli {
 
         match &self.command {
             Command::Basic { command } => self.run_basic(config, command).await,
-            Command::Maker { command } => self.run_maker(config, command).await,
-            Command::Taker { command } => self.run_taker(config, command).await,
+            Command::Maker { .. } => todo!(),
+            Command::Taker { .. } => todo!(),
             Command::Helper { command } => self.run_helper(config, command).await,
             Command::Config => {
                 println!("{config:#?}");

@@ -7,10 +7,12 @@ use simplicityhl::{
 #[derive(Clone, Default)]
 pub struct UtxoFilter {
     pub asset_id: Option<AssetId>,
+    pub token_id: Option<AssetId>,
     pub script_pubkey: Option<Script>,
     pub required_value: Option<u64>,
     pub limit: Option<i64>,
     pub include_spent: bool,
+    pub include_entropy: bool,
     pub cmr: Option<Cmr>,
     pub taproot_pubkey_gen: Option<TaprootPubkeyGen>,
     pub source: Option<String>,
@@ -25,6 +27,12 @@ impl UtxoFilter {
     #[must_use]
     pub const fn asset_id(mut self, id: AssetId) -> Self {
         self.asset_id = Some(id);
+        self
+    }
+
+    #[must_use]
+    pub const fn token_id(mut self, id: AssetId) -> Self {
+        self.token_id = Some(id);
         self
     }
 
@@ -49,6 +57,12 @@ impl UtxoFilter {
     #[must_use]
     pub const fn include_spent(mut self) -> Self {
         self.include_spent = true;
+        self
+    }
+
+    #[must_use]
+    pub const fn include_entropy(mut self) -> Self {
+        self.include_entropy = true;
         self
     }
 

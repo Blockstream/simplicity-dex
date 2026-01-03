@@ -1,5 +1,5 @@
 use clap::Subcommand;
-use simplicityhl::elements::{Address, OutPoint};
+use simplicityhl::elements::{Address, AssetId, OutPoint};
 
 #[derive(Debug, Subcommand)]
 pub enum Command {
@@ -123,9 +123,9 @@ pub enum BasicCommand {
 
     /// Transfer an asset to a recipient
     TransferAsset {
-        /// Asset ID (hex)
+        /// Asset id
         #[arg(long)]
-        asset: String,
+        asset_id: AssetId,
         /// Recipient address
         #[arg(long)]
         to: Address,
@@ -142,9 +142,9 @@ pub enum BasicCommand {
 
     /// Issue a new asset
     IssueAsset {
-        /// Asset name (local reference)
+        /// Asset id
         #[arg(long)]
-        name: String,
+        asset_id: AssetId,
         /// Amount to issue
         #[arg(long)]
         amount: u64,
@@ -158,9 +158,9 @@ pub enum BasicCommand {
 
     /// Reissue an existing asset
     ReissueAsset {
-        /// Asset name (local reference)
+        /// Asset id
         #[arg(long)]
-        name: String,
+        asset_id: AssetId,
         /// Amount to reissue
         #[arg(long)]
         amount: u64,

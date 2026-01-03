@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::entry::{ContractContext, UtxoEntry};
@@ -9,8 +10,9 @@ use contracts::sdk::taproot_pubkey_gen::TaprootPubkeyGen;
 
 use simplicityhl::elements::encode;
 use simplicityhl::elements::hashes::Hash;
-use simplicityhl::elements::secp256k1_zkp::{self as secp256k1, SecretKey};
-use simplicityhl::elements::{AssetId, OutPoint, TxOut, TxOutWitness, Txid};
+use simplicityhl::elements::issuance::{AssetId as IssuanceAssetId, ContractHash};
+use simplicityhl::elements::secp256k1_zkp::{self as secp256k1, Keypair, SecretKey, ZERO_TWEAK};
+use simplicityhl::elements::{AssetId, OutPoint, Transaction, TxOut, TxOutWitness, Txid};
 use simplicityhl::{Arguments, CompiledProgram};
 
 use sqlx::{QueryBuilder, Sqlite};
@@ -33,6 +35,20 @@ pub trait UtxoStore {
         source: &str,
         arguments: Arguments,
         taproot_pubkey_gen: TaprootPubkeyGen,
+    ) -> Result<(), StoreError>;
+
+    /// Process a transaction by inserting its outputs and marking inputs as spent.
+    ///
+    /// # Arguments
+    /// * `tx` - The transaction to process
+    /// * `out_blinder_keys` - Map from output index to keypair for unblinding.
+    ///   Outputs not in the map are attempted as explicit; unblind failures are skipped.
+    ///
+    /// Also inserts asset entropy entries for any inputs with new issuances.
+    async fn insert_transaction(
+        &self,
+        tx: &Transaction,
+        out_blinder_keys: HashMap<usize, Keypair>,
     ) -> Result<(), StoreError>;
 }
 
@@ -115,6 +131,76 @@ impl UtxoStore for Store {
 
         Ok(())
     }
+
+    async fn insert_transaction(
+        &self,
+        tx: &Transaction,
+        out_blinder_keys: HashMap<usize, Keypair>,
+    ) -> Result<(), StoreError> {
+        let txid = tx.txid();
+        let mut db_tx = self.pool.begin().await?;
+
+        for input in &tx.input {
+            let prev_txid: &[u8] = input.previous_output.txid.as_ref();
+            let prev_vout = i64::from(input.previous_output.vout);
+
+            sqlx::query("UPDATE utxos SET is_spent = 1 WHERE txid = ? AND vout = ?")
+                .bind(prev_txid)
+                .bind(prev_vout)
+                .execute(&mut *db_tx)
+                .await?;
+
+            if input.has_issuance() && input.asset_issuance.asset_blinding_nonce == ZERO_TWEAK {
+                let contract_hash = ContractHash::from_byte_array(input.asset_issuance.asset_entropy);
+                let entropy = IssuanceAssetId::generate_asset_entropy(input.previous_output, contract_hash);
+                let asset_id = IssuanceAssetId::from_entropy(entropy);
+                let token_id = IssuanceAssetId::reissuance_token_from_entropy(
+                    entropy,
+                    input.asset_issuance.inflation_keys.is_confidential(),
+                );
+
+                sqlx::query("INSERT OR IGNORE INTO asset_entropy (asset_id, token_id, entropy) VALUES (?, ?, ?)")
+                    .bind(&asset_id.into_inner().to_byte_array()[..])
+                    .bind(&token_id.into_inner().to_byte_array()[..])
+                    .bind(&entropy.to_byte_array()[..])
+                    .execute(&mut *db_tx)
+                    .await?;
+            }
+        }
+
+        for (vout, txout) in tx.output.iter().enumerate() {
+            #[allow(clippy::cast_possible_truncation)]
+            let outpoint = OutPoint::new(txid, vout as u32);
+            let blinder_key = out_blinder_keys.get(&vout);
+
+            match blinder_key {
+                Some(keypair) => {
+                    let key_bytes: [u8; crate::store::BLINDING_KEY_LEN] = keypair.secret_key().secret_bytes();
+
+                    self.internal_utxo_insert_with_tx(&mut db_tx, outpoint, txout.clone(), Some(key_bytes))
+                        .await?;
+                }
+                None => {
+                    if let Err(e) = self
+                        .internal_utxo_insert_with_tx(&mut db_tx, outpoint, txout.clone(), None)
+                        .await
+                    {
+                        match e {
+                            StoreError::MissingBlinderKey(_) | StoreError::Unblind(_) => {
+                                // Skip this output - blinding key was optional
+                                continue;
+                            }
+                            _ => return Err(e),
+                        }
+                    }
+                }
+            }
+        }
+
+        db_tx.commit().await?;
+        
+        Ok(())
+    }
 }
 
 impl Store {
@@ -149,6 +235,21 @@ impl Store {
         txout: TxOut,
         blinder_key: Option<[u8; crate::store::BLINDING_KEY_LEN]>,
     ) -> Result<(), StoreError> {
+        self.internal_utxo_insert_with_tx(&mut tx, outpoint, txout, blinder_key)
+            .await?;
+
+        tx.commit().await?;
+
+        Ok(())
+    }
+
+    async fn internal_utxo_insert_with_tx(
+        &self,
+        tx: &mut sqlx::Transaction<'_, Sqlite>,
+        outpoint: OutPoint,
+        txout: TxOut,
+        blinder_key: Option<[u8; crate::store::BLINDING_KEY_LEN]>,
+    ) -> Result<(), StoreError> {
         let (asset_id, value, is_confidential) = Self::unblind_or_explicit(&outpoint, &txout, blinder_key)?;
 
         let txid: &[u8] = outpoint.txid.as_ref();
@@ -166,7 +267,7 @@ impl Store {
         .bind(encode::serialize(&txout))
         .bind(encode::serialize(&txout.witness))
         .bind(i64::from(is_confidential))
-        .execute(&mut *tx)
+        .execute(&mut **tx)
         .await?;
 
         if let Some(key) = blinder_key {
@@ -174,11 +275,9 @@ impl Store {
                 .bind(txid)
                 .bind(vout)
                 .bind(key.as_slice())
-                .execute(&mut *tx)
+                .execute(&mut **tx)
                 .await?;
         }
-
-        tx.commit().await?;
 
         Ok(())
     }

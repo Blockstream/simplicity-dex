@@ -3,9 +3,6 @@ resolver = "3"
 members = [
     "crates/*"
 ]
-exclude = [
-    "crates/cli-client"
-]
 
 [workspace.package]
 version = "0.1.0"

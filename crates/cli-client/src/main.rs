@@ -1,14 +1,19 @@
 #![warn(clippy::all, clippy::pedantic)]
 
+mod cli;
+mod config;
+mod error;
+mod wallet;
+
+use crate::cli::Cli;
+
 use clap::Parser;
-use cli_client::cli::Cli;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let _ = dotenvy::dotenv();
-    let cli = Cli::parse();
 
-    cli.run().await?;
+    Cli::parse().run().await?;
 
     Ok(())
 }
