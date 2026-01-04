@@ -3,6 +3,8 @@ use std::collections::hash_map::Entry;
 use std::sync::Arc;
 
 use sha2::{Digest, Sha256};
+use simplicityhl::elements::hashes::sha256;
+use simplicityhl::elements::issuance::AssetId as IssuanceAssetId;
 use simplicityhl::elements::{AssetId, OutPoint, TxOut, TxOutSecrets};
 use simplicityhl::{Arguments, CompiledProgram};
 
@@ -94,6 +96,8 @@ pub struct UtxoEntry {
     txout: TxOut,
     secrets: Option<TxOutSecrets>,
     contract: Option<Arc<CompiledProgram>>,
+    entropy: Option<sha256::Midstate>,
+    is_confidential: Option<bool>,
 }
 
 impl UtxoEntry {
@@ -104,6 +108,8 @@ impl UtxoEntry {
             txout,
             secrets: None,
             contract: None,
+            entropy: None,
+            is_confidential: None,
         }
     }
 
@@ -114,12 +120,21 @@ impl UtxoEntry {
             txout,
             secrets: Some(secrets),
             contract: None,
+            entropy: None,
+            is_confidential: None,
         }
     }
 
     #[must_use]
     pub fn with_contract(mut self, contract: Arc<CompiledProgram>) -> Self {
         self.contract = Some(contract);
+        self
+    }
+
+    #[must_use]
+    pub const fn with_issuance(mut self, entropy: sha256::Midstate, is_confidential: bool) -> Self {
+        self.entropy = Some(entropy);
+        self.is_confidential = Some(is_confidential);
         self
     }
 
@@ -134,23 +149,19 @@ impl UtxoEntry {
     }
 
     #[must_use]
-    pub fn asset(&self) -> AssetId {
-        if let Some(secrets) = self.secrets.as_ref() {
-            return secrets.asset;
-        }
-
-        // SAFE: due to the internal logic of the executor, asset MUST exist at that point pf time
-        self.txout.asset.explicit().unwrap()
+    pub fn asset(&self) -> Option<AssetId> {
+        self.secrets
+            .as_ref()
+            .map(|s| s.asset)
+            .or_else(|| self.txout.asset.explicit())
     }
 
     #[must_use]
-    pub fn value(&self) -> u64 {
-        if let Some(secrets) = self.secrets.as_ref() {
-            return secrets.value;
-        }
-
-        // SAFE: due to the internal logic of the executor, value MUST exist at that point pf time
-        self.txout.value.explicit().unwrap()
+    pub fn value(&self) -> Option<u64> {
+        self.secrets
+            .as_ref()
+            .map(|s| s.value)
+            .or_else(|| self.txout.value.explicit())
     }
 
     #[must_use]
@@ -171,6 +182,22 @@ impl UtxoEntry {
     #[must_use]
     pub const fn is_bound(&self) -> bool {
         self.contract.is_some()
+    }
+
+    #[must_use]
+    pub fn issuance_ids(&self) -> Option<(AssetId, AssetId)> {
+        let entropy = self.entropy?;
+        let is_confidential = self.is_confidential?;
+
+        let asset_id = IssuanceAssetId::from_entropy(entropy);
+        let token_id = IssuanceAssetId::reissuance_token_from_entropy(entropy, is_confidential);
+
+        Some((asset_id, token_id))
+    }
+
+    #[must_use]
+    pub const fn entropy(&self) -> (Option<sha256::Midstate>, Option<bool>) {
+        (self.entropy, self.is_confidential)
     }
 }
 

@@ -1,3 +1,4 @@
+use simplicityhl::elements::hashes::FromSliceError;
 use simplicityhl::elements::secp256k1_zkp::UpstreamError;
 use simplicityhl::elements::{OutPoint, UnblindError};
 use std::path::PathBuf;
@@ -51,4 +52,10 @@ pub enum StoreError {
 
     #[error("Simplicity compilation error: {0}")]
     SimplicityCompilation(String),
+
+    #[error("Hash slice error: {0}")]
+    HashSlice(#[from] FromSliceError),
+
+    #[error("Invalid asset ID")]
+    InvalidAssetId,
 }
