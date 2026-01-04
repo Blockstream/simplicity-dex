@@ -1,4 +1,5 @@
 use contracts::sdk::taproot_pubkey_gen::TaprootPubkeyGen;
+use simplicityhl::elements::hashes::{sha256, Hash};
 use simplicityhl::{
     elements::{AssetId, Script},
     simplicity::Cmr,
@@ -21,6 +22,11 @@ impl UtxoFilter {
     #[must_use]
     pub fn new() -> Self {
         Self::default()
+    }
+
+    #[must_use]
+    pub fn hash_source(source: &str) -> [u8; 32] {
+        sha256::Hash::hash(source.as_bytes()).to_byte_array()
     }
 
     #[must_use]
@@ -75,6 +81,11 @@ impl UtxoFilter {
     pub const fn source_hash(mut self, hash: [u8; 32]) -> Self {
         self.source_hash = Some(hash);
         self
+    }
+
+    #[must_use]
+    pub fn source(self, source: &str) -> Self {
+        self.source_hash(Self::hash_source(source))
     }
 
     #[must_use]

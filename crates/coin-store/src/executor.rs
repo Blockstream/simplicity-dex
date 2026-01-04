@@ -514,9 +514,15 @@ mod tests {
 
     use std::fs;
 
+    use contracts::bytes32_tr_storage::{
+        get_bytes32_tr_compiled_program, taproot_spend_info, unspendable_internal_key,
+        BYTES32_TR_STORAGE_SOURCE,
+    };
+    use contracts::sdk::taproot_pubkey_gen::TaprootPubkeyGen;
     use simplicityhl::elements::confidential::{Asset, Nonce, Value};
-
-    use simplicityhl::elements::{AssetId, Script, TxOutWitness};
+    use simplicityhl::elements::{AddressParams, AssetId, Script, TxOutWitness};
+    use simplicityhl::simplicity::bitcoin::key::Parity;
+    use simplicityhl::simplicity::bitcoin::PublicKey;
 
     fn make_explicit_txout(asset_id: AssetId, value: u64) -> TxOut {
         TxOut {
@@ -530,6 +536,26 @@ mod tests {
 
     fn test_asset_id() -> AssetId {
         AssetId::from_slice(&[1; 32]).unwrap()
+    }
+
+    fn make_test_taproot_pubkey_gen(state: [u8; 32]) -> TaprootPubkeyGen {
+        let program = get_bytes32_tr_compiled_program();
+        let cmr = program.commit().cmr();
+        let spend_info = taproot_spend_info(unspendable_internal_key(), state, cmr);
+
+        let address = simplicityhl::elements::Address::p2tr(
+            secp256k1::SECP256K1,
+            spend_info.internal_key(),
+            spend_info.merkle_root(),
+            None,
+            &AddressParams::LIQUID_TESTNET,
+        );
+
+        let seed = vec![42u8; 32];
+        let xonly = simplicityhl::elements::schnorr::XOnlyPublicKey::from(spend_info.internal_key());
+        let pubkey = PublicKey::from(xonly.public_key(Parity::Even));
+
+        TaprootPubkeyGen { seed, pubkey, address }
     }
 
     #[tokio::test]
@@ -735,6 +761,142 @@ mod tests {
         assert_eq!(results.len(), 2);
         assert!(matches!(&results[0], UtxoQueryResult::Found(e, _) if e.len() == 1));
         assert!(matches!(&results[1], UtxoQueryResult::Found(e, _) if e.len() == 1));
+
+        let _ = fs::remove_file(path);
+    }
+
+    #[tokio::test]
+    async fn test_add_contract() {
+        let path = "/tmp/test_coin_store_add_contract.db";
+        let _ = fs::remove_file(path);
+
+        let store = Store::create(path).await.unwrap();
+
+        let tpg1 = make_test_taproot_pubkey_gen([0u8; 32]);
+        let tpg2 = make_test_taproot_pubkey_gen([1u8; 32]);
+        let arguments = simplicityhl::Arguments::default();
+
+        let result = store
+            .add_contract(BYTES32_TR_STORAGE_SOURCE, arguments.clone(), tpg1)
+            .await;
+        assert!(result.is_ok());
+
+        let result = store
+            .add_contract(BYTES32_TR_STORAGE_SOURCE, arguments, tpg2)
+            .await;
+        assert!(result.is_ok());
+
+        let _ = fs::remove_file(path);
+    }
+
+    #[tokio::test]
+    async fn test_query_by_cmr() {
+        let path = "/tmp/test_coin_store_query_cmr.db";
+        let _ = fs::remove_file(path);
+
+        let store = Store::create(path).await.unwrap();
+
+        let tpg = make_test_taproot_pubkey_gen([0u8; 32]);
+        let arguments = simplicityhl::Arguments::default();
+        let script_pubkey = tpg.address.script_pubkey();
+
+        store
+            .add_contract(BYTES32_TR_STORAGE_SOURCE, arguments.clone(), tpg)
+            .await
+            .unwrap();
+
+        let outpoint = OutPoint::new(Txid::from_byte_array([1; Txid::LEN]), 0);
+        let mut txout = make_explicit_txout(test_asset_id(), 1000);
+        txout.script_pubkey = script_pubkey;
+
+        store.insert(outpoint, txout, None).await.unwrap();
+
+        let program =
+            simplicityhl::CompiledProgram::new(BYTES32_TR_STORAGE_SOURCE, arguments, false).unwrap();
+        let cmr = program.commit().cmr();
+
+        let filter = UtxoFilter::new().cmr(cmr);
+        let results = store.query_utxos(&[filter]).await.unwrap();
+
+        match &results[0] {
+            UtxoQueryResult::Found(entries, _) => {
+                assert_eq!(entries.len(), 1);
+                assert_eq!(entries[0].value(), Some(1000));
+            }
+            _ => panic!("Expected Found result"),
+        }
+
+        let _ = fs::remove_file(path);
+    }
+
+    #[tokio::test]
+    async fn test_query_by_taproot_pubkey_gen() {
+        let path = "/tmp/test_coin_store_query_tpg.db";
+        let _ = fs::remove_file(path);
+
+        let store = Store::create(path).await.unwrap();
+
+        let tpg = make_test_taproot_pubkey_gen([0u8; 32]);
+        let arguments = simplicityhl::Arguments::default();
+        let script_pubkey = tpg.address.script_pubkey();
+
+        store
+            .add_contract(BYTES32_TR_STORAGE_SOURCE, arguments, tpg.clone())
+            .await
+            .unwrap();
+
+        let outpoint = OutPoint::new(Txid::from_byte_array([2; Txid::LEN]), 0);
+        let mut txout = make_explicit_txout(test_asset_id(), 2000);
+        txout.script_pubkey = script_pubkey;
+
+        store.insert(outpoint, txout, None).await.unwrap();
+
+        let filter = UtxoFilter::new().taproot_pubkey_gen(tpg);
+        let results = store.query_utxos(&[filter]).await.unwrap();
+
+        match &results[0] {
+            UtxoQueryResult::Found(entries, _) => {
+                assert_eq!(entries.len(), 1);
+                assert_eq!(entries[0].value(), Some(2000));
+            }
+            _ => panic!("Expected Found result"),
+        }
+
+        let _ = fs::remove_file(path);
+    }
+
+    #[tokio::test]
+    async fn test_query_by_source_hash() {
+        let path = "/tmp/test_coin_store_query_source_hash.db";
+        let _ = fs::remove_file(path);
+
+        let store = Store::create(path).await.unwrap();
+
+        let tpg = make_test_taproot_pubkey_gen([0u8; 32]);
+        let arguments = simplicityhl::Arguments::default();
+        let script_pubkey = tpg.address.script_pubkey();
+
+        store
+            .add_contract(BYTES32_TR_STORAGE_SOURCE, arguments, tpg)
+            .await
+            .unwrap();
+
+        let outpoint = OutPoint::new(Txid::from_byte_array([3; Txid::LEN]), 0);
+        let mut txout = make_explicit_txout(test_asset_id(), 3000);
+        txout.script_pubkey = script_pubkey;
+
+        store.insert(outpoint, txout, None).await.unwrap();
+
+        let filter = UtxoFilter::new().source(BYTES32_TR_STORAGE_SOURCE);
+        let results = store.query_utxos(&[filter]).await.unwrap();
+
+        match &results[0] {
+            UtxoQueryResult::Found(entries, _) => {
+                assert_eq!(entries.len(), 1);
+                assert_eq!(entries[0].value(), Some(3000));
+            }
+            _ => panic!("Expected Found result"),
+        }
 
         let _ = fs::remove_file(path);
     }
