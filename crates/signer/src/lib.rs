@@ -99,4 +99,24 @@ impl Signer {
 
         Ok(self.keypair.sign_schnorr(sighash_all))
     }
+
+    /// Sign a contract transaction input.
+    /// This is used for Simplicity contracts that require a user signature (e.g., swap withdraw).
+    #[allow(clippy::too_many_arguments)]
+    pub fn sign_contract(
+        &self,
+        tx: &Transaction,
+        program: &simplicityhl::CompiledProgram,
+        x_only_pubkey: &XOnlyPublicKey,
+        utxos: &[TxOut],
+        input_index: usize,
+        params: &'static AddressParams,
+        genesis_hash: BlockHash,
+    ) -> Result<Signature, SignerError> {
+        let env = get_and_verify_env(tx, program, x_only_pubkey, utxos, params, genesis_hash, input_index)?;
+
+        let sighash_all = Message::from_digest(env.c_tx_env().sighash_all().to_byte_array());
+
+        Ok(self.keypair.sign_schnorr(sighash_all))
+    }
 }

@@ -1,4 +1,4 @@
-use crate::cli::{Cli, HelperCommand};
+use crate::cli::{Cli, WalletCommand};
 use crate::config::Config;
 use crate::error::Error;
 use crate::wallet::Wallet;
@@ -7,9 +7,9 @@ use coin_store::UtxoStore;
 use simplicityhl::elements::bitcoin::secp256k1;
 
 impl Cli {
-    pub(crate) async fn run_helper(&self, config: Config, command: &HelperCommand) -> Result<(), Error> {
+    pub(crate) async fn run_wallet(&self, config: Config, command: &WalletCommand) -> Result<(), Error> {
         match command {
-            HelperCommand::Init => {
+            WalletCommand::Init => {
                 let seed = self.parse_seed()?;
                 let db_path = config.database_path();
 
@@ -17,16 +17,17 @@ impl Cli {
                 Wallet::create(&seed, &db_path, config.address_params()).await?;
 
                 println!("Wallet initialized at {}", db_path.display());
+
                 Ok(())
             }
-            HelperCommand::Address => {
+            WalletCommand::Address => {
                 let wallet = self.get_wallet(&config).await?;
 
                 wallet.signer().print_details()?;
 
                 Ok(())
             }
-            HelperCommand::Balance => {
+            WalletCommand::Balance => {
                 let wallet = self.get_wallet(&config).await?;
 
                 let filter = coin_store::UtxoFilter::new()
@@ -55,7 +56,7 @@ impl Cli {
                 }
                 Ok(())
             }
-            HelperCommand::Utxos => {
+            WalletCommand::Utxos => {
                 let wallet = self.get_wallet(&config).await?;
 
                 let filter = coin_store::UtxoFilter::new();
@@ -83,7 +84,7 @@ impl Cli {
                 }
                 Ok(())
             }
-            HelperCommand::Import { outpoint, blinding_key } => {
+            WalletCommand::Import { outpoint, blinding_key } => {
                 let wallet = self.get_wallet(&config).await?;
 
                 let txout = cli_helper::explorer::fetch_utxo(*outpoint).await?;
@@ -105,7 +106,7 @@ impl Cli {
 
                 Ok(())
             }
-            HelperCommand::Spend { outpoint } => {
+            WalletCommand::Spend { outpoint } => {
                 let wallet = self.get_wallet(&config).await?;
 
                 wallet.store().mark_as_spent(*outpoint).await?;

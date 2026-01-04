@@ -1,4 +1,4 @@
-use crate::config::RelayConfig;
+use crate::config::NostrRelayConfig;
 use crate::error::{ParseError, RelayError};
 use crate::events::{ActionCompletedEvent, OptionCreatedEvent, SwapCreatedEvent};
 
@@ -18,7 +18,7 @@ pub struct PublishingClient {
 
 impl PublishingClient {
     #[instrument(skip_all, level = "debug", err)]
-    pub async fn connect(config: RelayConfig, signer: impl IntoNostrSigner) -> Result<Self, RelayError> {
+    pub async fn connect(config: NostrRelayConfig, signer: impl IntoNostrSigner) -> Result<Self, RelayError> {
         let reader = ReadOnlyClient::connect(config).await?;
 
         reader.set_signer(signer).await;
@@ -128,7 +128,7 @@ impl PublishingClient {
     }
 
     #[must_use]
-    pub const fn config(&self) -> &RelayConfig {
+    pub const fn config(&self) -> &NostrRelayConfig {
         self.reader.config()
     }
 

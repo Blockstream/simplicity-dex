@@ -101,13 +101,7 @@ mod tests {
     fn get_mocked_data() -> anyhow::Result<(SwapWithChangeArguments, TaprootPubkeyGen)> {
         let settlement_asset_id = AssetId::from_slice(&hex::decode(LIQUID_TESTNET_TEST_ASSET_ID_STR)?)?;
 
-        let args = SwapWithChangeArguments {
-            collateral_asset_id: LIQUID_TESTNET_BITCOIN_ASSET.into_inner().0,
-            settlement_asset_id: settlement_asset_id.into_inner().0,
-            collateral_per_contract: 1000,
-            expiry_time: 50,
-            user_pubkey: [1; 32],
-        };
+        let args = SwapWithChangeArguments::new(*LIQUID_TESTNET_BITCOIN_ASSET, settlement_asset_id, 1000, 50, [1; 32]);
 
         let taproot_pubkey_gen =
             TaprootPubkeyGen::from(&args, &AddressParams::LIQUID_TESTNET, &get_swap_with_change_address)?;

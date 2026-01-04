@@ -37,6 +37,12 @@ tracing = { workspace = true }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 serde = { version = "1", features = ["derive"] }
+bincode = "2"
 toml = { version =  "0.8" }
 hex = { version =  "0.4" }
 dotenvy = { version =  "0.15" }
+
+nostr = "0.44.2"
+nostr-sdk = "0.44.1"
+
+minreq = { version = "2.14", features = ["https", "json-using-serde"] }

@@ -1,17 +1,26 @@
-mod basic;
+mod browse;
 mod commands;
-mod helper;
+mod interactive;
+mod option;
+mod positions;
+mod swap;
+mod sync;
+mod tx;
+mod wallet;
 
-use std::path::PathBuf;
-
-use clap::Parser;
+use crate::error::Error;
 
 use crate::config::{Config, default_config_path};
-use crate::error::Error;
-pub use commands::{BasicCommand, Command, HelperCommand};
+use crate::wallet::Wallet;
+
+use clap::Parser;
+use nostr::SecretKey;
+use options_relay::{PublishingClient, ReadOnlyClient};
+use std::path::PathBuf;
+
 use signer::Signer;
 
-use crate::wallet::Wallet;
+pub use commands::{Command, OptionCommand, SwapCommand, SyncCommand, TxCommand, WalletCommand};
 
 #[derive(Debug, Parser)]
 #[command(name = "simplicity-dex")]
@@ -27,6 +36,10 @@ pub struct Cli {
     pub command: Command,
 }
 
+/// TBD: delete. Needed for testing.
+/// keccak256(seed)
+const DEFAULT_SEED: &str = "66a80b61b29ec044d14c4c8c613e762ba1fb8eeb0c454d1ee00ed6dedaa5b5c5";
+
 impl Cli {
     #[must_use]
     pub fn load_config(&self) -> Config {
@@ -34,10 +47,7 @@ impl Cli {
     }
 
     fn parse_seed(&self) -> Result<[u8; Signer::SEED_LEN], Error> {
-        let seed_hex = self
-            .seed
-            .as_ref()
-            .ok_or_else(|| Error::Config("Seed is required. Use --seed or SIMPLICITY_DEX_SEED".to_string()))?;
+        let seed_hex = self.seed.as_deref().unwrap_or(DEFAULT_SEED);
 
         let bytes = hex::decode(seed_hex)?;
 
@@ -57,14 +67,38 @@ impl Cli {
         Wallet::open(&seed, &db_path, config.address_params()).await
     }
 
+    async fn get_read_only_client(&self, config: &Config) -> Result<ReadOnlyClient, Error> {
+        let relay_config = config.relay.get_nostr_relay_config();
+
+        let client = ReadOnlyClient::connect(relay_config).await?;
+
+        Ok(client)
+    }
+
+    async fn get_publishing_client(&self, config: &Config) -> Result<PublishingClient, Error> {
+        let seed = self.parse_seed()?;
+        let relay_config = config.relay.get_nostr_relay_config();
+
+        let secret_key =
+            SecretKey::from_slice(&seed).map_err(|e| Error::Config(format!("Invalid seed for NOSTR key: {e}")))?;
+        let keys = nostr::Keys::new(secret_key);
+
+        let client = PublishingClient::connect(relay_config, keys).await?;
+
+        Ok(client)
+    }
+
     pub async fn run(&self) -> Result<(), Error> {
         let config = self.load_config();
 
         match &self.command {
-            Command::Basic { command } => self.run_basic(config, command).await,
-            Command::Maker { .. } => todo!(),
-            Command::Taker { .. } => todo!(),
-            Command::Helper { command } => self.run_helper(config, command).await,
+            Command::Wallet { command } => self.run_wallet(config, command).await,
+            Command::Tx { command } => self.run_tx(config, command).await,
+            Command::Option { command } => Box::pin(self.run_option(config, command)).await,
+            Command::Swap { command } => Box::pin(self.run_swap(config, command)).await,
+            Command::Browse => self.run_browse(config).await,
+            Command::Positions => self.run_positions(config).await,
+            Command::Sync { command } => self.run_sync(config, command).await,
             Command::Config => {
                 println!("{config:#?}");
                 Ok(())
