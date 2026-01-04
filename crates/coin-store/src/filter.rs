@@ -7,7 +7,6 @@ use simplicityhl::{
 #[derive(Clone, Default)]
 pub struct UtxoFilter {
     pub asset_id: Option<AssetId>,
-    pub token_id: Option<AssetId>,
     pub script_pubkey: Option<Script>,
     pub required_value: Option<u64>,
     pub limit: Option<i64>,
@@ -27,12 +26,6 @@ impl UtxoFilter {
     #[must_use]
     pub const fn asset_id(mut self, id: AssetId) -> Self {
         self.asset_id = Some(id);
-        self
-    }
-
-    #[must_use]
-    pub const fn token_id(mut self, id: AssetId) -> Self {
-        self.token_id = Some(id);
         self
     }
 
@@ -87,5 +80,10 @@ impl UtxoFilter {
     #[must_use]
     pub(crate) const fn is_contract_join(&self) -> bool {
         self.cmr.is_some() || self.taproot_pubkey_gen.is_some() || self.source.is_some()
+    }
+
+    #[must_use]
+    pub(crate) const fn is_entropy_join(&self) -> bool {
+        self.include_entropy
     }
 }

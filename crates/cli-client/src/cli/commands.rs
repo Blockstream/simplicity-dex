@@ -88,6 +88,13 @@ pub enum HelperCommand {
         #[arg(long, short = 'b')]
         blinding_key: Option<String>,
     },
+
+    /// Mark a specific output as spent
+    Spend {
+        /// Outpoint to mark as spent (txid:vout)
+        #[arg(long, short = 'o')]
+        outpoint: OutPoint,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -121,6 +128,22 @@ pub enum BasicCommand {
         broadcast: bool,
     },
 
+    /// Merge multiple UTXOs of the same asset into one
+    Merge {
+        /// Asset ID to merge (defaults to native LBTC if not specified)
+        #[arg(long)]
+        asset_id: Option<AssetId>,
+        /// Number of UTXOs to merge
+        #[arg(long)]
+        count: usize,
+        /// Fee amount in satoshis
+        #[arg(long)]
+        fee: u64,
+        /// Broadcast transaction
+        #[arg(long)]
+        broadcast: bool,
+    },
+
     /// Transfer an asset to a recipient
     TransferAsset {
         /// Asset id
@@ -142,9 +165,6 @@ pub enum BasicCommand {
 
     /// Issue a new asset
     IssueAsset {
-        /// Asset id
-        #[arg(long)]
-        asset_id: AssetId,
         /// Amount to issue
         #[arg(long)]
         amount: u64,
@@ -156,9 +176,9 @@ pub enum BasicCommand {
         broadcast: bool,
     },
 
-    /// Reissue an existing asset
+    /// Reissue an existing asset using reissuance token
     ReissueAsset {
-        /// Asset id
+        /// Asset ID to reissue
         #[arg(long)]
         asset_id: AssetId,
         /// Amount to reissue

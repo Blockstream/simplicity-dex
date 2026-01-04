@@ -9,7 +9,8 @@ use futures::future::try_join_all;
 use contracts::sdk::taproot_pubkey_gen::TaprootPubkeyGen;
 
 use simplicityhl::elements::encode;
-use simplicityhl::elements::hashes::Hash;
+use simplicityhl::elements::hashes::{Hash, sha256};
+use simplicityhl::elements::hex::ToHex;
 use simplicityhl::elements::issuance::{AssetId as IssuanceAssetId, ContractHash};
 use simplicityhl::elements::secp256k1_zkp::{self as secp256k1, Keypair, SecretKey, ZERO_TWEAK};
 use simplicityhl::elements::{AssetId, OutPoint, Transaction, TxOut, TxOutWitness, Txid};
@@ -19,23 +20,25 @@ use sqlx::{QueryBuilder, Sqlite};
 
 #[async_trait::async_trait]
 pub trait UtxoStore {
+    type Error: std::error::Error;
+
     async fn insert(
         &self,
         outpoint: OutPoint,
         txout: TxOut,
         blinder_key: Option<[u8; crate::store::BLINDING_KEY_LEN]>,
-    ) -> Result<(), StoreError>;
+    ) -> Result<(), Self::Error>;
 
-    async fn mark_as_spent(&self, prev_outpoint: OutPoint) -> Result<(), StoreError>;
+    async fn mark_as_spent(&self, prev_outpoint: OutPoint) -> Result<(), Self::Error>;
 
-    async fn query_utxos(&self, filters: &[UtxoFilter]) -> Result<Vec<UtxoQueryResult>, StoreError>;
+    async fn query_utxos(&self, filters: &[UtxoFilter]) -> Result<Vec<UtxoQueryResult>, Self::Error>;
 
     async fn add_contract(
         &self,
         source: &str,
         arguments: Arguments,
         taproot_pubkey_gen: TaprootPubkeyGen,
-    ) -> Result<(), StoreError>;
+    ) -> Result<(), Self::Error>;
 
     /// Process a transaction by inserting its outputs and marking inputs as spent.
     ///
@@ -49,17 +52,19 @@ pub trait UtxoStore {
         &self,
         tx: &Transaction,
         out_blinder_keys: HashMap<usize, Keypair>,
-    ) -> Result<(), StoreError>;
+    ) -> Result<(), Self::Error>;
 }
 
 #[async_trait::async_trait]
 impl UtxoStore for Store {
+    type Error = StoreError;
+
     async fn insert(
         &self,
         outpoint: OutPoint,
         txout: TxOut,
         blinder_key: Option<[u8; crate::store::BLINDING_KEY_LEN]>,
-    ) -> Result<(), StoreError> {
+    ) -> Result<(), Self::Error> {
         let txid: &[u8] = outpoint.txid.as_ref();
         let vout = i64::from(outpoint.vout);
 
@@ -74,7 +79,7 @@ impl UtxoStore for Store {
         self.internal_utxo_insert(tx, outpoint, txout, blinder_key).await
     }
 
-    async fn mark_as_spent(&self, prev_outpoint: OutPoint) -> Result<(), StoreError> {
+    async fn mark_as_spent(&self, prev_outpoint: OutPoint) -> Result<(), Self::Error> {
         let prev_txid: &[u8] = prev_outpoint.txid.as_ref();
         let prev_vout = i64::from(prev_outpoint.vout);
 
@@ -97,7 +102,7 @@ impl UtxoStore for Store {
         Ok(())
     }
 
-    async fn query_utxos(&self, filters: &[UtxoFilter]) -> Result<Vec<UtxoQueryResult>, StoreError> {
+    async fn query_utxos(&self, filters: &[UtxoFilter]) -> Result<Vec<UtxoQueryResult>, Self::Error> {
         let futures: Vec<_> = filters.iter().map(|f| self.query_all_filter_utxos(f)).collect();
 
         try_join_all(futures).await
@@ -108,7 +113,7 @@ impl UtxoStore for Store {
         source: &str,
         arguments: Arguments,
         taproot_pubkey_gen: TaprootPubkeyGen,
-    ) -> Result<(), StoreError> {
+    ) -> Result<(), Self::Error> {
         let compiled_program =
             CompiledProgram::new(source, arguments.clone(), false).map_err(StoreError::SimplicityCompilation)?;
         let cmr = compiled_program.commit().cmr();
@@ -136,7 +141,7 @@ impl UtxoStore for Store {
         &self,
         tx: &Transaction,
         out_blinder_keys: HashMap<usize, Keypair>,
-    ) -> Result<(), StoreError> {
+    ) -> Result<(), Self::Error> {
         let txid = tx.txid();
         let mut db_tx = self.pool.begin().await?;
 
@@ -154,21 +159,24 @@ impl UtxoStore for Store {
                 let contract_hash = ContractHash::from_byte_array(input.asset_issuance.asset_entropy);
                 let entropy = IssuanceAssetId::generate_asset_entropy(input.previous_output, contract_hash);
                 let asset_id = IssuanceAssetId::from_entropy(entropy);
-                let token_id = IssuanceAssetId::reissuance_token_from_entropy(
-                    entropy,
-                    input.asset_issuance.inflation_keys.is_confidential(),
-                );
+                let is_confidential = input.asset_issuance.amount.is_confidential();
 
-                sqlx::query("INSERT OR IGNORE INTO asset_entropy (asset_id, token_id, entropy) VALUES (?, ?, ?)")
-                    .bind(&asset_id.into_inner().to_byte_array()[..])
-                    .bind(&token_id.into_inner().to_byte_array()[..])
-                    .bind(&entropy.to_byte_array()[..])
-                    .execute(&mut *db_tx)
-                    .await?;
+                sqlx::query(
+                    "INSERT OR IGNORE INTO asset_entropy (asset_id, issuance_is_confidential, entropy) VALUES (?, ?, ?)",
+                )
+                .bind(asset_id.to_hex())
+                .bind(is_confidential)
+                .bind(entropy.as_ref())
+                .execute(&mut *db_tx)
+                .await?;
             }
         }
 
         for (vout, txout) in tx.output.iter().enumerate() {
+            if txout.is_fee() {
+                continue;
+            }
+
             #[allow(clippy::cast_possible_truncation)]
             let outpoint = OutPoint::new(txid, vout as u32);
             let blinder_key = out_blinder_keys.get(&vout);
@@ -188,7 +196,6 @@ impl UtxoStore for Store {
                         match e {
                             StoreError::MissingBlinderKey(_) | StoreError::Unblind(_) => {
                                 // Skip this output - blinding key was optional
-                                continue;
                             }
                             _ => return Err(e),
                         }
@@ -198,7 +205,7 @@ impl UtxoStore for Store {
         }
 
         db_tx.commit().await?;
-        
+
         Ok(())
     }
 }
@@ -262,7 +269,7 @@ impl Store {
         .bind(txid)
         .bind(vout)
         .bind(txout.script_pubkey.as_bytes())
-        .bind(asset_id.into_inner().0.as_slice())
+        .bind(asset_id.to_hex())
         .bind(value)
         .bind(encode::serialize(&txout))
         .bind(encode::serialize(&txout.witness))
@@ -306,24 +313,36 @@ impl Store {
     ) -> Result<(Vec<UtxoRow>, ContractContext), StoreError> {
         let needs_contract_join = filter.is_contract_join();
 
-        let mut builder: QueryBuilder<Sqlite> = if needs_contract_join {
-            QueryBuilder::new(
-                "SELECT u.txid, u.vout, u.serialized, u.serialized_witness, u.is_confidential, u.value,
-                        b.blinding_key, c.source, c.arguments
-                 FROM utxos u
-                 LEFT JOIN blinder_keys b ON u.txid = b.txid AND u.vout = b.vout
-                 INNER JOIN simplicity_contracts c ON u.script_pubkey = c.script_pubkey
-                 WHERE 1=1",
-            )
+        let mut builder: QueryBuilder<Sqlite> = QueryBuilder::new(
+            "SELECT u.txid, u.vout, u.serialized, u.serialized_witness, u.is_confidential, u.value, b.blinding_key",
+        );
+
+        if needs_contract_join {
+            builder.push(", c.source, c.arguments");
         } else {
-            QueryBuilder::new(
-                "SELECT u.txid, u.vout, u.serialized, u.serialized_witness, u.is_confidential, u.value,
-                        b.blinding_key, NULL as source, NULL as arguments
-                 FROM utxos u
-                 LEFT JOIN blinder_keys b ON u.txid = b.txid AND u.vout = b.vout
-                 WHERE 1=1",
-            )
-        };
+            builder.push(", NULL as source, NULL as arguments");
+        }
+
+        if filter.include_entropy {
+            builder.push(", ae.entropy, ae.issuance_is_confidential");
+        } else {
+            builder.push(", NULL as entropy, NULL as issuance_is_confidential");
+        }
+
+        builder.push(
+            " FROM utxos u
+             LEFT JOIN blinder_keys b ON u.txid = b.txid AND u.vout = b.vout",
+        );
+
+        if needs_contract_join {
+            builder.push(" INNER JOIN simplicity_contracts c ON u.script_pubkey = c.script_pubkey");
+        }
+
+        if filter.is_entropy_join() {
+            builder.push(" LEFT JOIN asset_entropy ae ON u.asset_id = ae.asset_id");
+        }
+
+        builder.push(" WHERE 1=1");
 
         if !filter.include_spent {
             builder.push(" AND u.is_spent = 0");
@@ -331,7 +350,7 @@ impl Store {
 
         if let Some(ref asset_id) = filter.asset_id {
             builder.push(" AND u.asset_id = ");
-            builder.push_bind(asset_id.into_inner().0.to_vec());
+            builder.push_bind(asset_id.to_hex());
         }
 
         if let Some(ref script) = filter.script_pubkey {
@@ -411,11 +430,21 @@ pub struct UtxoRow {
     blinding_key: Option<Vec<u8>>,
     pub source: Option<Vec<u8>>,
     pub arguments: Option<Vec<u8>>,
+    pub entropy: Option<Vec<u8>>,
+    pub issuance_is_confidential: Option<i64>,
 }
 
 impl UtxoRow {
     fn into_entry(self, context: &ContractContext) -> Result<UtxoEntry, StoreError> {
         let contract = context.get_program_from_row(&self)?;
+
+        let entropy: Option<sha256::Midstate> = self
+            .entropy
+            .as_ref()
+            .map(|e| sha256::Midstate::from_slice(e))
+            .transpose()?;
+
+        let issuance_is_confidential: Option<bool> = self.issuance_is_confidential.map(|v| v != 0);
 
         let txid_array: [u8; Txid::LEN] = self
             .txid
@@ -427,13 +456,16 @@ impl UtxoRow {
         let mut txout: TxOut = encode::deserialize(&self.serialized)?;
 
         if self.is_confidential != 1 {
-            let entry = UtxoEntry::new_explicit(outpoint, txout);
+            let mut entry = UtxoEntry::new_explicit(outpoint, txout);
 
-            return Ok(if let Some(c) = contract {
-                entry.with_contract(Arc::clone(c))
-            } else {
-                entry
-            });
+            if let Some(c) = contract {
+                entry = entry.with_contract(Arc::clone(c));
+            }
+            if let Some((e, c)) = entropy.zip(issuance_is_confidential) {
+                entry = entry.with_issuance(e, c);
+            }
+
+            return Ok(entry);
         }
 
         let key_bytes: [u8; crate::store::BLINDING_KEY_LEN] = self
@@ -453,13 +485,16 @@ impl UtxoRow {
         let secret_key = SecretKey::from_slice(&key_bytes)?;
         let secrets = txout.unblind(secp256k1::SECP256K1, secret_key)?;
 
-        let entry = UtxoEntry::new_confidential(outpoint, txout, secrets);
+        let mut entry = UtxoEntry::new_confidential(outpoint, txout, secrets);
 
-        Ok(if let Some(c) = contract {
-            entry.with_contract(Arc::clone(c))
-        } else {
-            entry
-        })
+        if let Some(c) = contract {
+            entry = entry.with_contract(Arc::clone(c));
+        }
+        if let Some((e, c)) = entropy.zip(issuance_is_confidential) {
+            entry = entry.with_issuance(e, c);
+        }
+
+        Ok(entry)
     }
 }
 

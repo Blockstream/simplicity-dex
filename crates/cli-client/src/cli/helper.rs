@@ -38,7 +38,11 @@ impl Cli {
 
                 if let Some(coin_store::UtxoQueryResult::Found(entries, _)) = results.into_iter().next() {
                     for entry in entries {
-                        *balances.entry(entry.asset()).or_insert(0) += entry.value();
+                        let (Some(asset), Some(value)) = (entry.asset(), entry.value()) else {
+                            continue;
+                        };
+
+                        *balances.entry(asset).or_insert(0) += value;
                     }
                 }
 
@@ -59,7 +63,18 @@ impl Cli {
 
                 if let Some(coin_store::UtxoQueryResult::Found(entries, _)) = results.into_iter().next() {
                     for entry in &entries {
-                        println!("{} | {} | {}", entry.outpoint(), entry.asset(), entry.value());
+                        let (Some(asset), Some(value)) = (entry.asset(), entry.value()) else {
+                            println!(
+                                "{:<76} | {:<64} | {:<25}",
+                                entry.outpoint(),
+                                "Confidential",
+                                "Confidential"
+                            );
+
+                            continue;
+                        };
+
+                        println!("{:<76} | {:<64} | {:<25}", entry.outpoint(), asset, value);
                     }
 
                     println!("Total: {} UTXOs", entries.len());
@@ -87,6 +102,15 @@ impl Cli {
                 wallet.store().insert(*outpoint, txout, blinder).await?;
 
                 println!("Imported {outpoint}");
+
+                Ok(())
+            }
+            HelperCommand::Spend { outpoint } => {
+                let wallet = self.get_wallet(&config).await?;
+
+                wallet.store().mark_as_spent(*outpoint).await?;
+
+                println!("Marked {outpoint} as spent");
 
                 Ok(())
             }
