@@ -1,5 +1,5 @@
 use contracts::sdk::taproot_pubkey_gen::TaprootPubkeyGen;
-use simplicityhl::elements::hashes::{sha256, Hash};
+use simplicityhl::elements::hashes::{Hash, sha256};
 use simplicityhl::{
     elements::{AssetId, Script},
     simplicity::Cmr,

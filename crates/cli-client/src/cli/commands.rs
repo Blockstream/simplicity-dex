@@ -99,12 +99,15 @@ pub enum HelperCommand {
 
 #[derive(Debug, Subcommand)]
 pub enum BasicCommand {
-    /// Transfer LBTC to a recipient
-    TransferNative {
+    /// Transfer an asset to a recipient
+    Transfer {
+        /// Asset ID (defaults to native LBTC if not specified)
+        #[arg(long)]
+        asset_id: Option<AssetId>,
         /// Recipient address
         #[arg(long)]
         to: Address,
-        /// Amount to send in satoshis
+        /// Amount to send
         #[arg(long)]
         amount: u64,
         /// Fee amount in satoshis
@@ -136,25 +139,6 @@ pub enum BasicCommand {
         /// Number of UTXOs to merge
         #[arg(long)]
         count: usize,
-        /// Fee amount in satoshis
-        #[arg(long)]
-        fee: u64,
-        /// Broadcast transaction
-        #[arg(long)]
-        broadcast: bool,
-    },
-
-    /// Transfer an asset to a recipient
-    TransferAsset {
-        /// Asset id
-        #[arg(long)]
-        asset_id: AssetId,
-        /// Recipient address
-        #[arg(long)]
-        to: Address,
-        /// Amount to send
-        #[arg(long)]
-        amount: u64,
         /// Fee amount in satoshis
         #[arg(long)]
         fee: u64,

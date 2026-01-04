@@ -34,9 +34,11 @@ impl Cli {
                     .next()
                     .and_then(|r| match r {
                         coin_store::UtxoQueryResult::Found(entries, _) => entries.into_iter().next(),
-                        coin_store::UtxoQueryResult::InsufficientValue(_, _) | coin_store::UtxoQueryResult::Empty => {
+                        coin_store::UtxoQueryResult::InsufficientValue(_, _) => {
+                            eprintln!("No single UTXO large enough. Try using 'merge' command first.");
                             None
                         }
+                        coin_store::UtxoQueryResult::Empty => None,
                     })
                     .ok_or_else(|| Error::Config("No native UTXO found".to_string()))?;
 
@@ -105,9 +107,11 @@ impl Cli {
                     .next()
                     .and_then(|r| match r {
                         coin_store::UtxoQueryResult::Found(entries, _) => Some(entries),
-                        coin_store::UtxoQueryResult::InsufficientValue(_, _) | coin_store::UtxoQueryResult::Empty => {
-                            None
+                        coin_store::UtxoQueryResult::InsufficientValue(entries, _) => {
+                            eprintln!("Only found {} UTXOs for merge.", entries.len());
+                            Some(entries)
                         }
+                        coin_store::UtxoQueryResult::Empty => None,
                     })
                     .ok_or_else(|| Error::Config(format!("No UTXOs found for asset {target_asset}")))?;
 
@@ -163,7 +167,14 @@ impl Cli {
                         .next()
                         .and_then(|r| match r {
                             coin_store::UtxoQueryResult::Found(entries, _) => entries.into_iter().next(),
-                            _ => None,
+                            coin_store::UtxoQueryResult::InsufficientValue(entries, _) => {
+                                let available: u64 = entries.iter().filter_map(coin_store::UtxoEntry::value).sum();
+                                eprintln!(
+                                    "Insufficient LBTC for fee: have {available} sats, need {fee} sats. Try using 'merge' command first."
+                                );
+                                None
+                            }
+                            coin_store::UtxoQueryResult::Empty => None,
                         })
                         .ok_or_else(|| Error::Config(format!("No LBTC UTXO found to pay fee of {fee} sats")))?;
 
@@ -234,22 +245,171 @@ impl Cli {
                     }
                 }
             }
-            BasicCommand::TransferNative {
-                to: _,
-                amount: _,
-                fee: _,
-                broadcast: _,
+            BasicCommand::Transfer {
+                asset_id,
+                to,
+                amount,
+                fee,
+                broadcast,
             } => {
-                todo!()
-            }
-            BasicCommand::TransferAsset {
-                asset_id: _,
-                to: _,
-                amount: _,
-                fee: _,
-                broadcast: _,
-            } => {
-                todo!()
+                let wallet = self.get_wallet(&config).await?;
+                let script_pubkey = wallet.signer().p2pk_address(config.address_params())?.script_pubkey();
+
+                let target_asset = asset_id.unwrap_or(*LIQUID_TESTNET_BITCOIN_ASSET);
+                let is_native = target_asset == *LIQUID_TESTNET_BITCOIN_ASSET;
+
+                let required_amount = if is_native { *amount + *fee } else { *amount };
+
+                let asset_filter = coin_store::UtxoFilter::new()
+                    .asset_id(target_asset)
+                    .script_pubkey(script_pubkey.clone())
+                    .required_value(required_amount);
+
+                let results: Vec<coin_store::UtxoQueryResult> =
+                    <_ as UtxoStore>::query_utxos(wallet.store(), &[asset_filter]).await?;
+
+                let entries: Vec<_> = results
+                    .into_iter()
+                    .next()
+                    .and_then(|r| match r {
+                        coin_store::UtxoQueryResult::Found(entries, _) => Some(entries),
+                        coin_store::UtxoQueryResult::InsufficientValue(entries, _) => {
+                            let available: u64 = entries.iter().filter_map(coin_store::UtxoEntry::value).sum();
+                            eprintln!(
+                                "Insufficient funds: have {available} sats, need {required_amount} sats. Try using 'merge' command first."
+                            );
+                            None
+                        }
+                        coin_store::UtxoQueryResult::Empty => None,
+                    })
+                    .ok_or_else(|| Error::Config(format!("No UTXOs found for asset {target_asset}")))?;
+
+                let total_asset_value: u64 = entries.iter().filter_map(coin_store::UtxoEntry::value).sum();
+                let mut pst = PartiallySignedTransaction::new_v2();
+
+                let mut utxos: Vec<TxOut> = entries
+                    .iter()
+                    .map(|e| {
+                        let mut input = Input::from_prevout(*e.outpoint());
+                        input.witness_utxo = Some(e.txout().clone());
+                        pst.add_input(input);
+                        e.txout().clone()
+                    })
+                    .collect();
+
+                if is_native {
+                    pst.add_output(Output::new_explicit(
+                        to.script_pubkey(),
+                        *amount,
+                        *LIQUID_TESTNET_BITCOIN_ASSET,
+                        None,
+                    ));
+
+                    let change = total_asset_value
+                        .checked_sub(*amount + *fee)
+                        .ok_or_else(|| Error::Config("Fee + amount exceeds total UTXO value".to_string()))?;
+
+                    if change > 0 {
+                        pst.add_output(Output::new_explicit(
+                            script_pubkey,
+                            change,
+                            *LIQUID_TESTNET_BITCOIN_ASSET,
+                            None,
+                        ));
+                    }
+
+                    println!("Transferring {amount} sats LBTC to {to}");
+                } else {
+                    let fee_filter = coin_store::UtxoFilter::new()
+                        .asset_id(*LIQUID_TESTNET_BITCOIN_ASSET)
+                        .script_pubkey(script_pubkey.clone())
+                        .required_value(*fee);
+
+                    let fee_results: Vec<coin_store::UtxoQueryResult> =
+                        <_ as UtxoStore>::query_utxos(wallet.store(), &[fee_filter]).await?;
+
+                    let fee_entry = fee_results
+                        .into_iter()
+                        .next()
+                        .and_then(|r| match r {
+                            coin_store::UtxoQueryResult::Found(entries, _) => entries.into_iter().next(),
+                            coin_store::UtxoQueryResult::InsufficientValue(entries, _) => {
+                                let available: u64 = entries.iter().filter_map(coin_store::UtxoEntry::value).sum();
+                                eprintln!(
+                                    "Insufficient LBTC for fee: have {available} sats, need {fee} sats. Try using 'merge' command first."
+                                );
+                                None
+                            }
+                            coin_store::UtxoQueryResult::Empty => None,
+                        })
+                        .ok_or_else(|| Error::Config(format!("No LBTC UTXO found to pay fee of {fee} sats")))?;
+
+                    let Some(fee_input_value) = fee_entry.value() else {
+                        return Err(Error::Config("Unexpected confidential value".to_string()));
+                    };
+
+                    let mut fee_input = Input::from_prevout(*fee_entry.outpoint());
+                    fee_input.witness_utxo = Some(fee_entry.txout().clone());
+                    pst.add_input(fee_input);
+                    utxos.push(fee_entry.txout().clone());
+
+                    pst.add_output(Output::new_explicit(to.script_pubkey(), *amount, target_asset, None));
+
+                    let asset_change = total_asset_value - *amount;
+                    if asset_change > 0 {
+                        pst.add_output(Output::new_explicit(
+                            script_pubkey.clone(),
+                            asset_change,
+                            target_asset,
+                            None,
+                        ));
+                    }
+
+                    if fee_input_value > *fee {
+                        pst.add_output(Output::new_explicit(
+                            script_pubkey,
+                            fee_input_value - *fee,
+                            *LIQUID_TESTNET_BITCOIN_ASSET,
+                            None,
+                        ));
+                    }
+
+                    println!("Transferring {amount} units of asset {target_asset} to {to}");
+                }
+
+                pst.add_output(Output::from_txout(TxOut::new_fee(*fee, *LIQUID_TESTNET_BITCOIN_ASSET)));
+
+                let mut tx = pst.extract_tx()?;
+
+                for (i, _) in utxos.iter().enumerate() {
+                    let signature =
+                        wallet
+                            .signer()
+                            .sign_p2pk(&tx, &utxos, i, config.address_params(), *LIQUID_TESTNET_GENESIS)?;
+
+                    tx = finalize_p2pk_transaction(
+                        tx,
+                        &utxos,
+                        &wallet.signer().public_key(),
+                        &signature,
+                        i,
+                        config.address_params(),
+                        *LIQUID_TESTNET_GENESIS,
+                    )?;
+                }
+
+                match broadcast {
+                    false => {
+                        println!("{}", tx.serialize().to_lower_hex_string());
+                    }
+                    true => {
+                        cli_helper::explorer::broadcast_tx(&tx).await?;
+
+                        println!("Broadcasted: {}", tx.txid());
+
+                        wallet.store().insert_transaction(&tx, HashMap::default()).await?;
+                    }
+                }
             }
             BasicCommand::IssueAsset { amount, fee, broadcast } => {
                 let wallet = self.get_wallet(&config).await?;
@@ -267,7 +427,14 @@ impl Cli {
                     .next()
                     .and_then(|r| match r {
                         coin_store::UtxoQueryResult::Found(entries, _) => entries.into_iter().next(),
-                        _ => None,
+                        coin_store::UtxoQueryResult::InsufficientValue(entries, _) => {
+                            let available: u64 = entries.iter().filter_map(coin_store::UtxoEntry::value).sum();
+                            eprintln!(
+                                "Insufficient LBTC for fee: have {available} sats, need {fee} sats. Try using 'merge' command first."
+                            );
+                            None
+                        }
+                        coin_store::UtxoQueryResult::Empty => None,
                     })
                     .ok_or_else(|| Error::Config(format!("No LBTC UTXO found to pay fee of {fee} sats")))?;
 
@@ -345,8 +512,9 @@ impl Cli {
                     .into_iter()
                     .next()
                     .and_then(|r| match r {
-                        coin_store::UtxoQueryResult::Found(entries, _) => entries.into_iter().next(),
-                        _ => None,
+                        coin_store::UtxoQueryResult::Found(entries, _)
+                        | coin_store::UtxoQueryResult::InsufficientValue(entries, _) => entries.into_iter().next(),
+                        coin_store::UtxoQueryResult::Empty => None,
                     })
                     .ok_or_else(|| Error::Config(format!("No UTXO found for asset {asset_id}")))?;
 
@@ -374,19 +542,29 @@ impl Cli {
 
                 let results = <_ as UtxoStore>::query_utxos(wallet.store(), &[token_filter, fee_filter]).await?;
 
-                let UtxoQueryResult::Found(entries, _) = &results[0] else {
-                    return Err(Error::Config(format!("No reissuance token UTXO found for {token_id}")));
+                let token_entry = match &results[0] {
+                    UtxoQueryResult::Found(entries, _) => &entries[0],
+                    UtxoQueryResult::InsufficientValue(entries, _) if !entries.is_empty() => &entries[0],
+                    _ => return Err(Error::Config(format!("No reissuance token UTXO found for {token_id}"))),
                 };
-                let token_entry = &entries[0];
 
                 let token_secrets = token_entry
                     .secrets()
                     .ok_or_else(|| Error::Config("Reissuance token must be confidential".to_string()))?;
 
-                let UtxoQueryResult::Found(entries, _) = &results[1] else {
-                    return Err(Error::Config(format!("No fee UTXO found for {token_id}")));
+                let fee_entry = match &results[1] {
+                    UtxoQueryResult::Found(entries, _) => &entries[0],
+                    UtxoQueryResult::InsufficientValue(entries, _) => {
+                        let available: u64 = entries.iter().filter_map(coin_store::UtxoEntry::value).sum();
+                        eprintln!(
+                            "Insufficient LBTC for fee: have {available} sats, need {fee} sats. Try using 'merge' command first."
+                        );
+                        return Err(Error::Config(format!("No LBTC UTXO found to pay fee of {fee} sats")));
+                    }
+                    UtxoQueryResult::Empty => {
+                        return Err(Error::Config(format!("No LBTC UTXO found to pay fee of {fee} sats")));
+                    }
                 };
-                let fee_entry = &entries[0];
 
                 let token_utxo = (*token_entry.outpoint(), token_entry.txout().clone());
                 let fee_utxo = (*fee_entry.outpoint(), fee_entry.txout().clone());

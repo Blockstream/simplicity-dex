@@ -515,14 +515,13 @@ mod tests {
     use std::fs;
 
     use contracts::bytes32_tr_storage::{
-        get_bytes32_tr_compiled_program, taproot_spend_info, unspendable_internal_key,
-        BYTES32_TR_STORAGE_SOURCE,
+        BYTES32_TR_STORAGE_SOURCE, get_bytes32_tr_compiled_program, taproot_spend_info, unspendable_internal_key,
     };
     use contracts::sdk::taproot_pubkey_gen::TaprootPubkeyGen;
     use simplicityhl::elements::confidential::{Asset, Nonce, Value};
     use simplicityhl::elements::{AddressParams, AssetId, Script, TxOutWitness};
-    use simplicityhl::simplicity::bitcoin::key::Parity;
     use simplicityhl::simplicity::bitcoin::PublicKey;
+    use simplicityhl::simplicity::bitcoin::key::Parity;
 
     fn make_explicit_txout(asset_id: AssetId, value: u64) -> TxOut {
         TxOut {
@@ -552,7 +551,7 @@ mod tests {
         );
 
         let seed = vec![42u8; 32];
-        let xonly = simplicityhl::elements::schnorr::XOnlyPublicKey::from(spend_info.internal_key());
+        let xonly = spend_info.internal_key();
         let pubkey = PublicKey::from(xonly.public_key(Parity::Even));
 
         TaprootPubkeyGen { seed, pubkey, address }
@@ -781,9 +780,7 @@ mod tests {
             .await;
         assert!(result.is_ok());
 
-        let result = store
-            .add_contract(BYTES32_TR_STORAGE_SOURCE, arguments, tpg2)
-            .await;
+        let result = store.add_contract(BYTES32_TR_STORAGE_SOURCE, arguments, tpg2).await;
         assert!(result.is_ok());
 
         let _ = fs::remove_file(path);
@@ -811,8 +808,7 @@ mod tests {
 
         store.insert(outpoint, txout, None).await.unwrap();
 
-        let program =
-            simplicityhl::CompiledProgram::new(BYTES32_TR_STORAGE_SOURCE, arguments, false).unwrap();
+        let program = simplicityhl::CompiledProgram::new(BYTES32_TR_STORAGE_SOURCE, arguments, false).unwrap();
         let cmr = program.commit().cmr();
 
         let filter = UtxoFilter::new().cmr(cmr);
