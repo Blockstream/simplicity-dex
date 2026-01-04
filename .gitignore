@@ -22,7 +22,7 @@ Cargo.lock
 # Disable logs that have obtained during run
 /logs
 *.log
-.env
+tmp/.env
 
 # RustRover
 #  JetBrains specific template is maintained in a separate JetBrains.gitignore that can
@@ -47,3 +47,4 @@ logs/*
 /.cache
 taker/
 simplicity-dex
+tmp

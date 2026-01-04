@@ -1,4 +1,4 @@
-use crate::config::RelayConfig;
+use crate::config::NostrRelayConfig;
 use crate::error::{ParseError, RelayError};
 use crate::events::{ActionCompletedEvent, OptionCreatedEvent, SwapCreatedEvent, filters};
 
@@ -11,12 +11,12 @@ use tracing::instrument;
 #[derive(Debug, Clone)]
 pub struct ReadOnlyClient {
     client: Client,
-    config: RelayConfig,
+    config: NostrRelayConfig,
 }
 
 impl ReadOnlyClient {
     #[instrument(skip_all, level = "debug", err)]
-    pub async fn connect(config: RelayConfig) -> Result<Self, RelayError> {
+    pub async fn connect(config: NostrRelayConfig) -> Result<Self, RelayError> {
         tracing::debug!(
             primary = %config.primary_relay(),
             backup_count = config.all_relays().len() - 1,
@@ -94,7 +94,7 @@ impl ReadOnlyClient {
     }
 
     #[must_use]
-    pub const fn config(&self) -> &RelayConfig {
+    pub const fn config(&self) -> &NostrRelayConfig {
         &self.config
     }
 

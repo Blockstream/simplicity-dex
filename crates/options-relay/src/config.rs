@@ -1,14 +1,14 @@
 use std::time::Duration;
 
 #[derive(Debug, Clone)]
-pub struct RelayConfig {
+pub struct NostrRelayConfig {
     primary_relay: String,
     backup_relays: Vec<String>,
     timeout: Duration,
     retry_count: u32,
 }
 
-impl RelayConfig {
+impl NostrRelayConfig {
     pub const DEFAULT_TIMEOUT: Duration = Duration::from_secs(30);
     pub const DEFAULT_RETRY_COUNT: u32 = 3;
 
@@ -75,17 +75,17 @@ mod tests {
 
     #[test]
     fn test_config_new() {
-        let config = RelayConfig::new("wss://relay.example.com");
+        let config = NostrRelayConfig::new("wss://relay.example.com");
 
         assert_eq!(config.primary_relay(), "wss://relay.example.com");
         assert_eq!(config.all_relays().len(), 1);
-        assert_eq!(config.timeout(), RelayConfig::DEFAULT_TIMEOUT);
-        assert_eq!(config.retry_count(), RelayConfig::DEFAULT_RETRY_COUNT);
+        assert_eq!(config.timeout(), NostrRelayConfig::DEFAULT_TIMEOUT);
+        assert_eq!(config.retry_count(), NostrRelayConfig::DEFAULT_RETRY_COUNT);
     }
 
     #[test]
     fn test_config_with_backup_relays() {
-        let config = RelayConfig::new("wss://primary.example.com")
+        let config = NostrRelayConfig::new("wss://primary.example.com")
             .add_backup_relay("wss://backup1.example.com")
             .add_backup_relay("wss://backup2.example.com");
 
@@ -98,7 +98,7 @@ mod tests {
 
     #[test]
     fn test_config_with_custom_settings() {
-        let config = RelayConfig::new("wss://relay.example.com")
+        let config = NostrRelayConfig::new("wss://relay.example.com")
             .with_timeout(Duration::from_secs(60))
             .with_retry_count(5);
 

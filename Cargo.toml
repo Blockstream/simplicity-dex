@@ -19,8 +19,8 @@ anyhow = { version = "1.0.100" }
 
 tracing = { version = "0.1.41" }
 
-contracts = { git = "https://github.com/BlockstreamResearch/simplicity-contracts.git", rev = "b3d1ae9", package = "contracts" }
-cli-helper = { git = "https://github.com/BlockstreamResearch/simplicity-contracts.git", rev = "b3d1ae9", package = "cli" }
-simplicityhl-core = { version = "0.3.1", features = ["encoding"] }
+contracts = { git = "https://github.com/BlockstreamResearch/simplicity-contracts.git", rev = "f277bec", package = "contracts" }
+cli-helper = { git = "https://github.com/BlockstreamResearch/simplicity-contracts.git", rev = "f277bec", package = "cli" }
+simplicityhl-core = { version = "0.3.2", features = ["encoding"] }
 
 simplicityhl = { version = "0.4.0" }

@@ -7,7 +7,7 @@ pub mod error;
 pub mod events;
 
 pub use client::{PublishingClient, ReadOnlyClient};
-pub use config::RelayConfig;
+pub use config::NostrRelayConfig;
 pub use error::{ParseError, RelayError};
 pub use events::{
     ACTION_COMPLETED, ActionCompletedEvent, ActionType, OPTION_CREATED, OptionCreatedEvent, SWAP_CREATED,

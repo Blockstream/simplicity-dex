@@ -29,7 +29,7 @@ pub trait UtxoStore {
         blinder_key: Option<[u8; crate::store::BLINDING_KEY_LEN]>,
     ) -> Result<(), Self::Error>;
 
-    async fn mark_as_spent(&self, prev_outpoint: OutPoint) -> Result<(), Self::Error>;
+    async fn mark_as_spent(&self, prev_outpoint: OutPoint) -> Result<bool, Self::Error>;
 
     async fn query_utxos(&self, filters: &[UtxoFilter]) -> Result<Vec<UtxoQueryResult>, Self::Error>;
 
@@ -38,7 +38,37 @@ pub trait UtxoStore {
         source: &str,
         arguments: Arguments,
         taproot_pubkey_gen: TaprootPubkeyGen,
+        app_metadata: Option<&[u8]>,
     ) -> Result<(), Self::Error>;
+
+    async fn get_contract_metadata(
+        &self,
+        taproot_pubkey_gen: &TaprootPubkeyGen,
+    ) -> Result<Option<Vec<u8>>, Self::Error>;
+
+    async fn update_contract_metadata(
+        &self,
+        taproot_pubkey_gen: &TaprootPubkeyGen,
+        metadata: &[u8],
+    ) -> Result<(), Self::Error>;
+
+    /// Get contract metadata, arguments, and taproot pubkey gen by script pubkey.
+    /// Returns (`app_metadata`, arguments, `taproot_pubkey_gen`).
+    async fn get_contract_by_script_pubkey(
+        &self,
+        script_pubkey: &simplicityhl::elements::Script,
+    ) -> Result<Option<(Vec<u8>, Vec<u8>, String)>, Self::Error>;
+
+    /// List all contracts matching a source.
+    /// Returns a list of (`arguments_bytes`, `taproot_pubkey_gen_string`) tuples.
+    async fn list_contracts_by_source(&self, source: &str) -> Result<Vec<(Vec<u8>, String)>, Self::Error>;
+
+    /// List all contracts matching a source with metadata.
+    /// Returns a list of (`arguments_bytes`, `taproot_pubkey_gen_string`, `app_metadata`) tuples.
+    async fn list_contracts_by_source_with_metadata(
+        &self,
+        source: &str,
+    ) -> Result<Vec<(Vec<u8>, String, Option<Vec<u8>>)>, Self::Error>;
 
     /// Process a transaction by inserting its outputs and marking inputs as spent.
     ///
@@ -53,6 +83,14 @@ pub trait UtxoStore {
         tx: &Transaction,
         out_blinder_keys: HashMap<usize, Keypair>,
     ) -> Result<(), Self::Error>;
+
+    /// List all unspent outpoints in the store.
+    /// Returns a list of (txid, vout) tuples for UTXOs where `is_spent` = 0.
+    async fn list_unspent_outpoints(&self) -> Result<Vec<OutPoint>, Self::Error>;
+
+    /// List all tracked script pubkeys from contracts.
+    /// Returns distinct script pubkeys from the `simplicity_contracts` table.
+    async fn list_tracked_script_pubkeys(&self) -> Result<Vec<simplicityhl::elements::Script>, Self::Error>;
 }
 
 #[async_trait::async_trait]
@@ -79,27 +117,17 @@ impl UtxoStore for Store {
         self.internal_utxo_insert(tx, outpoint, txout, blinder_key).await
     }
 
-    async fn mark_as_spent(&self, prev_outpoint: OutPoint) -> Result<(), Self::Error> {
+    async fn mark_as_spent(&self, prev_outpoint: OutPoint) -> Result<bool, Self::Error> {
         let prev_txid: &[u8] = prev_outpoint.txid.as_ref();
         let prev_vout = i64::from(prev_outpoint.vout);
 
-        let existing: bool = self.does_outpoint_exist(prev_txid, prev_vout).await?;
-
-        if !existing {
-            return Err(StoreError::UtxoNotFound(prev_outpoint));
-        }
-
-        let mut tx = self.pool.begin().await?;
-
-        sqlx::query("UPDATE utxos SET is_spent = 1 WHERE txid = ? AND vout = ?")
+        let result = sqlx::query("UPDATE utxos SET is_spent = 1 WHERE txid = ? AND vout = ?")
             .bind(prev_txid)
             .bind(prev_vout)
-            .execute(&mut *tx)
+            .execute(&self.pool)
             .await?;
 
-        tx.commit().await?;
-
-        Ok(())
+        Ok(result.rows_affected() > 0)
     }
 
     async fn query_utxos(&self, filters: &[UtxoFilter]) -> Result<Vec<UtxoQueryResult>, Self::Error> {
@@ -113,6 +141,7 @@ impl UtxoStore for Store {
         source: &str,
         arguments: Arguments,
         taproot_pubkey_gen: TaprootPubkeyGen,
+        app_metadata: Option<&[u8]>,
     ) -> Result<(), Self::Error> {
         let compiled_program =
             CompiledProgram::new(source, arguments.clone(), false).map_err(StoreError::SimplicityCompilation)?;
@@ -132,18 +161,98 @@ impl UtxoStore for Store {
             .await?;
 
         sqlx::query(
-            "INSERT INTO simplicity_contracts (script_pubkey, taproot_pubkey_gen, cmr, source_hash, arguments)
-             VALUES (?, ?, ?, ?, ?)",
+            "INSERT INTO simplicity_contracts (script_pubkey, taproot_pubkey_gen, cmr, source_hash, arguments, app_metadata)
+             VALUES (?, ?, ?, ?, ?, ?)",
         )
         .bind(script_pubkey.as_bytes())
         .bind(taproot_gen_str)
         .bind(cmr.as_ref())
         .bind(source_hash_bytes)
         .bind(arguments_bytes)
+        .bind(app_metadata)
         .execute(&self.pool)
         .await?;
 
         Ok(())
+    }
+
+    async fn get_contract_metadata(
+        &self,
+        taproot_pubkey_gen: &TaprootPubkeyGen,
+    ) -> Result<Option<Vec<u8>>, Self::Error> {
+        let taproot_gen_str = taproot_pubkey_gen.to_string();
+
+        let result: Option<(Option<Vec<u8>>,)> =
+            sqlx::query_as("SELECT app_metadata FROM simplicity_contracts WHERE taproot_pubkey_gen = ?")
+                .bind(taproot_gen_str)
+                .fetch_optional(&self.pool)
+                .await?;
+
+        Ok(result.and_then(|(metadata,)| metadata))
+    }
+
+    async fn update_contract_metadata(
+        &self,
+        taproot_pubkey_gen: &TaprootPubkeyGen,
+        metadata: &[u8],
+    ) -> Result<(), Self::Error> {
+        let taproot_gen_str = taproot_pubkey_gen.to_string();
+
+        sqlx::query("UPDATE simplicity_contracts SET app_metadata = ? WHERE taproot_pubkey_gen = ?")
+            .bind(metadata)
+            .bind(taproot_gen_str)
+            .execute(&self.pool)
+            .await?;
+
+        Ok(())
+    }
+
+    async fn get_contract_by_script_pubkey(
+        &self,
+        script_pubkey: &simplicityhl::elements::Script,
+    ) -> Result<Option<(Vec<u8>, Vec<u8>, String)>, Self::Error> {
+        let result: Option<(Option<Vec<u8>>, Option<Vec<u8>>, String)> = sqlx::query_as(
+            "SELECT app_metadata, arguments, taproot_pubkey_gen FROM simplicity_contracts WHERE script_pubkey = ?",
+        )
+        .bind(script_pubkey.as_bytes())
+        .fetch_optional(&self.pool)
+        .await?;
+
+        match result {
+            Some((Some(metadata), Some(arguments), tpg)) => Ok(Some((metadata, arguments, tpg))),
+            Some((Some(metadata), None, tpg)) => Ok(Some((metadata, Vec::new(), tpg))),
+            Some((None, _, _)) | None => Ok(None),
+        }
+    }
+
+    async fn list_contracts_by_source(&self, source: &str) -> Result<Vec<(Vec<u8>, String)>, Self::Error> {
+        let source_hash = sha256::Hash::hash(source.as_bytes());
+        let source_hash_bytes: &[u8] = source_hash.as_ref();
+
+        let results: Vec<(Vec<u8>, String)> =
+            sqlx::query_as("SELECT arguments, taproot_pubkey_gen FROM simplicity_contracts WHERE source_hash = ?")
+                .bind(source_hash_bytes)
+                .fetch_all(&self.pool)
+                .await?;
+
+        Ok(results)
+    }
+
+    async fn list_contracts_by_source_with_metadata(
+        &self,
+        source: &str,
+    ) -> Result<Vec<(Vec<u8>, String, Option<Vec<u8>>)>, Self::Error> {
+        let source_hash = sha256::Hash::hash(source.as_bytes());
+        let source_hash_bytes: &[u8] = source_hash.as_ref();
+
+        let results: Vec<(Vec<u8>, String, Option<Vec<u8>>)> = sqlx::query_as(
+            "SELECT arguments, taproot_pubkey_gen, app_metadata FROM simplicity_contracts WHERE source_hash = ?",
+        )
+        .bind(source_hash_bytes)
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(results)
     }
 
     async fn insert_transaction(
@@ -216,6 +325,39 @@ impl UtxoStore for Store {
         db_tx.commit().await?;
 
         Ok(())
+    }
+
+    async fn list_unspent_outpoints(&self) -> Result<Vec<OutPoint>, Self::Error> {
+        let rows: Vec<(Vec<u8>, i64)> = sqlx::query_as("SELECT txid, vout FROM utxos WHERE is_spent = 0")
+            .fetch_all(&self.pool)
+            .await?;
+
+        let mut outpoints = Vec::with_capacity(rows.len());
+        for (txid_bytes, vout) in rows {
+            let txid_array: [u8; Txid::LEN] = txid_bytes
+                .try_into()
+                .map_err(|_| sqlx::Error::Decode("Invalid txid length".into()))?;
+
+            let txid = Txid::from_byte_array(txid_array);
+            #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
+            let outpoint = OutPoint::new(txid, vout as u32);
+            outpoints.push(outpoint);
+        }
+
+        Ok(outpoints)
+    }
+
+    async fn list_tracked_script_pubkeys(&self) -> Result<Vec<simplicityhl::elements::Script>, Self::Error> {
+        let rows: Vec<(Vec<u8>,)> = sqlx::query_as("SELECT DISTINCT script_pubkey FROM simplicity_contracts")
+            .fetch_all(&self.pool)
+            .await?;
+
+        let scripts = rows
+            .into_iter()
+            .map(|(bytes,)| simplicityhl::elements::Script::from(bytes))
+            .collect();
+
+        Ok(scripts)
     }
 }
 
@@ -776,11 +918,13 @@ mod tests {
         let arguments = simplicityhl::Arguments::default();
 
         let result = store
-            .add_contract(BYTES32_TR_STORAGE_SOURCE, arguments.clone(), tpg1)
+            .add_contract(BYTES32_TR_STORAGE_SOURCE, arguments.clone(), tpg1, None)
             .await;
         assert!(result.is_ok());
 
-        let result = store.add_contract(BYTES32_TR_STORAGE_SOURCE, arguments, tpg2).await;
+        let result = store
+            .add_contract(BYTES32_TR_STORAGE_SOURCE, arguments, tpg2, None)
+            .await;
         assert!(result.is_ok());
 
         let _ = fs::remove_file(path);
@@ -798,7 +942,7 @@ mod tests {
         let script_pubkey = tpg.address.script_pubkey();
 
         store
-            .add_contract(BYTES32_TR_STORAGE_SOURCE, arguments.clone(), tpg)
+            .add_contract(BYTES32_TR_STORAGE_SOURCE, arguments.clone(), tpg, None)
             .await
             .unwrap();
 
@@ -837,7 +981,7 @@ mod tests {
         let script_pubkey = tpg.address.script_pubkey();
 
         store
-            .add_contract(BYTES32_TR_STORAGE_SOURCE, arguments, tpg.clone())
+            .add_contract(BYTES32_TR_STORAGE_SOURCE, arguments, tpg.clone(), None)
             .await
             .unwrap();
 
@@ -873,7 +1017,7 @@ mod tests {
         let script_pubkey = tpg.address.script_pubkey();
 
         store
-            .add_contract(BYTES32_TR_STORAGE_SOURCE, arguments, tpg)
+            .add_contract(BYTES32_TR_STORAGE_SOURCE, arguments, tpg, None)
             .await
             .unwrap();
 

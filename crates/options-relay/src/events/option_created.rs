@@ -103,16 +103,20 @@ mod tests {
     fn get_mocked_data() -> anyhow::Result<(OptionsArguments, TaprootPubkeyGen)> {
         let settlement_asset_id = AssetId::from_slice(&hex::decode(LIQUID_TESTNET_TEST_ASSET_ID_STR)?)?;
 
-        let args = OptionsArguments {
-            start_time: 10,
-            expiry_time: 50,
-            collateral_per_contract: 100,
-            settlement_per_contract: 1000,
-            collateral_asset_id: LIQUID_TESTNET_BITCOIN_ASSET.into_inner().0,
-            settlement_asset_id: settlement_asset_id.into_inner().0,
-            option_token_entropy: get_random_seed(),
-            grantor_token_entropy: get_random_seed(),
-        };
+        let option_creation_outpoint = OutPoint::new(Txid::from_slice(&[1; 32])?, 0);
+        let grantor_creation_outpoint = OutPoint::new(Txid::from_slice(&[2; 32])?, 0);
+
+        let args = OptionsArguments::new(
+            10,
+            50,
+            100,
+            1000,
+            *LIQUID_TESTNET_BITCOIN_ASSET,
+            settlement_asset_id,
+            get_random_seed(),
+            (option_creation_outpoint, false),
+            (grantor_creation_outpoint, false),
+        );
 
         let taproot_pubkey_gen = TaprootPubkeyGen::from(&args, &AddressParams::LIQUID_TESTNET, &get_options_address)?;
 

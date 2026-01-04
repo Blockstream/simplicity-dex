@@ -3,74 +3,54 @@ use simplicityhl::elements::{Address, AssetId, OutPoint};
 
 #[derive(Debug, Subcommand)]
 pub enum Command {
-    /// Maker commands for creating and managing options
-    Maker {
+    /// Wallet management (init, address, balance, utxos, import, spend)
+    Wallet {
         #[command(subcommand)]
-        command: MakerCommand,
+        command: WalletCommand,
     },
 
-    /// Taker commands for participating in options
-    Taker {
+    /// Basic transactions (transfer, split, merge, issue, reissue)
+    Tx {
         #[command(subcommand)]
-        command: TakerCommand,
+        command: TxCommand,
     },
 
-    /// Helper utilities
-    Helper {
+    /// Options lifecycle (create, exercise, expire, cancel)
+    Option {
         #[command(subcommand)]
-        command: HelperCommand,
+        command: OptionCommand,
+    },
+
+    /// Swap lifecycle (create, take, cancel, withdraw)
+    Swap {
+        #[command(subcommand)]
+        command: SwapCommand,
+    },
+
+    /// Fetch options/swaps from NOSTR, sync to coin-store, display
+    Browse,
+
+    /// Show my holdings with expiration warnings
+    Positions,
+
+    /// Sync coin-store with blockchain via Esplora and/or NOSTR
+    Sync {
+        #[command(subcommand)]
+        command: SyncCommand,
     },
 
     /// Show current configuration
     Config,
-
-    /// Basic transaction commands (transfer, split, issue)
-    Basic {
-        #[command(subcommand)]
-        command: BasicCommand,
-    },
 }
 
+/// Wallet management commands
 #[derive(Debug, Subcommand)]
-pub enum MakerCommand {
-    /// Create a new options contract
-    Create,
-
-    /// Fund an options contract with collateral
-    Fund,
-
-    /// Exercise an option before expiration
-    Exercise,
-
-    /// Cancel an unfilled option and retrieve collateral
-    Cancel,
-
-    /// List your created options
-    List,
-}
-
-#[derive(Debug, Subcommand)]
-pub enum TakerCommand {
-    /// Browse available options
-    Browse,
-
-    /// Take an option by purchasing grantor token
-    Take,
-
-    /// Claim settlement after expiration
-    Claim,
-
-    /// List your positions
-    List,
-}
-
-#[derive(Debug, Subcommand)]
-pub enum HelperCommand {
-    /// Show wallet details
-    Address,
-
+pub enum WalletCommand {
     /// Initialize the wallet database
     Init,
+
+    /// Show wallet details
+    Address,
 
     /// Show wallet balance
     Balance,
@@ -97,8 +77,9 @@ pub enum HelperCommand {
     },
 }
 
+/// Basic transaction commands
 #[derive(Debug, Subcommand)]
-pub enum BasicCommand {
+pub enum TxCommand {
     /// Transfer an asset to a recipient
     Transfer {
         /// Asset ID (defaults to native LBTC if not specified)
@@ -110,9 +91,9 @@ pub enum BasicCommand {
         /// Amount to send
         #[arg(long)]
         amount: u64,
-        /// Fee amount in satoshis
+        /// Fee amount in satoshis (auto-estimated if not specified)
         #[arg(long)]
-        fee: u64,
+        fee: Option<u64>,
         /// Broadcast transaction
         #[arg(long)]
         broadcast: bool,
@@ -122,10 +103,10 @@ pub enum BasicCommand {
     SplitNative {
         /// Number of parts to split into
         #[arg(long)]
-        parts: u64,
-        /// Fee amount in satoshis
+        count: u64,
+        /// Fee amount in satoshis (auto-estimated if not specified)
         #[arg(long)]
-        fee: u64,
+        fee: Option<u64>,
         /// Broadcast transaction
         #[arg(long)]
         broadcast: bool,
@@ -139,9 +120,9 @@ pub enum BasicCommand {
         /// Number of UTXOs to merge
         #[arg(long)]
         count: usize,
-        /// Fee amount in satoshis
+        /// Fee amount in satoshis (auto-estimated if not specified)
         #[arg(long)]
-        fee: u64,
+        fee: Option<u64>,
         /// Broadcast transaction
         #[arg(long)]
         broadcast: bool,
@@ -152,9 +133,9 @@ pub enum BasicCommand {
         /// Amount to issue
         #[arg(long)]
         amount: u64,
-        /// Fee amount in satoshis
+        /// Fee amount in satoshis (auto-estimated if not specified)
         #[arg(long)]
-        fee: u64,
+        fee: Option<u64>,
         /// Broadcast transaction
         #[arg(long)]
         broadcast: bool,
@@ -168,11 +149,176 @@ pub enum BasicCommand {
         /// Amount to reissue
         #[arg(long)]
         amount: u64,
-        /// Fee amount in satoshis
+        /// Fee amount in satoshis (auto-estimated if not specified)
         #[arg(long)]
-        fee: u64,
+        fee: Option<u64>,
         /// Broadcast transaction
         #[arg(long)]
         broadcast: bool,
     },
+}
+
+/// Options lifecycle commands
+#[derive(Debug, Subcommand)]
+pub enum OptionCommand {
+    /// Create a new options contract (fund collateral, get Option + Grantor tokens)
+    Create {
+        /// Collateral asset ID
+        #[arg(long)]
+        collateral_asset: AssetId,
+        /// Total collateral to lock in the contract
+        #[arg(long)]
+        total_collateral: u64,
+        /// Number of option contracts (tokens) to issue
+        #[arg(long)]
+        num_contracts: u64,
+        /// Settlement asset ID
+        #[arg(long)]
+        settlement_asset: AssetId,
+        /// Total strike price (settlement needed to exercise ALL contracts)
+        #[arg(long)]
+        total_strike: u64,
+        /// Expiry time as Unix timestamp or duration (e.g., +30d)
+        #[arg(long)]
+        expiry: String,
+        /// Fee amount in satoshis (auto-estimated if not specified)
+        #[arg(long)]
+        fee: Option<u64>,
+        /// Broadcast transaction
+        #[arg(long)]
+        broadcast: bool,
+    },
+
+    /// Exercise an option before expiration (deposit settlement, get collateral, burn option)
+    Exercise {
+        /// Option token outpoint (interactive selection if not provided)
+        #[arg(long)]
+        option_token: Option<OutPoint>,
+        /// Fee amount in satoshis (auto-estimated if not specified)
+        #[arg(long)]
+        fee: Option<u64>,
+        /// Broadcast transaction
+        #[arg(long)]
+        broadcast: bool,
+    },
+
+    /// Expire an option after expiration (use Grantor Token to get collateral)
+    Expire {
+        /// Grantor token outpoint (interactive selection if not provided)
+        #[arg(long)]
+        grantor_token: Option<OutPoint>,
+        /// Fee amount in satoshis (auto-estimated if not specified)
+        #[arg(long)]
+        fee: Option<u64>,
+        /// Broadcast transaction
+        #[arg(long)]
+        broadcast: bool,
+    },
+
+    /// Claim settlement after options were exercised (use Grantor Token to get settlement asset)
+    Settlement {
+        /// Grantor token outpoint (interactive selection if not provided)
+        #[arg(long)]
+        grantor_token: Option<OutPoint>,
+        /// Fee amount in satoshis (auto-estimated if not specified)
+        #[arg(long)]
+        fee: Option<u64>,
+        /// Broadcast transaction
+        #[arg(long)]
+        broadcast: bool,
+    },
+
+    /// Cancel an option (requires both Option + Grantor tokens)
+    Cancel {
+        /// Option token outpoint (interactive selection if not provided)
+        #[arg(long)]
+        option_token: Option<OutPoint>,
+        /// Fee amount in satoshis (auto-estimated if not specified)
+        #[arg(long)]
+        fee: Option<u64>,
+        /// Broadcast transaction
+        #[arg(long)]
+        broadcast: bool,
+    },
+}
+
+/// Swap lifecycle commands
+#[derive(Debug, Subcommand)]
+pub enum SwapCommand {
+    /// Create a swap offer (offer Grantor Token for premium)
+    Create {
+        /// Grantor token outpoint (interactive selection if not provided)
+        #[arg(long)]
+        grantor_token: Option<OutPoint>,
+        /// Premium asset ID (defaults to native LBTC)
+        #[arg(long)]
+        premium_asset: Option<AssetId>,
+        /// Premium amount
+        #[arg(long)]
+        premium_amount: u64,
+        /// Expiry time (defaults to same as option)
+        #[arg(long)]
+        expiry: Option<String>,
+        /// Fee amount in satoshis (auto-estimated if not specified)
+        #[arg(long)]
+        fee: Option<u64>,
+        /// Broadcast transaction and publish to NOSTR
+        #[arg(long)]
+        broadcast: bool,
+    },
+
+    /// Take a swap offer (atomic swap: premium for Grantor Token)
+    Take {
+        /// Swap event ID from NOSTR (interactive selection if not provided)
+        #[arg(long)]
+        swap_event: Option<String>,
+        /// Fee amount in satoshis (auto-estimated if not specified)
+        #[arg(long)]
+        fee: Option<u64>,
+        /// Broadcast transaction
+        #[arg(long)]
+        broadcast: bool,
+    },
+
+    /// Cancel a swap offer after expiry (reclaim collateral if no one took it)
+    Cancel {
+        /// Swap event ID from NOSTR (interactive selection if not provided)
+        #[arg(long)]
+        swap_event: Option<String>,
+        /// Fee amount in satoshis (auto-estimated if not specified)
+        #[arg(long)]
+        fee: Option<u64>,
+        /// Broadcast transaction
+        #[arg(long)]
+        broadcast: bool,
+    },
+
+    /// Withdraw settlement after swap was taken (claim your payment)
+    Withdraw {
+        /// Swap event ID from NOSTR (interactive selection if not provided)
+        #[arg(long)]
+        swap_event: Option<String>,
+        /// Fee amount in satoshis (auto-estimated if not specified)
+        #[arg(long)]
+        fee: Option<u64>,
+        /// Broadcast transaction
+        #[arg(long)]
+        broadcast: bool,
+    },
+}
+
+/// Sync commands for reconciling coin-store with blockchain
+#[derive(Debug, Subcommand)]
+pub enum SyncCommand {
+    /// Full sync: mark spent UTXOs + discover new UTXOs + sync NOSTR events
+    Full,
+
+    /// Only check and mark spent UTXOs as spent via Esplora
+    Spent,
+
+    /// Only discover new UTXOs for wallet address and tracked contracts via Esplora
+    Utxos,
+
+    /// Only sync options and swaps from NOSTR relay
+    Nostr,
 }

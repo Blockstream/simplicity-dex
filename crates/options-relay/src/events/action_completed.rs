@@ -1,7 +1,7 @@
 use crate::error::ParseError;
 use crate::events::kinds::{
-    ACTION_COMPLETED, ACTION_OPTION_EXERCISED, ACTION_OPTION_EXPIRED, ACTION_SETTLEMENT_CLAIMED, ACTION_SWAP_EXERCISED,
-    TAG_ACTION, TAG_OUTPOINT,
+    ACTION_COMPLETED, ACTION_OPTION_CANCELLED, ACTION_OPTION_EXERCISED, ACTION_OPTION_EXPIRED,
+    ACTION_SETTLEMENT_CLAIMED, ACTION_SWAP_CANCELLED, ACTION_SWAP_EXERCISED, TAG_ACTION, TAG_OUTPOINT,
 };
 
 use std::str::FromStr;
@@ -12,7 +12,9 @@ use simplicityhl::elements::OutPoint;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ActionType {
     SwapExercised,
+    SwapCancelled,
     OptionExercised,
+    OptionCancelled,
     SettlementClaimed,
     OptionExpired,
 }
@@ -22,7 +24,9 @@ impl ActionType {
     pub const fn as_str(&self) -> &'static str {
         match self {
             Self::SwapExercised => ACTION_SWAP_EXERCISED,
+            Self::SwapCancelled => ACTION_SWAP_CANCELLED,
             Self::OptionExercised => ACTION_OPTION_EXERCISED,
+            Self::OptionCancelled => ACTION_OPTION_CANCELLED,
             Self::SettlementClaimed => ACTION_SETTLEMENT_CLAIMED,
             Self::OptionExpired => ACTION_OPTION_EXPIRED,
         }
@@ -35,7 +39,9 @@ impl FromStr for ActionType {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             ACTION_SWAP_EXERCISED => Ok(Self::SwapExercised),
+            ACTION_SWAP_CANCELLED => Ok(Self::SwapCancelled),
             ACTION_OPTION_EXERCISED => Ok(Self::OptionExercised),
+            ACTION_OPTION_CANCELLED => Ok(Self::OptionCancelled),
             ACTION_SETTLEMENT_CLAIMED => Ok(Self::SettlementClaimed),
             ACTION_OPTION_EXPIRED => Ok(Self::OptionExpired),
             _ => Err(()),
@@ -133,7 +139,9 @@ mod tests {
     fn action_type_roundtrip() {
         let actions = [
             ActionType::SwapExercised,
+            ActionType::SwapCancelled,
             ActionType::OptionExercised,
+            ActionType::OptionCancelled,
             ActionType::SettlementClaimed,
             ActionType::OptionExpired,
         ];

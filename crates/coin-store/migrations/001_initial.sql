@@ -37,6 +37,7 @@ CREATE TABLE simplicity_contracts
     cmr                BLOB NOT NULL,
     source_hash        BLOB NOT NULL,
     arguments          BLOB,
+    app_metadata       BLOB,
 
     PRIMARY KEY (taproot_pubkey_gen),
     FOREIGN KEY (source_hash) REFERENCES simplicity_sources (source_hash)

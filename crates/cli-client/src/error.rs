@@ -20,6 +20,9 @@ pub enum Error {
     #[error("Explorer error: {0}")]
     Explorer(#[from] cli_helper::explorer::ExplorerError),
 
+    #[error("Fetch transaction error: {0}")]
+    FetchTransaction(#[from] crate::explorer::FetchTransactionError),
+
     #[error("Contract error: {0}")]
     Contract(#[from] contracts::error::TransactionBuildError),
 
@@ -34,4 +37,19 @@ pub enum Error {
 
     #[error("Hex to array error: {0}")]
     HexToArray(#[from] HexToArrayError),
+
+    #[error("Metadata encode error: {0}")]
+    MetadataEncode(bincode::error::EncodeError),
+
+    #[error("Metadata decode error: {0}")]
+    MetadataDecode(bincode::error::DecodeError),
+
+    #[error("Relay error: {0}")]
+    Relay(#[from] options_relay::RelayError),
+
+    #[error("Event parse error: {0}")]
+    EventParse(#[from] options_relay::ParseError),
+
+    #[error("Taproot pubkey generation error: {0}")]
+    TaprootPubkeyGen(#[from] contracts::error::TaprootPubkeyGenError),
 }
