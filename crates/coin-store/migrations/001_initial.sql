@@ -22,14 +22,24 @@ CREATE TABLE blinder_keys
     FOREIGN KEY (txid, vout) REFERENCES utxos (txid, vout)
 );
 
+CREATE TABLE simplicity_sources
+(
+    source_hash BLOB NOT NULL,
+    source      BLOB NOT NULL,
+
+    PRIMARY KEY (source_hash)
+);
+
 CREATE TABLE simplicity_contracts
 (
     script_pubkey      BLOB NOT NULL,
     taproot_pubkey_gen BLOB NOT NULL,
     cmr                BLOB NOT NULL,
-    source             BLOB NOT NULL,
+    source_hash        BLOB NOT NULL,
     arguments          BLOB,
-    PRIMARY KEY (taproot_pubkey_gen)
+
+    PRIMARY KEY (taproot_pubkey_gen),
+    FOREIGN KEY (source_hash) REFERENCES simplicity_sources (source_hash)
 );
 
 CREATE TABLE asset_entropy

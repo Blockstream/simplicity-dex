@@ -122,14 +122,23 @@ impl UtxoStore for Store {
         let taproot_gen_str = taproot_pubkey_gen.to_string();
         let arguments_bytes = bincode::serde::encode_to_vec(&arguments, bincode::config::standard())?;
 
+        let source_hash = sha256::Hash::hash(source.as_bytes());
+        let source_hash_bytes: &[u8] = source_hash.as_ref();
+
+        sqlx::query("INSERT OR IGNORE INTO simplicity_sources (source_hash, source) VALUES (?, ?)")
+            .bind(source_hash_bytes)
+            .bind(source.as_bytes())
+            .execute(&self.pool)
+            .await?;
+
         sqlx::query(
-            "INSERT INTO simplicity_contracts (script_pubkey, taproot_pubkey_gen, cmr, source, arguments)
+            "INSERT INTO simplicity_contracts (script_pubkey, taproot_pubkey_gen, cmr, source_hash, arguments)
              VALUES (?, ?, ?, ?, ?)",
         )
         .bind(script_pubkey.as_bytes())
         .bind(taproot_gen_str)
         .bind(cmr.as_ref())
-        .bind(source.as_bytes())
+        .bind(source_hash_bytes)
         .bind(arguments_bytes)
         .execute(&self.pool)
         .await?;
@@ -318,7 +327,7 @@ impl Store {
         );
 
         if needs_contract_join {
-            builder.push(", c.source, c.arguments");
+            builder.push(", s.source, c.arguments");
         } else {
             builder.push(", NULL as source, NULL as arguments");
         }
@@ -336,6 +345,7 @@ impl Store {
 
         if needs_contract_join {
             builder.push(" INNER JOIN simplicity_contracts c ON u.script_pubkey = c.script_pubkey");
+            builder.push(" INNER JOIN simplicity_sources s ON c.source_hash = s.source_hash");
         }
 
         if filter.is_entropy_join() {
@@ -368,9 +378,9 @@ impl Store {
             builder.push_bind(tpg.to_string());
         }
 
-        if let Some(ref source) = filter.source {
-            builder.push(" AND c.source = ");
-            builder.push_bind(source.as_bytes().to_vec());
+        if let Some(ref source_hash) = filter.source_hash {
+            builder.push(" AND c.source_hash = ");
+            builder.push_bind(source_hash.to_vec());
         }
 
         builder.push(" ORDER BY u.value DESC");

@@ -14,7 +14,7 @@ pub struct UtxoFilter {
     pub include_entropy: bool,
     pub cmr: Option<Cmr>,
     pub taproot_pubkey_gen: Option<TaprootPubkeyGen>,
-    pub source: Option<String>,
+    pub source_hash: Option<[u8; 32]>,
 }
 
 impl UtxoFilter {
@@ -72,14 +72,14 @@ impl UtxoFilter {
     }
 
     #[must_use]
-    pub fn source(mut self, source: String) -> Self {
-        self.source = Some(source);
+    pub const fn source_hash(mut self, hash: [u8; 32]) -> Self {
+        self.source_hash = Some(hash);
         self
     }
 
     #[must_use]
     pub(crate) const fn is_contract_join(&self) -> bool {
-        self.cmr.is_some() || self.taproot_pubkey_gen.is_some() || self.source.is_some()
+        self.cmr.is_some() || self.taproot_pubkey_gen.is_some() || self.source_hash.is_some()
     }
 
     #[must_use]
