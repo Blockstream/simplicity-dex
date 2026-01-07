@@ -4,6 +4,7 @@ use coin_store::{Store, UtxoStore};
 use options_relay::{OptionCreatedEvent, SwapCreatedEvent};
 use simplicityhl_core::derive_public_blinder_key;
 
+use crate::cli::{GRANTOR_TOKEN_TAG, OPTION_TOKEN_TAG, SWAP_COLLATERAL_TAG};
 use crate::error::Error;
 use crate::explorer::fetch_transaction;
 use crate::metadata::ContractMetadata;
@@ -29,6 +30,16 @@ pub async fn sync_option_event(
             event.taproot_pubkey_gen.clone(),
             Some(&metadata_bytes),
         )
+        .await?;
+
+    let (option_token_id, _) = event.options_args.get_option_token_ids();
+    let (grantor_token_id, _) = event.options_args.get_grantor_token_ids();
+
+    store
+        .insert_contract_token(&event.taproot_pubkey_gen, option_token_id, OPTION_TOKEN_TAG)
+        .await?;
+    store
+        .insert_contract_token(&event.taproot_pubkey_gen, grantor_token_id, GRANTOR_TOKEN_TAG)
         .await?;
 
     if let Err(e) = sync_utxo_with_public_blinder(store, event.utxo).await {
@@ -92,6 +103,11 @@ pub async fn sync_swap_event(
             event.taproot_pubkey_gen.clone(),
             Some(&metadata_bytes),
         )
+        .await?;
+
+    let collateral_asset = event.swap_args.get_collateral_asset_id();
+    store
+        .insert_contract_token(&event.taproot_pubkey_gen, collateral_asset, SWAP_COLLATERAL_TAG)
         .await?;
 
     if let Err(e) = sync_utxo_with_public_blinder(store, event.utxo).await {

@@ -1,6 +1,6 @@
 use crate::cli::interactive::{
-    current_timestamp, extract_entries_from_result, format_relative_time, get_grantor_tokens_from_wallet, parse_expiry,
-    prompt_amount, select_enriched_token_interactive,
+    SWAP_COLLATERAL_TAG, current_timestamp, extract_entries_from_result, format_relative_time,
+    get_grantor_tokens_from_wallet, parse_expiry, prompt_amount, select_enriched_token_interactive,
 };
 use crate::cli::{Cli, SwapCommand};
 use crate::config::Config;
@@ -180,7 +180,7 @@ impl Cli {
 
                     wallet
                         .store()
-                        .insert_contract_token(&taproot_pubkey_gen, collateral_asset, "swap_collateral")
+                        .insert_contract_token(&taproot_pubkey_gen, collateral_asset, SWAP_COLLATERAL_TAG)
                         .await?;
 
                     wallet.store().insert_transaction(&tx, HashMap::default()).await?;

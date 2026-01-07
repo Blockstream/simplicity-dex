@@ -21,6 +21,7 @@ use std::path::PathBuf;
 use signer::Signer;
 
 pub use commands::{Command, OptionCommand, SwapCommand, SyncCommand, TxCommand, WalletCommand};
+pub use interactive::{GRANTOR_TOKEN_TAG, OPTION_TOKEN_TAG, SWAP_COLLATERAL_TAG};
 
 #[derive(Debug, Parser)]
 #[command(name = "simplicity-dex")]

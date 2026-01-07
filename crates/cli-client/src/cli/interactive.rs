@@ -11,6 +11,10 @@ use simplicityhl::elements::Script;
 use simplicityhl::elements::hex::ToHex;
 use simplicityhl_core::LIQUID_TESTNET_BITCOIN_ASSET;
 
+pub const OPTION_TOKEN_TAG: &str = "option_token";
+pub const GRANTOR_TOKEN_TAG: &str = "grantor_token";
+pub const SWAP_COLLATERAL_TAG: &str = "swap_collateral";
+
 #[derive(Debug, Clone)]
 pub struct TokenDisplay {
     pub index: usize,
@@ -318,7 +322,7 @@ pub async fn get_grantor_tokens_from_wallet(
     user_script_pubkey: &Script,
 ) -> Result<Vec<EnrichedTokenEntry>, Error> {
     let filter = UtxoFilter::new()
-        .token_tag("grantor_token")
+        .token_tag(GRANTOR_TOKEN_TAG)
         .script_pubkey(user_script_pubkey.clone());
 
     let results = <_ as UtxoStore>::query_utxos(wallet.store(), &[filter]).await?;
@@ -362,7 +366,7 @@ pub async fn get_option_tokens_from_wallet(
     user_script_pubkey: &Script,
 ) -> Result<Vec<EnrichedTokenEntry>, Error> {
     let filter = UtxoFilter::new()
-        .token_tag("option_token")
+        .token_tag(OPTION_TOKEN_TAG)
         .script_pubkey(user_script_pubkey.clone());
 
     let results = <_ as UtxoStore>::query_utxos(wallet.store(), &[filter]).await?;
