@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use coin_store::{Store, UtxoStore};
-use options_relay::{OptionCreatedEvent, SwapCreatedEvent};
+use options_relay::{ActionType, OptionCreatedEvent, SwapCreatedEvent};
 use simplicityhl_core::derive_public_blinder_key;
 
 use crate::cli::{GRANTOR_TOKEN_TAG, OPTION_TOKEN_TAG, SWAP_COLLATERAL_TAG};
@@ -19,7 +19,15 @@ pub async fn sync_option_event(
     #[allow(clippy::cast_possible_wrap)]
     let created_at = event.created_at.as_secs() as i64;
 
-    let metadata = ContractMetadata::from_nostr(event.event_id.to_hex(), event.pubkey.to_hex(), created_at);
+    let history = vec![HistoryEntry::with_txid_and_nostr(
+        ActionType::OptionCreated.as_str(),
+        &event.utxo.txid.to_string(),
+        &event.event_id.to_hex(),
+        created_at,
+    )];
+
+    let metadata =
+        ContractMetadata::from_nostr_with_history(event.event_id.to_hex(), event.pubkey.to_hex(), created_at, history);
 
     let metadata_bytes = metadata.to_bytes()?;
 
@@ -82,15 +90,31 @@ pub async fn sync_swap_event(
     #[allow(clippy::cast_possible_wrap)]
     let created_at = event.created_at.as_secs() as i64;
 
+    let history = vec![HistoryEntry::with_txid_and_nostr(
+        ActionType::SwapCreated.as_str(),
+        &event.utxo.txid.to_string(),
+        &event.event_id.to_hex(),
+        created_at,
+    )];
+
     let metadata = parent_option_event_id.map_or_else(
-        || ContractMetadata::from_nostr(event.event_id.to_hex(), event.pubkey.to_hex(), created_at),
+        || {
+            ContractMetadata::from_nostr_with_history(
+                event.event_id.to_hex(),
+                event.pubkey.to_hex(),
+                created_at,
+                history.clone(),
+            )
+        },
         |parent_id| {
-            ContractMetadata::from_nostr_with_parent(
+            let mut meta = ContractMetadata::from_nostr_with_parent(
                 event.event_id.to_hex(),
                 event.pubkey.to_hex(),
                 created_at,
                 parent_id,
-            )
+            );
+            meta.history.clone_from(&history);
+            meta
         },
     );
 

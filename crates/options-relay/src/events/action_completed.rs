@@ -1,7 +1,8 @@
 use crate::error::ParseError;
 use crate::events::kinds::{
-    ACTION_COMPLETED, ACTION_OPTION_CANCELLED, ACTION_OPTION_EXERCISED, ACTION_OPTION_EXPIRED,
-    ACTION_SETTLEMENT_CLAIMED, ACTION_SWAP_CANCELLED, ACTION_SWAP_EXERCISED, TAG_ACTION, TAG_OUTPOINT,
+    ACTION_COMPLETED, ACTION_OPTION_CANCELLED, ACTION_OPTION_CREATED, ACTION_OPTION_EXERCISED, ACTION_OPTION_EXPIRED,
+    ACTION_OPTION_FUNDED, ACTION_SETTLEMENT_CLAIMED, ACTION_SWAP_CANCELLED, ACTION_SWAP_CREATED, ACTION_SWAP_EXERCISED,
+    TAG_ACTION, TAG_OUTPOINT,
 };
 
 use std::str::FromStr;
@@ -11,6 +12,9 @@ use simplicityhl::elements::OutPoint;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ActionType {
+    OptionCreated,
+    OptionFunded,
+    SwapCreated,
     SwapExercised,
     SwapCancelled,
     OptionExercised,
@@ -23,6 +27,9 @@ impl ActionType {
     #[must_use]
     pub const fn as_str(&self) -> &'static str {
         match self {
+            Self::OptionCreated => ACTION_OPTION_CREATED,
+            Self::OptionFunded => ACTION_OPTION_FUNDED,
+            Self::SwapCreated => ACTION_SWAP_CREATED,
             Self::SwapExercised => ACTION_SWAP_EXERCISED,
             Self::SwapCancelled => ACTION_SWAP_CANCELLED,
             Self::OptionExercised => ACTION_OPTION_EXERCISED,
@@ -38,6 +45,9 @@ impl FromStr for ActionType {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
+            ACTION_OPTION_CREATED => Ok(Self::OptionCreated),
+            ACTION_OPTION_FUNDED => Ok(Self::OptionFunded),
+            ACTION_SWAP_CREATED => Ok(Self::SwapCreated),
             ACTION_SWAP_EXERCISED => Ok(Self::SwapExercised),
             ACTION_SWAP_CANCELLED => Ok(Self::SwapCancelled),
             ACTION_OPTION_EXERCISED => Ok(Self::OptionExercised),
@@ -138,6 +148,9 @@ mod tests {
     #[test]
     fn action_type_roundtrip() {
         let actions = [
+            ActionType::OptionCreated,
+            ActionType::OptionFunded,
+            ActionType::SwapCreated,
             ActionType::SwapExercised,
             ActionType::SwapCancelled,
             ActionType::OptionExercised,

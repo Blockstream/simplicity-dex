@@ -154,7 +154,7 @@ impl Cli {
 
                     let now = current_timestamp();
                     let history = vec![HistoryEntry::with_txid_and_nostr(
-                        "swap_created",
+                        ActionType::SwapCreated.as_str(),
                         &tx.txid().to_string(),
                         &event_id.to_hex(),
                         now,
@@ -483,7 +483,11 @@ impl Cli {
 
                     wallet.store().insert_transaction(&tx, HashMap::default()).await?;
 
-                    let entry = HistoryEntry::with_txid("swap_exercised", &tx.txid().to_string(), current_timestamp());
+                    let entry = HistoryEntry::with_txid(
+                        ActionType::SwapExercised.as_str(),
+                        &tx.txid().to_string(),
+                        current_timestamp(),
+                    );
                     crate::sync::add_history_entry(wallet.store(), &selected_swap.taproot_pubkey_gen, entry).await?;
                 } else {
                     println!("{}", tx.serialize().to_lower_hex_string());
@@ -779,7 +783,11 @@ impl Cli {
 
                     wallet.store().insert_transaction(&tx, HashMap::default()).await?;
 
-                    let entry = HistoryEntry::with_txid("swap_cancelled", &tx.txid().to_string(), current_timestamp());
+                    let entry = HistoryEntry::with_txid(
+                        ActionType::SwapCancelled.as_str(),
+                        &tx.txid().to_string(),
+                        current_timestamp(),
+                    );
                     crate::sync::add_history_entry(wallet.store(), taproot_pubkey_gen, entry).await?;
                 } else {
                     println!("{}", tx.serialize().to_lower_hex_string());

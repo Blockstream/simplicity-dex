@@ -244,12 +244,22 @@ impl Cli {
                     let nostr_event_id = publishing_client.publish_option_created(&option_event).await?;
                     println!("Published to NOSTR: {nostr_event_id}");
 
+                    let funded_action =
+                        ActionCompletedEvent::new(nostr_event_id, ActionType::OptionFunded, funding_outpoint);
+                    let funded_event_id = publishing_client.publish_action_completed(&funded_action).await?;
+                    println!("Published funding action: {funded_event_id}");
+
                     let history = vec![
-                        HistoryEntry::with_txid("option_created", &creation_tx.txid().to_string(), start_time),
                         HistoryEntry::with_txid_and_nostr(
-                            "option_funded",
-                            &funding_tx.txid().to_string(),
+                            ActionType::OptionCreated.as_str(),
+                            &creation_tx.txid().to_string(),
                             &nostr_event_id.to_hex(),
+                            start_time,
+                        ),
+                        HistoryEntry::with_txid_and_nostr(
+                            ActionType::OptionFunded.as_str(),
+                            &funding_tx.txid().to_string(),
+                            &funded_event_id.to_hex(),
                             start_time,
                         ),
                     ];
@@ -544,8 +554,11 @@ impl Cli {
 
                     wallet.store().insert_transaction(&tx, HashMap::default()).await?;
 
-                    let entry =
-                        HistoryEntry::with_txid("option_exercised", &tx.txid().to_string(), current_timestamp());
+                    let entry = HistoryEntry::with_txid(
+                        ActionType::OptionExercised.as_str(),
+                        &tx.txid().to_string(),
+                        current_timestamp(),
+                    );
                     add_history_entry(wallet.store(), &taproot_pubkey_gen, entry).await?;
                 } else {
                     println!("{}", tx.serialize().to_lower_hex_string());
@@ -774,7 +787,11 @@ impl Cli {
 
                     wallet.store().insert_transaction(&tx, HashMap::default()).await?;
 
-                    let entry = HistoryEntry::with_txid("option_expired", &tx.txid().to_string(), current_timestamp());
+                    let entry = HistoryEntry::with_txid(
+                        ActionType::OptionExpired.as_str(),
+                        &tx.txid().to_string(),
+                        current_timestamp(),
+                    );
                     add_history_entry(wallet.store(), &taproot_pubkey_gen, entry).await?;
                 } else {
                     println!("{}", tx.serialize().to_lower_hex_string());
@@ -1019,8 +1036,11 @@ impl Cli {
 
                     wallet.store().insert_transaction(&tx, HashMap::default()).await?;
 
-                    let entry =
-                        HistoryEntry::with_txid("settlement_claimed", &tx.txid().to_string(), current_timestamp());
+                    let entry = HistoryEntry::with_txid(
+                        ActionType::SettlementClaimed.as_str(),
+                        &tx.txid().to_string(),
+                        current_timestamp(),
+                    );
                     add_history_entry(wallet.store(), &taproot_pubkey_gen, entry).await?;
                 } else {
                     println!("{}", tx.serialize().to_lower_hex_string());
@@ -1222,8 +1242,11 @@ impl Cli {
 
                     wallet.store().insert_transaction(&tx, HashMap::default()).await?;
 
-                    let entry =
-                        HistoryEntry::with_txid("option_cancelled", &tx.txid().to_string(), current_timestamp());
+                    let entry = HistoryEntry::with_txid(
+                        ActionType::OptionCancelled.as_str(),
+                        &tx.txid().to_string(),
+                        current_timestamp(),
+                    );
                     add_history_entry(wallet.store(), &taproot_pubkey_gen, entry).await?;
                 } else {
                     println!("{}", tx.serialize().to_lower_hex_string());

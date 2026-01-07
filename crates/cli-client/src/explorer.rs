@@ -168,10 +168,8 @@ pub fn fetch_address_utxos(address: &Address) -> Result<Vec<EsploraUtxo>, Esplor
 /// Uses the `GET /scripthash/:hash/utxo` endpoint.
 /// The scripthash is SHA256 of the scriptPubKey (reversed for display).
 pub fn fetch_scripthash_utxos(script: &Script) -> Result<Vec<EsploraUtxo>, EsploraError> {
-    // Esplora uses SHA256 of scriptPubKey, displayed as hex (reversed byte order for Electrum compat)
     let hash = sha256::Hash::hash(script.as_bytes());
-    let mut hash_bytes = hash.to_byte_array();
-    hash_bytes.reverse();
+    let hash_bytes = hash.to_byte_array();
     let scripthash = hex::encode(hash_bytes);
 
     let url = format!("{ESPLORA_URL}/scripthash/{scripthash}/utxo");

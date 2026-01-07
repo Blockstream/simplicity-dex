@@ -197,19 +197,10 @@ impl Cli {
 
             if let Ok(actions) = client.fetch_actions_for_event(event_id).await {
                 for action in actions.into_iter().flatten() {
-                    let action_name = match action.action {
-                        options_relay::ActionType::SwapExercised => "swap_exercised",
-                        options_relay::ActionType::SwapCancelled => "swap_cancelled",
-                        options_relay::ActionType::OptionExercised => "option_exercised",
-                        options_relay::ActionType::OptionCancelled => "option_cancelled",
-                        options_relay::ActionType::OptionExpired => "option_expired",
-                        options_relay::ActionType::SettlementClaimed => "settlement_claimed",
-                    };
-
                     #[allow(clippy::cast_possible_wrap)]
                     let timestamp = action.created_at.as_secs() as i64;
                     let entry = crate::metadata::HistoryEntry::with_txid_and_nostr(
-                        action_name,
+                        action.action.as_str(),
                         &action.outpoint.txid.to_string(),
                         &action.event_id.to_hex(),
                         timestamp,
@@ -272,19 +263,10 @@ impl Cli {
 
             if let Ok(actions) = client.fetch_actions_for_event(event_id).await {
                 for action in actions.into_iter().flatten() {
-                    let action_name = match action.action {
-                        options_relay::ActionType::SwapExercised => "swap_exercised",
-                        options_relay::ActionType::SwapCancelled => "swap_cancelled",
-                        options_relay::ActionType::OptionExercised => "option_exercised",
-                        options_relay::ActionType::OptionCancelled => "option_cancelled",
-                        options_relay::ActionType::OptionExpired => "option_expired",
-                        options_relay::ActionType::SettlementClaimed => "settlement_claimed",
-                    };
-
                     #[allow(clippy::cast_possible_wrap)]
                     let timestamp = action.created_at.as_secs() as i64;
                     let entry = crate::metadata::HistoryEntry::with_txid_and_nostr(
-                        action_name,
+                        action.action.as_str(),
                         &action.outpoint.txid.to_string(),
                         &action.event_id.to_hex(),
                         timestamp,
@@ -575,19 +557,10 @@ impl Cli {
 
             if let Ok(actions) = client.fetch_actions_for_event(swap.event_id).await {
                 for action in actions.into_iter().flatten() {
-                    let action_name = match action.action {
-                        options_relay::ActionType::SwapExercised => "swap_exercised",
-                        options_relay::ActionType::SwapCancelled => "swap_cancelled",
-                        options_relay::ActionType::OptionExercised => "option_exercised",
-                        options_relay::ActionType::OptionCancelled => "option_cancelled",
-                        options_relay::ActionType::OptionExpired => "option_expired",
-                        options_relay::ActionType::SettlementClaimed => "settlement_claimed",
-                    };
-
                     #[allow(clippy::cast_possible_wrap)]
                     let timestamp = action.created_at.as_secs() as i64;
                     let entry = crate::metadata::HistoryEntry::with_txid_and_nostr(
-                        action_name,
+                        action.action.as_str(),
                         &action.outpoint.txid.to_string(),
                         &action.event_id.to_hex(),
                         timestamp,

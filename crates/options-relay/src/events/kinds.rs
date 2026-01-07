@@ -13,6 +13,9 @@ pub const TAG_ACTION: &str = "action";
 pub const TAG_OUTPOINT: &str = "outpoint";
 pub const TAG_EXPIRY: &str = "expiry";
 
+pub const ACTION_OPTION_CREATED: &str = "option_created";
+pub const ACTION_OPTION_FUNDED: &str = "option_funded";
+pub const ACTION_SWAP_CREATED: &str = "swap_created";
 pub const ACTION_SWAP_EXERCISED: &str = "swap_exercised";
 pub const ACTION_SWAP_CANCELLED: &str = "swap_cancelled";
 pub const ACTION_OPTION_EXERCISED: &str = "option_exercised";

@@ -111,18 +111,6 @@ impl ContractMetadata {
         }
     }
 
-    /// Create metadata for a contract synced from Nostr.
-    #[must_use]
-    pub const fn from_nostr(event_id: String, author: String, created_at: i64) -> Self {
-        Self {
-            nostr_event_id: Some(event_id),
-            nostr_author: Some(author),
-            created_at: Some(created_at),
-            parent_event_id: None,
-            history: Vec::new(),
-        }
-    }
-
     /// Create metadata for a contract synced from Nostr with initial history.
     #[must_use]
     pub const fn from_nostr_with_history(
@@ -213,7 +201,12 @@ mod tests {
 
     #[test]
     fn test_metadata_roundtrip() {
-        let metadata = ContractMetadata::from_nostr("event123".to_string(), "npub1abc".to_string(), 1_704_067_200);
+        let metadata = ContractMetadata::from_nostr_with_history(
+            "event123".to_string(),
+            "npub1abc".to_string(),
+            1_704_067_200,
+            Vec::new(),
+        );
 
         let bytes = metadata.to_bytes().unwrap();
         let restored = ContractMetadata::from_bytes(&bytes).unwrap();
