@@ -1,13 +1,15 @@
 use crate::cli::Cli;
-use crate::cli::interactive::{TokenDisplay, display_token_table, format_relative_time, format_time_ago};
+use crate::cli::interactive::{
+    TokenDisplay, display_token_table, format_asset_value_with_tag, format_asset_with_tag, format_relative_time,
+    format_time_ago,
+};
 use crate::config::Config;
 use crate::error::Error;
 use crate::metadata::ContractMetadata;
 
-use coin_store::{UtxoEntry, UtxoFilter, UtxoQueryResult, UtxoStore};
+use coin_store::{Store, UtxoEntry, UtxoFilter, UtxoQueryResult, UtxoStore};
 use contracts::options::{OPTION_SOURCE, OptionsArguments};
 use contracts::swap_with_change::{SWAP_WITH_CHANGE_SOURCE, SwapWithChangeArguments};
-use simplicityhl::elements::hex::ToHex;
 
 /// Result type for contract info queries: (metadata, arguments, `taproot_pubkey_gen`)
 type ContractInfoResult = Result<Option<(Vec<u8>, Vec<u8>, String)>, coin_store::StoreError>;
@@ -99,12 +101,15 @@ async fn build_option_displays_with_args(wallet: &crate::wallet::Wallet, entries
         let script_pubkey = entry.txout().script_pubkey.clone();
         let contract_info = <_ as UtxoStore>::get_contract_by_script_pubkey(wallet.store(), &script_pubkey).await;
 
-        let (settlement, expires, status) = extract_option_display_info(contract_info, entry);
+        let (settlement, expires, status) =
+            extract_option_display_info_with_tags(wallet.store(), contract_info, entry).await;
+
+        let collateral = format_asset_value_with_tag(wallet.store(), entry.value(), entry.asset()).await;
 
         displays.push(TokenDisplay {
             index: idx + 1,
             outpoint: entry.outpoint().to_string(),
-            collateral: format_asset_value(entry.value(), entry.asset()),
+            collateral,
             settlement,
             expires,
             status,
@@ -114,7 +119,11 @@ async fn build_option_displays_with_args(wallet: &crate::wallet::Wallet, entries
     displays
 }
 
-fn extract_option_display_info(contract_info: ContractInfoResult, entry: &UtxoEntry) -> (String, String, String) {
+async fn extract_option_display_info_with_tags(
+    store: &Store,
+    contract_info: ContractInfoResult,
+    entry: &UtxoEntry,
+) -> (String, String, String) {
     let default = || ("N/A".to_string(), "N/A".to_string(), "Token".to_string());
 
     let Some((_metadata, args_bytes, _tpg)) = contract_info.ok().flatten() else {
@@ -131,7 +140,7 @@ fn extract_option_display_info(contract_info: ContractInfoResult, entry: &UtxoEn
         return default();
     };
 
-    let settlement_str = format_asset_short(&opt_args.get_settlement_asset_id());
+    let settlement_str = format_asset_with_tag(store, &opt_args.get_settlement_asset_id()).await;
     let expiry_str = format_relative_time(i64::from(opt_args.expiry_time()));
     let status_str = if entry.contract().is_some() {
         "Collateral"
@@ -151,7 +160,7 @@ async fn build_swap_displays_with_args(wallet: &crate::wallet::Wallet, entries: 
         let contract_info = <_ as UtxoStore>::get_contract_by_script_pubkey(wallet.store(), &script_pubkey).await;
 
         let Some((settlement, expires, is_collateral, price)) =
-            extract_swap_display_info_with_asset_check(contract_info, entry)
+            extract_swap_display_info_with_tags(wallet.store(), contract_info, entry).await
         else {
             continue;
         };
@@ -160,11 +169,13 @@ async fn build_swap_displays_with_args(wallet: &crate::wallet::Wallet, entries: 
             continue; // Skip settlement outputs
         }
 
+        let collateral = format_asset_value_with_tag(wallet.store(), entry.value(), entry.asset()).await;
+
         display_idx += 1;
         displays.push(TokenDisplay {
             index: display_idx,
             outpoint: entry.outpoint().to_string(),
-            collateral: format_asset_value(entry.value(), entry.asset()),
+            collateral,
             settlement,
             expires,
             status: format!("Price: {price}"),
@@ -175,7 +186,8 @@ async fn build_swap_displays_with_args(wallet: &crate::wallet::Wallet, entries: 
 }
 
 /// Returns (`settlement_display`, `expiry_display`, `is_collateral_asset`, price)
-fn extract_swap_display_info_with_asset_check(
+async fn extract_swap_display_info_with_tags(
+    store: &Store,
     contract_info: ContractInfoResult,
     entry: &UtxoEntry,
 ) -> Option<(String, String, bool, u64)> {
@@ -187,29 +199,13 @@ fn extract_swap_display_info_with_asset_check(
 
     let swap_args = SwapWithChangeArguments::from_arguments(&args).ok()?;
 
-    let settlement_str = format_asset_short(&swap_args.get_settlement_asset_id());
+    let settlement_str = format_asset_with_tag(store, &swap_args.get_settlement_asset_id()).await;
     let expiry_str = format_relative_time(i64::from(swap_args.expiry_time()));
     let price = swap_args.collateral_per_contract();
 
     let is_collateral = entry.asset().is_some_and(|a| a == swap_args.get_collateral_asset_id());
 
     Some((settlement_str, expiry_str, is_collateral, price))
-}
-
-fn format_asset_value(value: Option<u64>, asset: Option<simplicityhl::elements::AssetId>) -> String {
-    match (value, asset) {
-        (Some(v), Some(a)) => {
-            let hex = a.to_hex();
-            format!("{v} ({})...", &hex[..hex.len().min(8)])
-        }
-        (Some(v), None) => format!("{v} (unknown)"),
-        _ => "Confidential".to_string(),
-    }
-}
-
-fn format_asset_short(asset_id: &simplicityhl::elements::AssetId) -> String {
-    let hex = asset_id.to_hex();
-    format!("({})...", &hex[..hex.len().min(8)])
 }
 
 fn truncate_id(s: &str) -> String {
