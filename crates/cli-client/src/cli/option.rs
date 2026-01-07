@@ -1,8 +1,9 @@
 use std::collections::HashMap;
 
 use crate::cli::interactive::{
-    current_timestamp, extract_entries_from_result, format_relative_time, get_grantor_tokens_from_wallet,
-    get_option_tokens_from_wallet, parse_expiry, prompt_amount, select_enriched_token_interactive,
+    GRANTOR_TOKEN_TAG, OPTION_TOKEN_TAG, current_timestamp, extract_entries_from_result, format_relative_time,
+    get_grantor_tokens_from_wallet, get_option_tokens_from_wallet, parse_expiry, prompt_amount,
+    select_enriched_token_interactive,
 };
 use crate::cli::{Cli, OptionCommand};
 use crate::config::Config;
@@ -285,11 +286,11 @@ impl Cli {
 
                     wallet
                         .store()
-                        .insert_contract_token(&taproot_pubkey_gen, option_token_id, "option_token")
+                        .insert_contract_token(&taproot_pubkey_gen, option_token_id, OPTION_TOKEN_TAG)
                         .await?;
                     wallet
                         .store()
-                        .insert_contract_token(&taproot_pubkey_gen, grantor_token_id, "grantor_token")
+                        .insert_contract_token(&taproot_pubkey_gen, grantor_token_id, GRANTOR_TOKEN_TAG)
                         .await?;
 
                     println!("  Option token: {option_token_id}");
