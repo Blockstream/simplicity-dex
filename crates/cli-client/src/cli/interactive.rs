@@ -128,7 +128,7 @@ pub fn display_token_table(tokens: &[TokenDisplay]) {
 
     println!(
         "  {:<3} | {:<18} | {:<14} | {:<18} | Contract",
-        "#", "Tokens", "Settlement", "Expires"
+        "#", "Collateral/Token", "Strike/Token", "Expires"
     );
     println!("{}", "-".repeat(80));
 

@@ -60,6 +60,7 @@ impl Cli {
             SyncCommand::Spent => self.run_sync_spent(config).await,
             SyncCommand::Utxos => self.run_sync_utxos(config).await,
             SyncCommand::Nostr => self.run_sync_nostr(config).await,
+            SyncCommand::History => self.run_sync_history(config).await,
         }
     }
 
@@ -122,6 +123,201 @@ impl Cli {
         self.sync_nostr_events(&config, &mut stats).await?;
 
         stats.print_summary();
+        Ok(())
+    }
+
+    /// Only sync action history for existing contracts from NOSTR (no UTXOs)
+    #[allow(clippy::too_many_lines)]
+    async fn run_sync_history(&self, config: Config) -> Result<(), Error> {
+        println!("Syncing action history for existing contracts...");
+        println!();
+
+        let wallet = self.get_wallet(&config).await?;
+        let client = self.get_read_only_client(&config).await?;
+
+        let mut actions_synced = 0;
+        let mut contracts_checked = 0;
+        let mut errors: Vec<String> = Vec::new();
+
+        let option_contracts =
+            <_ as UtxoStore>::list_contracts_by_source_with_metadata(wallet.store(), OPTION_SOURCE).await?;
+        let swap_contracts =
+            <_ as UtxoStore>::list_contracts_by_source_with_metadata(wallet.store(), SWAP_WITH_CHANGE_SOURCE).await?;
+
+        println!(
+            "  Found {} option contracts and {} swap contracts",
+            option_contracts.len(),
+            swap_contracts.len()
+        );
+
+        // Process option contracts
+        for (args_bytes, tpg_str, metadata_bytes) in &option_contracts {
+            let Some(meta_bytes) = metadata_bytes else {
+                continue;
+            };
+
+            let Ok(metadata) = crate::metadata::ContractMetadata::from_bytes(meta_bytes) else {
+                continue;
+            };
+
+            let Some(nostr_event_id_str) = &metadata.nostr_event_id else {
+                continue;
+            };
+
+            let Ok(event_id) = nostr::EventId::from_hex(nostr_event_id_str) else {
+                errors.push(format!("Invalid event ID: {nostr_event_id_str}"));
+                continue;
+            };
+
+            let Ok((args, _)) = bincode::serde::decode_from_slice::<simplicityhl::Arguments, _>(
+                args_bytes,
+                bincode::config::standard(),
+            ) else {
+                continue;
+            };
+
+            let Ok(options_args) = contracts::options::OptionsArguments::from_arguments(&args) else {
+                continue;
+            };
+
+            let Ok(taproot_pubkey_gen) = contracts::sdk::taproot_pubkey_gen::TaprootPubkeyGen::build_from_str(
+                tpg_str,
+                &options_args,
+                config.address_params(),
+                &contracts::options::get_options_address,
+            ) else {
+                errors.push(format!(
+                    "Invalid taproot pubkey gen: {}",
+                    &tpg_str[..tpg_str.len().min(20)]
+                ));
+                continue;
+            };
+
+            contracts_checked += 1;
+
+            if let Ok(actions) = client.fetch_actions_for_event(event_id).await {
+                for action in actions.into_iter().flatten() {
+                    let action_name = match action.action {
+                        options_relay::ActionType::SwapExercised => "swap_exercised",
+                        options_relay::ActionType::SwapCancelled => "swap_cancelled",
+                        options_relay::ActionType::OptionExercised => "option_exercised",
+                        options_relay::ActionType::OptionCancelled => "option_cancelled",
+                        options_relay::ActionType::OptionExpired => "option_expired",
+                        options_relay::ActionType::SettlementClaimed => "settlement_claimed",
+                    };
+
+                    #[allow(clippy::cast_possible_wrap)]
+                    let timestamp = action.created_at.as_secs() as i64;
+                    let entry = crate::metadata::HistoryEntry::with_txid_and_nostr(
+                        action_name,
+                        &action.outpoint.txid.to_string(),
+                        &action.event_id.to_hex(),
+                        timestamp,
+                    );
+
+                    if let Ok(added) =
+                        crate::sync::add_history_entry_if_new(wallet.store(), &taproot_pubkey_gen, entry).await
+                        && added
+                    {
+                        actions_synced += 1;
+                    }
+                }
+            }
+        }
+
+        // Process swap contracts
+        for (args_bytes, tpg_str, metadata_bytes) in &swap_contracts {
+            let Some(meta_bytes) = metadata_bytes else {
+                continue;
+            };
+
+            let Ok(metadata) = crate::metadata::ContractMetadata::from_bytes(meta_bytes) else {
+                continue;
+            };
+
+            let Some(nostr_event_id_str) = &metadata.nostr_event_id else {
+                continue;
+            };
+
+            let Ok(event_id) = nostr::EventId::from_hex(nostr_event_id_str) else {
+                errors.push(format!("Invalid event ID: {nostr_event_id_str}"));
+                continue;
+            };
+
+            let Ok((args, _)) = bincode::serde::decode_from_slice::<simplicityhl::Arguments, _>(
+                args_bytes,
+                bincode::config::standard(),
+            ) else {
+                continue;
+            };
+
+            let Ok(swap_args) = contracts::swap_with_change::SwapWithChangeArguments::from_arguments(&args) else {
+                continue;
+            };
+
+            let Ok(taproot_pubkey_gen) = contracts::sdk::taproot_pubkey_gen::TaprootPubkeyGen::build_from_str(
+                tpg_str,
+                &swap_args,
+                config.address_params(),
+                &contracts::swap_with_change::get_swap_with_change_address,
+            ) else {
+                errors.push(format!(
+                    "Invalid taproot pubkey gen: {}",
+                    &tpg_str[..tpg_str.len().min(20)]
+                ));
+                continue;
+            };
+
+            contracts_checked += 1;
+
+            if let Ok(actions) = client.fetch_actions_for_event(event_id).await {
+                for action in actions.into_iter().flatten() {
+                    let action_name = match action.action {
+                        options_relay::ActionType::SwapExercised => "swap_exercised",
+                        options_relay::ActionType::SwapCancelled => "swap_cancelled",
+                        options_relay::ActionType::OptionExercised => "option_exercised",
+                        options_relay::ActionType::OptionCancelled => "option_cancelled",
+                        options_relay::ActionType::OptionExpired => "option_expired",
+                        options_relay::ActionType::SettlementClaimed => "settlement_claimed",
+                    };
+
+                    #[allow(clippy::cast_possible_wrap)]
+                    let timestamp = action.created_at.as_secs() as i64;
+                    let entry = crate::metadata::HistoryEntry::with_txid_and_nostr(
+                        action_name,
+                        &action.outpoint.txid.to_string(),
+                        &action.event_id.to_hex(),
+                        timestamp,
+                    );
+
+                    if let Ok(added) =
+                        crate::sync::add_history_entry_if_new(wallet.store(), &taproot_pubkey_gen, entry).await
+                        && added
+                    {
+                        actions_synced += 1;
+                    }
+                }
+            }
+        }
+
+        client.disconnect().await;
+
+        println!();
+        println!("=== History Sync Summary ===");
+        println!("Contracts checked:    {contracts_checked}");
+        println!("Actions synced:       {actions_synced}");
+
+        if !errors.is_empty() {
+            println!();
+            println!("Warnings/Errors ({}):", errors.len());
+            for (i, error) in errors.iter().enumerate().take(10) {
+                println!("  {}. {}", i + 1, error);
+            }
+            if errors.len() > 10 {
+                println!("  ... and {} more", errors.len() - 10);
+            }
+        }
+
         Ok(())
     }
 

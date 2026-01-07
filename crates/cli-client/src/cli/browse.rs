@@ -65,7 +65,7 @@ impl Cli {
                     SwapDisplay {
                         index: idx + 1,
                         event_id: truncate_with_ellipsis(&event.event_id.to_hex(), 16),
-                        offering: format!("{}", args.collateral_per_contract()),
+                        offering: format_asset_amount(args.collateral_per_contract(), args.get_collateral_asset_id()),
                         wants: format_settlement_asset(&args.get_settlement_asset_id()),
                         expires: format_relative_time(i64::from(args.expiry_time())),
                         seller: truncate_with_ellipsis(&event.pubkey.to_hex(), 12),

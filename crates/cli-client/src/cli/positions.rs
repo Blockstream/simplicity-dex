@@ -1,7 +1,8 @@
 use crate::cli::Cli;
 use crate::cli::interactive::{
-    TokenDisplay, display_token_table, format_asset_value_with_tag, format_asset_with_tag, format_relative_time,
-    format_time_ago,
+    EnrichedTokenEntry, GRANTOR_TOKEN_TAG, OPTION_TOKEN_TAG, TokenDisplay, display_token_table,
+    format_asset_value_with_tag, format_asset_with_tag, format_relative_time, format_settlement_asset, format_time_ago,
+    get_grantor_tokens_from_wallet, get_option_tokens_from_wallet, truncate_with_ellipsis,
 };
 use crate::config::Config;
 use crate::error::Error;
@@ -22,15 +23,27 @@ impl Cli {
         println!("===============");
         println!();
 
+        let user_script_pubkey = wallet.signer().p2pk_address(config.address_params())?.script_pubkey();
+
         let options_filter = UtxoFilter::new().source(OPTION_SOURCE);
         let options_results = <_ as UtxoStore>::query_utxos(wallet.store(), &[options_filter]).await?;
         let option_entries = extract_entries(options_results);
 
-        let option_displays = build_option_displays_with_args(&wallet, &option_entries).await;
+        let collateral_displays = build_collateral_displays(&wallet, &option_entries).await;
 
-        println!("Option/Grantor Tokens:");
-        println!("----------------------");
-        display_token_table(&option_displays);
+        println!("Option Contract Locked Assets:");
+        println!("------------------------------");
+        display_collateral_table(&collateral_displays);
+        println!();
+
+        let option_tokens = get_option_tokens_from_wallet(&wallet, OPTION_SOURCE, &user_script_pubkey).await?;
+        let grantor_tokens = get_grantor_tokens_from_wallet(&wallet, OPTION_SOURCE, &user_script_pubkey).await?;
+
+        let user_token_displays = build_user_token_displays(&option_tokens, &grantor_tokens);
+
+        println!("Your Option/Grantor Tokens:");
+        println!("---------------------------");
+        display_user_token_table(&user_token_displays);
         println!();
 
         let swap_filter = UtxoFilter::new().source(SWAP_WITH_CHANGE_SOURCE);
@@ -47,36 +60,42 @@ impl Cli {
         println!("Contract History:");
         println!("-----------------");
 
-        let contracts = <_ as UtxoStore>::list_contracts_by_source_with_metadata(wallet.store(), OPTION_SOURCE).await?;
-        for (_args_bytes, tpg_str, metadata_bytes) in &contracts {
+        let option_contracts =
+            <_ as UtxoStore>::list_contracts_by_source_with_metadata(wallet.store(), OPTION_SOURCE).await?;
+        let swap_contracts =
+            <_ as UtxoStore>::list_contracts_by_source_with_metadata(wallet.store(), SWAP_WITH_CHANGE_SOURCE).await?;
+
+        let mut contracts_with_history: Vec<(&str, &str, ContractMetadata, i64)> = Vec::new();
+
+        for (_args_bytes, tpg_str, metadata_bytes) in &option_contracts {
             if let Some(bytes) = metadata_bytes
                 && let Ok(metadata) = ContractMetadata::from_bytes(bytes)
                 && !metadata.history.is_empty()
             {
-                let short_tpg = truncate_id(tpg_str);
-                println!("\n  Option Contract {short_tpg}:");
-                for entry in &metadata.history {
-                    let time_str = format_time_ago(entry.timestamp);
-                    let txid_str = entry.txid.as_deref().map_or("N/A", |t| &t[..t.len().min(12)]);
-                    println!("    - {} @ {} (tx: {}...)", entry.action, time_str, txid_str);
-                }
+                let most_recent = metadata.history.iter().map(|h| h.timestamp).max().unwrap_or(0);
+                contracts_with_history.push(("Option", tpg_str, metadata, most_recent));
             }
         }
 
-        let swap_contracts =
-            <_ as UtxoStore>::list_contracts_by_source_with_metadata(wallet.store(), SWAP_WITH_CHANGE_SOURCE).await?;
         for (_args_bytes, tpg_str, metadata_bytes) in &swap_contracts {
             if let Some(bytes) = metadata_bytes
                 && let Ok(metadata) = ContractMetadata::from_bytes(bytes)
                 && !metadata.history.is_empty()
             {
-                let short_tpg = truncate_id(tpg_str);
-                println!("\n  Swap Contract {short_tpg}:");
-                for entry in &metadata.history {
-                    let time_str = format_time_ago(entry.timestamp);
-                    let txid_str = entry.txid.as_deref().map_or("N/A", |t| &t[..t.len().min(12)]);
-                    println!("    - {} @ {} (tx: {}...)", entry.action, time_str, txid_str);
-                }
+                let most_recent = metadata.history.iter().map(|h| h.timestamp).max().unwrap_or(0);
+                contracts_with_history.push(("Swap", tpg_str, metadata, most_recent));
+            }
+        }
+
+        contracts_with_history.sort_by(|a, b| b.3.cmp(&a.3));
+
+        for (contract_type, tpg_str, metadata, _) in &contracts_with_history {
+            let short_tpg = truncate_id(tpg_str);
+            println!("\n  {contract_type} Contract {short_tpg}:");
+            for entry in &metadata.history {
+                let time_str = format_time_ago(entry.timestamp);
+                let txid_str = entry.txid.as_deref().map_or("N/A", |t| &t[..t.len().min(12)]);
+                println!("    - {} @ {} (tx: {}...)", entry.action, time_str, txid_str);
             }
         }
 
@@ -94,61 +113,186 @@ fn extract_entries(results: Vec<UtxoQueryResult>) -> Vec<UtxoEntry> {
         .collect()
 }
 
-async fn build_option_displays_with_args(wallet: &crate::wallet::Wallet, entries: &[UtxoEntry]) -> Vec<TokenDisplay> {
-    let mut displays = Vec::new();
+/// Display struct for contract collateral
+#[derive(Debug, Clone)]
+pub struct CollateralDisplay {
+    pub index: usize,
+    pub collateral: String,
+    pub settlement: String,
+    pub expires: String,
+    pub contract: String,
+}
 
-    for (idx, entry) in entries.iter().enumerate() {
+/// Display struct for user-owned option/grantor tokens
+#[derive(Debug, Clone)]
+pub struct UserTokenDisplay {
+    pub index: usize,
+    pub token_type: String,
+    pub amount: String,
+    pub strike: String,
+    pub expires: String,
+    pub contract: String,
+}
+
+fn display_collateral_table(displays: &[CollateralDisplay]) {
+    if displays.is_empty() {
+        println!("  (No locked assets found)");
+        return;
+    }
+
+    println!(
+        "  {:<3} | {:<18} | {:<14} | {:<18} | Contract",
+        "#", "Locked Assets", "Settlement", "Expires"
+    );
+    println!("{}", "-".repeat(80));
+
+    for display in displays {
+        println!(
+            "  {:<3} | {:<18} | {:<14} | {:<18} | {}",
+            display.index, display.collateral, display.settlement, display.expires, display.contract
+        );
+    }
+}
+
+fn display_user_token_table(displays: &[UserTokenDisplay]) {
+    if displays.is_empty() {
+        println!("  (No option/grantor tokens found)");
+        return;
+    }
+
+    println!(
+        "  {:<3} | {:<8} | {:<10} | {:<14} | {:<18} | Contract",
+        "#", "Type", "Amount", "Strike/Token", "Expires"
+    );
+    println!("{}", "-".repeat(90));
+
+    for display in displays {
+        println!(
+            "  {:<3} | {:<8} | {:<10} | {:<14} | {:<18} | {}",
+            display.index, display.token_type, display.amount, display.strike, display.expires, display.contract
+        );
+    }
+}
+
+/// Build locked asset displays, filtering to only show collateral or settlement assets (not reissuance tokens)
+async fn build_collateral_displays(wallet: &crate::wallet::Wallet, entries: &[UtxoEntry]) -> Vec<CollateralDisplay> {
+    let mut displays = Vec::new();
+    let mut display_idx = 0;
+
+    for entry in entries {
         let script_pubkey = entry.txout().script_pubkey.clone();
         let contract_info = <_ as UtxoStore>::get_contract_by_script_pubkey(wallet.store(), &script_pubkey).await;
 
-        let (settlement, expires, status) =
-            extract_option_display_info_with_tags(wallet.store(), contract_info, entry).await;
+        // Try to get option arguments to check if this is collateral
+        let Some(info) = extract_collateral_info(wallet.store(), contract_info, entry).await else {
+            continue;
+        };
 
-        let collateral = format_asset_value_with_tag(wallet.store(), entry.value(), entry.asset()).await;
-
-        displays.push(TokenDisplay {
-            index: idx + 1,
-            outpoint: entry.outpoint().to_string(),
-            collateral,
-            settlement,
-            expires,
-            status,
+        display_idx += 1;
+        displays.push(CollateralDisplay {
+            index: display_idx,
+            collateral: info.0,
+            settlement: info.1,
+            expires: info.2,
+            contract: info.3,
         });
     }
 
     displays
 }
 
-async fn extract_option_display_info_with_tags(
+/// Extract contract asset info, returning None if this UTXO is not a collateral or settlement asset (e.g., reissuance token)
+async fn extract_collateral_info(
     store: &Store,
     contract_info: ContractInfoResult,
     entry: &UtxoEntry,
-) -> (String, String, String) {
-    let default = || ("N/A".to_string(), "N/A".to_string(), "Token".to_string());
+) -> Option<(String, String, String, String)> {
+    let (_metadata, args_bytes, tpg) = contract_info.ok().flatten()?;
 
-    let Some((_metadata, args_bytes, _tpg)) = contract_info.ok().flatten() else {
-        return default();
-    };
-
-    let Ok((args, _)) =
+    let (args, _) =
         bincode::serde::decode_from_slice::<simplicityhl::Arguments, _>(&args_bytes, bincode::config::standard())
-    else {
-        return default();
-    };
+            .ok()?;
 
-    let Ok(opt_args) = OptionsArguments::from_arguments(&args) else {
-        return default();
-    };
+    let opt_args = OptionsArguments::from_arguments(&args).ok()?;
 
+    let entry_asset = entry.asset()?;
+    let is_collateral = entry_asset == opt_args.get_collateral_asset_id();
+    let is_settlement = entry_asset == opt_args.get_settlement_asset_id();
+    if !is_collateral && !is_settlement {
+        return None;
+    }
+
+    let locked_str = format_asset_value_with_tag(store, entry.value(), entry.asset()).await;
     let settlement_str = format_asset_with_tag(store, &opt_args.get_settlement_asset_id()).await;
     let expiry_str = format_relative_time(i64::from(opt_args.expiry_time()));
-    let status_str = if entry.contract().is_some() {
-        "Collateral"
-    } else {
-        "Token"
-    };
+    let contract_str = truncate_id(&tpg);
 
-    (settlement_str, expiry_str, status_str.to_string())
+    Some((locked_str, settlement_str, expiry_str, contract_str))
+}
+
+/// Build user token displays from option and grantor tokens
+fn build_user_token_displays(
+    option_tokens: &[EnrichedTokenEntry],
+    grantor_tokens: &[EnrichedTokenEntry],
+) -> Vec<UserTokenDisplay> {
+    let mut displays = Vec::new();
+    let mut idx = 0;
+
+    // Add option tokens
+    for entry in option_tokens {
+        idx += 1;
+        let settlement_asset = entry.option_arguments.get_settlement_asset_id();
+        let settlement_per_contract = entry.option_arguments.settlement_per_contract();
+        let expiry_time = entry.option_arguments.expiry_time();
+
+        let contract_addr = entry
+            .taproot_pubkey_gen_str
+            .split(':')
+            .next_back()
+            .map_or_else(|| "???".to_string(), |s| truncate_with_ellipsis(s, 12));
+
+        displays.push(UserTokenDisplay {
+            index: idx,
+            token_type: OPTION_TOKEN_TAG.to_string(),
+            amount: entry.entry.value().unwrap_or(0).to_string(),
+            strike: format!(
+                "{} {}",
+                settlement_per_contract,
+                format_settlement_asset(&settlement_asset)
+            ),
+            expires: format_relative_time(i64::from(expiry_time)),
+            contract: contract_addr,
+        });
+    }
+
+    // Add grantor tokens
+    for entry in grantor_tokens {
+        idx += 1;
+        let settlement_asset = entry.option_arguments.get_settlement_asset_id();
+        let settlement_per_contract = entry.option_arguments.settlement_per_contract();
+        let expiry_time = entry.option_arguments.expiry_time();
+
+        let contract_addr = entry
+            .taproot_pubkey_gen_str
+            .split(':')
+            .next_back()
+            .map_or_else(|| "???".to_string(), |s| truncate_with_ellipsis(s, 12));
+
+        displays.push(UserTokenDisplay {
+            index: idx,
+            token_type: GRANTOR_TOKEN_TAG.to_string(),
+            amount: entry.entry.value().unwrap_or(0).to_string(),
+            strike: format!(
+                "{} {}",
+                settlement_per_contract,
+                format_settlement_asset(&settlement_asset)
+            ),
+            expires: format_relative_time(i64::from(expiry_time)),
+            contract: contract_addr,
+        });
+    }
+
+    displays
 }
 
 async fn build_swap_displays_with_args(wallet: &crate::wallet::Wallet, entries: &[UtxoEntry]) -> Vec<TokenDisplay> {
