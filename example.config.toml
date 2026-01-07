@@ -1,0 +1,20 @@
+[network]
+name = "testnet"
+
+[relay]
+urls = [
+    "wss://relay.damus.io/"
+]
+timeout_secs = 60
+
+[storage]
+data_dir = "./path_to_the_sqlite_db"
+
+[fee]
+# Confirmation target in blocks.
+# Set to 0 to always use the fallback rate (no network call).
+# Common targets: 1 (next block), 6 (1 hour), 144 (1 day).
+confirmation_target = 1
+# Fallback fee rate in sats/kvb if estimation fails or target is 0.
+# Default: 100.0 sats/kvb (0.10 sat/vB) to meet Liquid minimum relay fee.
+fallback_rate = 100.0
