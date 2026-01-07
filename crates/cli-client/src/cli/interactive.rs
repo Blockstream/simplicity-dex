@@ -18,8 +18,6 @@ pub const SWAP_COLLATERAL_TAG: &str = "swap_collateral";
 #[derive(Debug, Clone)]
 pub struct TokenDisplay {
     pub index: usize,
-    #[allow(dead_code)]
-    pub outpoint: String,
     pub collateral: String,
     pub settlement: String,
     pub expires: String,
@@ -29,8 +27,6 @@ pub struct TokenDisplay {
 #[derive(Debug, Clone)]
 pub struct SwapDisplay {
     pub index: usize,
-    #[allow(dead_code)]
-    pub event_id: String,
     pub offering: String,
     pub wants: String,
     pub expires: String,
@@ -198,18 +194,6 @@ pub fn prompt_amount(prompt: &str) -> io::Result<u64> {
     )
 }
 
-#[allow(dead_code)]
-pub fn prompt_confirm(prompt: &str) -> io::Result<bool> {
-    print!("{prompt} [y/N]: ");
-    io::stdout().flush()?;
-
-    let mut input = String::new();
-    io::stdin().read_line(&mut input)?;
-    let input = input.trim();
-
-    Ok(input.eq_ignore_ascii_case("y") || input.eq_ignore_ascii_case("yes"))
-}
-
 #[must_use]
 pub fn truncate_with_ellipsis(s: &str, max_len: usize) -> String {
     if s.len() <= max_len {
@@ -218,20 +202,6 @@ pub fn truncate_with_ellipsis(s: &str, max_len: usize) -> String {
         s[..max_len].to_string()
     } else {
         format!("{}...", &s[..max_len - 3])
-    }
-}
-
-#[must_use]
-#[allow(dead_code, clippy::cast_precision_loss)]
-pub fn format_sats(sats: u64) -> String {
-    if sats >= 100_000_000 {
-        format!("{:.4} BTC", sats as f64 / 100_000_000.0)
-    } else if sats >= 1_000_000 {
-        format!("{:.2}M sats", sats as f64 / 1_000_000.0)
-    } else if sats >= 1_000 {
-        format!("{:.1}k sats", sats as f64 / 1_000.0)
-    } else {
-        format!("{sats} sats")
     }
 }
 
@@ -298,17 +268,6 @@ pub fn extract_entries_from_results(results: Vec<UtxoQueryResult>) -> Vec<UtxoEn
             UtxoQueryResult::Empty => vec![],
         })
         .collect()
-}
-
-/// Get contract UTXOs at the contract address by source.
-/// NOTE: This returns UTXOs at the contract address itself (collateral, reissuance tokens),
-/// NOT user-held tokens. For user-held option/grantor tokens, use `get_option_tokens_from_wallet`
-/// or `get_grantor_tokens_from_wallet`.
-#[allow(dead_code)]
-pub async fn get_contract_tokens(wallet: &crate::wallet::Wallet, source: &str) -> Result<Vec<UtxoEntry>, Error> {
-    let filter = UtxoFilter::new().source(source);
-    let results = <_ as UtxoStore>::query_utxos(wallet.store(), &[filter]).await?;
-    Ok(extract_entries_from_results(results))
 }
 
 /// Get grantor tokens from user's wallet using the `contract_tokens` table.
@@ -414,7 +373,6 @@ pub fn select_enriched_token_interactive<'a>(
 
             TokenDisplay {
                 index: idx + 1,
-                outpoint: enriched.entry.outpoint().to_string(),
                 collateral: format!("{} tokens", enriched.entry.value().unwrap_or(0)),
                 settlement: format!(
                     "{} {}",
@@ -520,13 +478,5 @@ mod tests {
         assert_eq!(truncate_with_ellipsis("hello", 10), "hello");
         assert_eq!(truncate_with_ellipsis("hello world", 8), "hello...");
         assert_eq!(truncate_with_ellipsis("abc", 3), "abc");
-    }
-
-    #[test]
-    fn test_format_sats() {
-        assert_eq!(format_sats(500), "500 sats");
-        assert_eq!(format_sats(5000), "5.0k sats");
-        assert_eq!(format_sats(5_000_000), "5.00M sats");
-        assert_eq!(format_sats(100_000_000), "1.0000 BTC");
     }
 }

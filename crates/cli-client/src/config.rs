@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
@@ -99,11 +97,6 @@ impl Config {
     #[must_use]
     pub const fn address_params(&self) -> &'static AddressParams {
         self.network.name.address_params()
-    }
-
-    #[must_use]
-    pub const fn relay_timeout(&self) -> Duration {
-        Duration::from_secs(self.relay.timeout_secs)
     }
 
     /// Get fee rate from config or Esplora.

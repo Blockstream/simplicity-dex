@@ -34,7 +34,6 @@ impl Cli {
                     let args = &event.options_args;
                     TokenDisplay {
                         index: idx + 1,
-                        outpoint: event.utxo.to_string(),
                         collateral: format_asset_amount(args.collateral_per_contract(), args.get_collateral_asset_id()),
                         settlement: format_asset_amount(args.settlement_per_contract(), args.get_settlement_asset_id()),
                         expires: format_relative_time(i64::from(args.expiry_time())),
@@ -64,7 +63,6 @@ impl Cli {
                     let args = &event.swap_args;
                     SwapDisplay {
                         index: idx + 1,
-                        event_id: truncate_with_ellipsis(&event.event_id.to_hex(), 16),
                         offering: format_asset_amount(args.collateral_per_contract(), args.get_collateral_asset_id()),
                         wants: format_settlement_asset(&args.get_settlement_asset_id()),
                         expires: format_relative_time(i64::from(args.expiry_time())),

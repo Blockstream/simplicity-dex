@@ -98,28 +98,6 @@ pub fn fetch_transaction(txid: Txid) -> Result<Transaction, EsploraError> {
     Ok(tx)
 }
 
-/// Check if a specific output has been spent.
-///
-/// Uses the `GET /tx/:txid/outspend/:vout` endpoint.
-#[allow(dead_code)]
-pub fn fetch_outspend(txid: Txid, vout: u32) -> Result<OutspendStatus, EsploraError> {
-    let url = format!("{ESPLORA_URL}/tx/{}/outspend/{vout}", txid.to_hex());
-    let response = minreq::get(&url)
-        .send()
-        .map_err(|e| EsploraError::Request(e.to_string()))?;
-
-    if response.status_code != 200 {
-        return Err(EsploraError::Request(format!(
-            "HTTP {}: {}",
-            response.status_code, response.reason_phrase
-        )));
-    }
-
-    let status: OutspendStatus = response.json().map_err(|e| EsploraError::Deserialize(e.to_string()))?;
-
-    Ok(status)
-}
-
 /// Check spending status of all outputs in a transaction.
 ///
 /// Uses the `GET /tx/:txid/outspends` endpoint. More efficient than
