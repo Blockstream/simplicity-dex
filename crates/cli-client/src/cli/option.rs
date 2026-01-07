@@ -283,6 +283,15 @@ impl Cli {
                     let (option_token_id, _) = args.get_option_token_ids();
                     let (grantor_token_id, _) = args.get_grantor_token_ids();
 
+                    wallet
+                        .store()
+                        .insert_contract_token(&taproot_pubkey_gen, option_token_id, "option_token")
+                        .await?;
+                    wallet
+                        .store()
+                        .insert_contract_token(&taproot_pubkey_gen, grantor_token_id, "grantor_token")
+                        .await?;
+
                     println!("  Option token: {option_token_id}");
                     println!("  Grantor token: {grantor_token_id}");
                     println!("  Contract address: {}", taproot_pubkey_gen.address);
