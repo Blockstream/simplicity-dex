@@ -41,27 +41,6 @@ impl HistoryEntry {
             details: None,
         }
     }
-
-    /// Create a new history entry with only NOSTR event.
-    #[must_use]
-    #[allow(dead_code)]
-    pub fn with_nostr(action: &str, nostr_event_id: &str, timestamp: i64) -> Self {
-        Self {
-            action: action.to_string(),
-            txid: None,
-            nostr_event_id: Some(nostr_event_id.to_string()),
-            timestamp,
-            details: None,
-        }
-    }
-
-    /// Add details to the history entry.
-    #[must_use]
-    #[allow(dead_code)]
-    pub fn with_details(mut self, details: &str) -> Self {
-        self.details = Some(details.to_string());
-        self
-    }
 }
 
 /// Metadata for contracts stored in the database.
@@ -85,32 +64,6 @@ pub struct ContractMetadata {
 }
 
 impl ContractMetadata {
-    /// Create metadata for a locally created contract.
-    #[must_use]
-    #[allow(dead_code)]
-    pub const fn from_local(created_at: i64) -> Self {
-        Self {
-            nostr_event_id: None,
-            nostr_author: None,
-            created_at: Some(created_at),
-            parent_event_id: None,
-            history: Vec::new(),
-        }
-    }
-
-    /// Create metadata for a locally created contract with initial history.
-    #[must_use]
-    #[allow(dead_code)]
-    pub const fn from_local_with_history(created_at: i64, history: Vec<HistoryEntry>) -> Self {
-        Self {
-            nostr_event_id: None,
-            nostr_author: None,
-            created_at: Some(created_at),
-            parent_event_id: None,
-            history,
-        }
-    }
-
     /// Create metadata for a contract synced from Nostr with initial history.
     #[must_use]
     pub const fn from_nostr_with_history(
@@ -177,13 +130,6 @@ impl ContractMetadata {
         }
     }
 
-    /// Get the history entries.
-    #[must_use]
-    #[allow(dead_code)]
-    pub fn history(&self) -> &[HistoryEntry] {
-        &self.history
-    }
-
     pub fn to_bytes(&self) -> Result<Vec<u8>, Error> {
         bincode::serde::encode_to_vec(self, bincode::config::standard()).map_err(Error::MetadataEncode)
     }
@@ -246,20 +192,6 @@ mod tests {
     }
 
     #[test]
-    fn test_local_metadata_roundtrip() {
-        let metadata = ContractMetadata::from_local(1_704_067_200);
-
-        let bytes = metadata.to_bytes().unwrap();
-        let restored = ContractMetadata::from_bytes(&bytes).unwrap();
-
-        assert_eq!(restored.nostr_event_id, None);
-        assert_eq!(restored.nostr_author, None);
-        assert_eq!(restored.created_at, Some(1_704_067_200));
-        assert_eq!(restored.parent_event_id, None);
-        assert!(restored.history.is_empty());
-    }
-
-    #[test]
     fn test_history_entry_with_txid() {
         let entry = HistoryEntry::with_txid("option_created", "abc123", 1_704_067_200);
 
@@ -280,34 +212,8 @@ mod tests {
     }
 
     #[test]
-    fn test_history_entry_with_details() {
-        let entry =
-            HistoryEntry::with_txid("option_funded", "xyz789", 1_704_067_200).with_details("Funded with 1000 sats");
-
-        assert_eq!(entry.details, Some("Funded with 1000 sats".to_string()));
-    }
-
-    #[test]
-    fn test_metadata_with_history_roundtrip() {
-        let history = vec![
-            HistoryEntry::with_txid("option_created", "tx1", 1_704_067_200),
-            HistoryEntry::with_txid_and_nostr("option_funded", "tx2", "event1", 1_704_067_300),
-        ];
-
-        let metadata = ContractMetadata::from_local_with_history(1_704_067_200, history);
-
-        let bytes = metadata.to_bytes().unwrap();
-        let restored = ContractMetadata::from_bytes(&bytes).unwrap();
-
-        assert_eq!(restored.history.len(), 2);
-        assert_eq!(restored.history[0].action, "option_created");
-        assert_eq!(restored.history[1].action, "option_funded");
-        assert_eq!(restored.history[1].nostr_event_id, Some("event1".to_string()));
-    }
-
-    #[test]
     fn test_add_history() {
-        let mut metadata = ContractMetadata::from_local(1_704_067_200);
+        let mut metadata = ContractMetadata::default();
         assert!(metadata.history.is_empty());
 
         metadata.add_history(HistoryEntry::with_txid("action1", "tx1", 1_704_067_200));

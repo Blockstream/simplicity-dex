@@ -363,7 +363,6 @@ async fn build_swap_displays_with_args(wallet: &crate::wallet::Wallet, entries: 
         display_idx += 1;
         displays.push(TokenDisplay {
             index: display_idx,
-            outpoint: entry.outpoint().to_string(),
             collateral,
             settlement,
             expires,

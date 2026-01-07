@@ -12,7 +12,6 @@ pub const PLACEHOLDER_FEE: u64 = 1;
 
 /// Default fallback fee rate in sats/kvb (0.10 sat/vB).
 /// Higher than LWK default to meet Liquid minimum relay fee requirements.
-#[allow(dead_code)]
 pub const DEFAULT_FEE_RATE: f32 = 100.0;
 
 /// Estimate fee by signing a placeholder transaction to get accurate weight.
