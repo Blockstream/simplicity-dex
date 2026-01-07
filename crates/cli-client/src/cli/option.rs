@@ -596,9 +596,7 @@ impl Cli {
                     )?;
 
                     let collateral_asset_id = entry.option_arguments.get_collateral_asset_id();
-                    let collateral_filter = UtxoFilter::new()
-                        .taproot_pubkey_gen(tpg)
-                        .asset_id(collateral_asset_id);
+                    let collateral_filter = UtxoFilter::new().taproot_pubkey_gen(tpg).asset_id(collateral_asset_id);
 
                     if let Ok(results) = <_ as UtxoStore>::query_utxos(wallet.store(), &[collateral_filter]).await {
                         let collateral_entries = extract_entries_from_results(results);
