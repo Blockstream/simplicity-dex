@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
 use crate::cli::interactive::{
-    GRANTOR_TOKEN_TAG, OPTION_TOKEN_TAG, current_timestamp, extract_entries_from_result, format_relative_time,
-    get_grantor_tokens_from_wallet, get_option_tokens_from_wallet, parse_expiry, prompt_amount,
+    GRANTOR_TOKEN_TAG, OPTION_TOKEN_TAG, current_timestamp, extract_entries_from_result, extract_entries_from_results,
+    format_relative_time, get_grantor_tokens_from_wallet, get_option_tokens_from_wallet, parse_expiry, prompt_amount,
     select_enriched_token_interactive,
 };
 use crate::cli::{Cli, OptionCommand};
@@ -86,7 +86,7 @@ impl Cli {
                     .limit(3);
 
                 let lbtc_results = <_ as UtxoStore>::query_utxos(wallet.store(), &[lbtc_fee_filter]).await?;
-                let lbtc_entries = extract_entries_from_result(&lbtc_results[0]);
+                let lbtc_entries = extract_entries_from_results(lbtc_results);
 
                 if lbtc_entries.len() < 3 {
                     return Err(Error::Config(
@@ -105,7 +105,7 @@ impl Cli {
                         .required_value(*total_collateral);
                     coll_query_results = <_ as UtxoStore>::query_utxos(wallet.store(), &[collateral_filter]).await?;
 
-                    let coll_entries = extract_entries_from_result(&coll_query_results[0]);
+                    let coll_entries = extract_entries_from_results(coll_query_results);
                     let coll_entry = coll_entries.first().ok_or_else(|| {
                         Error::Config(format!("No UTXOs found for collateral asset {collateral_asset}"))
                     })?;
@@ -348,7 +348,7 @@ impl Cli {
                     let collateral_filter = UtxoFilter::new().taproot_pubkey_gen(tpg).asset_id(collateral_asset_id);
 
                     if let Ok(results) = <_ as UtxoStore>::query_utxos(wallet.store(), &[collateral_filter]).await {
-                        let collateral_entries = extract_entries_from_result(&results[0]);
+                        let collateral_entries = extract_entries_from_results(results);
                         if !collateral_entries.is_empty() {
                             contracts_with_collateral.insert(entry.taproot_pubkey_gen_str.clone());
                         }
@@ -596,10 +596,12 @@ impl Cli {
                     )?;
 
                     let collateral_asset_id = entry.option_arguments.get_collateral_asset_id();
-                    let collateral_filter = UtxoFilter::new().taproot_pubkey_gen(tpg).asset_id(collateral_asset_id);
+                    let collateral_filter = UtxoFilter::new()
+                        .taproot_pubkey_gen(tpg)
+                        .asset_id(collateral_asset_id);
 
                     if let Ok(results) = <_ as UtxoStore>::query_utxos(wallet.store(), &[collateral_filter]).await {
-                        let collateral_entries = extract_entries_from_result(&results[0]);
+                        let collateral_entries = extract_entries_from_results(results);
                         if !collateral_entries.is_empty() {
                             contracts_with_collateral.insert(entry.taproot_pubkey_gen_str.clone());
                         }
@@ -620,6 +622,8 @@ impl Cli {
                         }
                     })
                     .collect();
+
+                dbg!("here");
 
                 if entries_with_collateral.is_empty() {
                     return Err(Error::Config(
