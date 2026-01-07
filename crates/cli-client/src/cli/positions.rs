@@ -9,8 +9,10 @@ use crate::error::Error;
 use crate::metadata::ContractMetadata;
 
 use coin_store::{Store, UtxoEntry, UtxoFilter, UtxoQueryResult, UtxoStore};
-use contracts::options::{OPTION_SOURCE, OptionsArguments};
+use contracts::options::{OPTION_SOURCE, OptionsArguments, get_options_address};
+use contracts::sdk::taproot_pubkey_gen::TaprootPubkeyGen;
 use contracts::swap_with_change::{SWAP_WITH_CHANGE_SOURCE, SwapWithChangeArguments};
+use simplicityhl::elements::Address;
 
 /// Result type for contract info queries: (metadata, arguments, `taproot_pubkey_gen`)
 type ContractInfoResult = Result<Option<(Vec<u8>, Vec<u8>, String)>, coin_store::StoreError>;
@@ -29,7 +31,7 @@ impl Cli {
         let options_results = <_ as UtxoStore>::query_utxos(wallet.store(), &[options_filter]).await?;
         let option_entries = extract_entries(options_results);
 
-        let collateral_displays = build_collateral_displays(&wallet, &option_entries).await;
+        let collateral_displays = build_collateral_displays(&wallet, &option_entries, config.address_params()).await;
 
         println!("Option Contract Locked Assets:");
         println!("------------------------------");
@@ -39,7 +41,7 @@ impl Cli {
         let option_tokens = get_option_tokens_from_wallet(&wallet, OPTION_SOURCE, &user_script_pubkey).await?;
         let grantor_tokens = get_grantor_tokens_from_wallet(&wallet, OPTION_SOURCE, &user_script_pubkey).await?;
 
-        let user_token_displays = build_user_token_displays(&option_tokens, &grantor_tokens);
+        let user_token_displays = build_user_token_displays(&option_tokens, &grantor_tokens, config.address_params());
 
         println!("Your Option/Grantor Tokens:");
         println!("---------------------------");
@@ -65,33 +67,64 @@ impl Cli {
         let swap_contracts =
             <_ as UtxoStore>::list_contracts_by_source_with_metadata(wallet.store(), SWAP_WITH_CHANGE_SOURCE).await?;
 
-        let mut contracts_with_history: Vec<(&str, &str, ContractMetadata, i64)> = Vec::new();
+        let mut contracts_with_history: Vec<(&str, Address, ContractMetadata, i64)> = Vec::new();
 
-        for (_args_bytes, tpg_str, metadata_bytes) in &option_contracts {
+        for (args_bytes, tpg_str, metadata_bytes) in &option_contracts {
             if let Some(bytes) = metadata_bytes
                 && let Ok(metadata) = ContractMetadata::from_bytes(bytes)
                 && !metadata.history.is_empty()
             {
+                let Ok((args, _)) = bincode::serde::decode_from_slice::<simplicityhl::Arguments, _>(
+                    args_bytes,
+                    bincode::config::standard(),
+                ) else {
+                    continue;
+                };
+                let Ok(opt_args) = OptionsArguments::from_arguments(&args) else {
+                    continue;
+                };
+                let Ok(tpg) =
+                    TaprootPubkeyGen::build_from_str(tpg_str, &opt_args, config.address_params(), &get_options_address)
+                else {
+                    continue;
+                };
                 let most_recent = metadata.history.iter().map(|h| h.timestamp).max().unwrap_or(0);
-                contracts_with_history.push(("Option", tpg_str, metadata, most_recent));
+                contracts_with_history.push(("Option", tpg.address, metadata, most_recent));
             }
         }
 
-        for (_args_bytes, tpg_str, metadata_bytes) in &swap_contracts {
+        for (args_bytes, tpg_str, metadata_bytes) in &swap_contracts {
             if let Some(bytes) = metadata_bytes
                 && let Ok(metadata) = ContractMetadata::from_bytes(bytes)
                 && !metadata.history.is_empty()
             {
+                let Ok((args, _)) = bincode::serde::decode_from_slice::<simplicityhl::Arguments, _>(
+                    args_bytes,
+                    bincode::config::standard(),
+                ) else {
+                    continue;
+                };
+                let Ok(swap_args) = SwapWithChangeArguments::from_arguments(&args) else {
+                    continue;
+                };
+                let Ok(tpg) = TaprootPubkeyGen::build_from_str(
+                    tpg_str,
+                    &swap_args,
+                    config.address_params(),
+                    &contracts::swap_with_change::get_swap_with_change_address,
+                ) else {
+                    continue;
+                };
                 let most_recent = metadata.history.iter().map(|h| h.timestamp).max().unwrap_or(0);
-                contracts_with_history.push(("Swap", tpg_str, metadata, most_recent));
+                contracts_with_history.push(("Swap", tpg.address, metadata, most_recent));
             }
         }
 
         contracts_with_history.sort_by(|a, b| b.3.cmp(&a.3));
 
-        for (contract_type, tpg_str, metadata, _) in &contracts_with_history {
-            let short_tpg = truncate_id(tpg_str);
-            println!("\n  {contract_type} Contract {short_tpg}:");
+        for (contract_type, address, metadata, _) in &contracts_with_history {
+            let short_addr = format_contract_address(address);
+            println!("\n  {contract_type} Contract {short_addr}:");
             for entry in &metadata.history {
                 let time_str = format_time_ago(entry.timestamp);
                 let txid_str = entry.txid.as_deref().map_or("N/A", |t| &t[..t.len().min(12)]);
@@ -175,7 +208,11 @@ fn display_user_token_table(displays: &[UserTokenDisplay]) {
 }
 
 /// Build locked asset displays, filtering to only show collateral or settlement assets (not reissuance tokens)
-async fn build_collateral_displays(wallet: &crate::wallet::Wallet, entries: &[UtxoEntry]) -> Vec<CollateralDisplay> {
+async fn build_collateral_displays(
+    wallet: &crate::wallet::Wallet,
+    entries: &[UtxoEntry],
+    address_params: &'static simplicityhl::elements::AddressParams,
+) -> Vec<CollateralDisplay> {
     let mut displays = Vec::new();
     let mut display_idx = 0;
 
@@ -184,7 +221,7 @@ async fn build_collateral_displays(wallet: &crate::wallet::Wallet, entries: &[Ut
         let contract_info = <_ as UtxoStore>::get_contract_by_script_pubkey(wallet.store(), &script_pubkey).await;
 
         // Try to get option arguments to check if this is collateral
-        let Some(info) = extract_collateral_info(wallet.store(), contract_info, entry).await else {
+        let Some(info) = extract_collateral_info(wallet.store(), contract_info, entry, address_params).await else {
             continue;
         };
 
@@ -206,8 +243,9 @@ async fn extract_collateral_info(
     store: &Store,
     contract_info: ContractInfoResult,
     entry: &UtxoEntry,
+    address_params: &'static simplicityhl::elements::AddressParams,
 ) -> Option<(String, String, String, String)> {
-    let (_metadata, args_bytes, tpg) = contract_info.ok().flatten()?;
+    let (_metadata, args_bytes, tpg_str) = contract_info.ok().flatten()?;
 
     let (args, _) =
         bincode::serde::decode_from_slice::<simplicityhl::Arguments, _>(&args_bytes, bincode::config::standard())
@@ -222,10 +260,12 @@ async fn extract_collateral_info(
         return None;
     }
 
+    let tpg = TaprootPubkeyGen::build_from_str(&tpg_str, &opt_args, address_params, &get_options_address).ok()?;
+
     let locked_str = format_asset_value_with_tag(store, entry.value(), entry.asset()).await;
     let settlement_str = format_asset_with_tag(store, &opt_args.get_settlement_asset_id()).await;
     let expiry_str = format_relative_time(i64::from(opt_args.expiry_time()));
-    let contract_str = truncate_id(&tpg);
+    let contract_str = format_contract_address(&tpg.address);
 
     Some((locked_str, settlement_str, expiry_str, contract_str))
 }
@@ -234,6 +274,7 @@ async fn extract_collateral_info(
 fn build_user_token_displays(
     option_tokens: &[EnrichedTokenEntry],
     grantor_tokens: &[EnrichedTokenEntry],
+    address_params: &'static simplicityhl::elements::AddressParams,
 ) -> Vec<UserTokenDisplay> {
     let mut displays = Vec::new();
     let mut idx = 0;
@@ -245,11 +286,13 @@ fn build_user_token_displays(
         let settlement_per_contract = entry.option_arguments.settlement_per_contract();
         let expiry_time = entry.option_arguments.expiry_time();
 
-        let contract_addr = entry
-            .taproot_pubkey_gen_str
-            .split(':')
-            .next_back()
-            .map_or_else(|| "???".to_string(), |s| truncate_with_ellipsis(s, 12));
+        let contract_addr = TaprootPubkeyGen::build_from_str(
+            &entry.taproot_pubkey_gen_str,
+            &entry.option_arguments,
+            address_params,
+            &get_options_address,
+        )
+        .map_or_else(|_| "???".to_string(), |tpg| format_contract_address(&tpg.address));
 
         displays.push(UserTokenDisplay {
             index: idx,
@@ -272,11 +315,13 @@ fn build_user_token_displays(
         let settlement_per_contract = entry.option_arguments.settlement_per_contract();
         let expiry_time = entry.option_arguments.expiry_time();
 
-        let contract_addr = entry
-            .taproot_pubkey_gen_str
-            .split(':')
-            .next_back()
-            .map_or_else(|| "???".to_string(), |s| truncate_with_ellipsis(s, 12));
+        let contract_addr = TaprootPubkeyGen::build_from_str(
+            &entry.taproot_pubkey_gen_str,
+            &entry.option_arguments,
+            address_params,
+            &get_options_address,
+        )
+        .map_or_else(|_| "???".to_string(), |tpg| format_contract_address(&tpg.address));
 
         displays.push(UserTokenDisplay {
             index: idx,
@@ -352,10 +397,7 @@ async fn extract_swap_display_info_with_tags(
     Some((settlement_str, expiry_str, is_collateral, price))
 }
 
-fn truncate_id(s: &str) -> String {
-    if s.len() > 12 {
-        format!("{}...", &s[..12])
-    } else {
-        s.to_string()
-    }
+/// Format a contract address for display by truncating the bech32 address.
+fn format_contract_address(address: &Address) -> String {
+    truncate_with_ellipsis(&address.to_string(), 12)
 }
