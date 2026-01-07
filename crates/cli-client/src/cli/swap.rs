@@ -173,9 +173,14 @@ impl Cli {
                         .add_contract(
                             SWAP_WITH_CHANGE_SOURCE,
                             swap_args.build_arguments(),
-                            taproot_pubkey_gen,
+                            taproot_pubkey_gen.clone(),
                             Some(&metadata_bytes),
                         )
+                        .await?;
+
+                    wallet
+                        .store()
+                        .insert_contract_token(&taproot_pubkey_gen, collateral_asset, "swap_collateral")
                         .await?;
 
                     wallet.store().insert_transaction(&tx, HashMap::default()).await?;

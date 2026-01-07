@@ -446,6 +446,50 @@ pub fn format_settlement_asset(asset_id: &simplicityhl::elements::AssetId) -> St
     }
 }
 
+/// Look up a human-readable tag for an asset from the `contract_tokens` table.
+///
+/// Returns `Some(tag)` if the asset is registered (e.g., "`option_token`", "`grantor_token`"),
+/// or `None` if not found.
+pub async fn lookup_asset_tag(store: &coin_store::Store, asset_id: &simplicityhl::elements::AssetId) -> Option<String> {
+    <_ as UtxoStore>::get_contract_by_token(store, *asset_id)
+        .await
+        .ok()
+        .flatten()
+        .map(|(_, tag)| tag)
+}
+
+/// Format an asset ID with tag lookup, falling back to hex if no tag found.
+///
+/// Returns "LBTC" for native asset, the tag if registered, or truncated hex otherwise.
+pub async fn format_asset_with_tag(store: &coin_store::Store, asset_id: &simplicityhl::elements::AssetId) -> String {
+    if *asset_id == *LIQUID_TESTNET_BITCOIN_ASSET {
+        return "LBTC".to_string();
+    }
+
+    if let Some(tag) = lookup_asset_tag(store, asset_id).await {
+        return tag;
+    }
+
+    let hex = asset_id.to_hex();
+    format!("({})...", &hex[..hex.len().min(8)])
+}
+
+/// Format an asset value with tag lookup, showing "value tag" or "value (hex)...".
+pub async fn format_asset_value_with_tag(
+    store: &coin_store::Store,
+    value: Option<u64>,
+    asset_id: Option<simplicityhl::elements::AssetId>,
+) -> String {
+    match (value, asset_id) {
+        (Some(v), Some(a)) => {
+            let asset_str = format_asset_with_tag(store, &a).await;
+            format!("{v} {asset_str}")
+        }
+        (Some(v), None) => format!("{v} (unknown)"),
+        _ => "Confidential".to_string(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

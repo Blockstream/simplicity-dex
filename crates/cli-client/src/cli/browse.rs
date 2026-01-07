@@ -9,6 +9,7 @@ use crate::error::Error;
 use options_relay::{OptionCreatedEvent, SwapCreatedEvent};
 use simplicityhl::elements::AssetId;
 use simplicityhl::elements::hex::ToHex;
+use simplicityhl_core::LIQUID_TESTNET_BITCOIN_ASSET;
 
 impl Cli {
     pub(crate) async fn run_browse(&self, config: Config) -> Result<(), Error> {
@@ -89,8 +90,11 @@ impl Cli {
 }
 
 fn format_asset_amount(amount: u64, asset_id: AssetId) -> String {
-    let hex = asset_id.to_hex();
-    let prefix = &hex[..hex.len().min(8)];
-
-    format!("{amount} ({prefix}...)")
+    if asset_id == *LIQUID_TESTNET_BITCOIN_ASSET {
+        format!("{amount} LBTC")
+    } else {
+        let hex = asset_id.to_hex();
+        let prefix = &hex[..hex.len().min(8)];
+        format!("{amount} ({prefix}...)")
+    }
 }
