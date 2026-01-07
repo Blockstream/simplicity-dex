@@ -1,5 +1,6 @@
 use crate::config::NostrRelayConfig;
 use crate::error::{ParseError, RelayError};
+use crate::events::kinds::TAG_EXPIRY;
 use crate::events::{ActionCompletedEvent, OptionCreatedEvent, SwapCreatedEvent, filters};
 
 use nostr::prelude::*;
@@ -7,6 +8,18 @@ use nostr_sdk::Client;
 use nostr_sdk::prelude::Events;
 use simplicityhl::elements::AddressParams;
 use tracing::instrument;
+
+/// Check if an event is still active (not expired) based on its expiry tag.
+/// Returns `false` if the expiry tag is missing or if the contract has expired.
+fn is_active(event: &Event) -> bool {
+    let now = Timestamp::now().as_secs();
+    event
+        .tags
+        .iter()
+        .find(|t| matches!(t.kind(), TagKind::Custom(s) if s.as_ref() == TAG_EXPIRY))
+        .and_then(|t| t.content()?.parse::<u64>().ok())
+        .is_some_and(|expiry| expiry > now)
+}
 
 #[derive(Debug, Clone)]
 pub struct ReadOnlyClient {
@@ -50,6 +63,7 @@ impl ReadOnlyClient {
         let events = self.fetch_events(filters::option_created()).await?;
         Ok(events
             .iter()
+            .filter(|e| is_active(e))
             .map(|e| OptionCreatedEvent::from_event(e, params))
             .collect())
     }
@@ -59,7 +73,11 @@ impl ReadOnlyClient {
         params: &'static AddressParams,
     ) -> Result<Vec<Result<SwapCreatedEvent, ParseError>>, RelayError> {
         let events = self.fetch_events(filters::swap_created()).await?;
-        Ok(events.iter().map(|e| SwapCreatedEvent::from_event(e, params)).collect())
+        Ok(events
+            .iter()
+            .filter(|e| is_active(e))
+            .map(|e| SwapCreatedEvent::from_event(e, params))
+            .collect())
     }
 
     pub async fn fetch_actions_for_event(

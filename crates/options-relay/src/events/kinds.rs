@@ -11,6 +11,7 @@ pub const TAG_SWAP_UTXO: &str = "swap_utxo";
 pub const TAG_TAPROOT_GEN: &str = "t";
 pub const TAG_ACTION: &str = "action";
 pub const TAG_OUTPOINT: &str = "outpoint";
+pub const TAG_EXPIRY: &str = "expiry";
 
 pub const ACTION_SWAP_EXERCISED: &str = "swap_exercised";
 pub const ACTION_SWAP_CANCELLED: &str = "swap_cancelled";

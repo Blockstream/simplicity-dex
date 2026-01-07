@@ -1,5 +1,5 @@
 use crate::error::{ParseError, RelayError};
-use crate::events::kinds::{SWAP_CREATED, TAG_SWAP_ARGS, TAG_SWAP_UTXO, TAG_TAPROOT_GEN};
+use crate::events::kinds::{SWAP_CREATED, TAG_EXPIRY, TAG_SWAP_ARGS, TAG_SWAP_UTXO, TAG_TAPROOT_GEN};
 
 use contracts::sdk::taproot_pubkey_gen::TaprootPubkeyGen;
 use contracts::swap_with_change::{SwapWithChangeArguments, get_swap_with_change_address};
@@ -40,6 +40,10 @@ impl SwapCreatedEvent {
             .tag(Tag::custom(
                 TagKind::custom(TAG_TAPROOT_GEN),
                 [self.taproot_pubkey_gen.to_string()],
+            ))
+            .tag(Tag::custom(
+                TagKind::custom(TAG_EXPIRY),
+                [self.swap_args.expiry_time().to_string()],
             )))
     }
 

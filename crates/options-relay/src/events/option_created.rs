@@ -1,5 +1,5 @@
 use crate::error::{ParseError, RelayError};
-use crate::events::kinds::{OPTION_CREATED, TAG_OPTIONS_ARGS, TAG_OPTIONS_UTXO, TAG_TAPROOT_GEN};
+use crate::events::kinds::{OPTION_CREATED, TAG_EXPIRY, TAG_OPTIONS_ARGS, TAG_OPTIONS_UTXO, TAG_TAPROOT_GEN};
 
 use contracts::options::{OptionsArguments, get_options_address};
 use contracts::sdk::taproot_pubkey_gen::TaprootPubkeyGen;
@@ -40,6 +40,10 @@ impl OptionCreatedEvent {
             .tag(Tag::custom(
                 TagKind::custom(TAG_TAPROOT_GEN),
                 [self.taproot_pubkey_gen.to_string()],
+            ))
+            .tag(Tag::custom(
+                TagKind::custom(TAG_EXPIRY),
+                [self.options_args.expiry_time().to_string()],
             )))
     }
 
