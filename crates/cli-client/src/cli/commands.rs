@@ -321,4 +321,7 @@ pub enum SyncCommand {
 
     /// Only sync options and swaps from NOSTR relay
     Nostr,
+
+    /// Only sync action history for existing contracts from NOSTR (does not populate UTXOs)
+    History,
 }
