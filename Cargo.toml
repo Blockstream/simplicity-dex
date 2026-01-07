@@ -24,3 +24,6 @@ cli-helper = { git = "https://github.com/BlockstreamResearch/simplicity-contract
 simplicityhl-core = { version = "0.3.2", features = ["encoding"] }
 
 simplicityhl = { version = "0.4.0" }
+
+[patch.crates-io]
+simplicity-sys = { git = "https://github.com/BlockstreamResearch/rust-simplicity", tag = "simplicity-sys-0.6.1" }
