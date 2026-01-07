@@ -316,25 +316,17 @@ impl UtxoStore for Store {
             let outpoint = OutPoint::new(txid, vout as u32);
             let blinder_key = out_blinder_keys.get(&vout);
 
-            match blinder_key {
-                Some(keypair) => {
-                    let key_bytes: [u8; crate::store::BLINDING_KEY_LEN] = keypair.secret_key().secret_bytes();
+            let blinder_key_bytes = blinder_key.map(|kp| kp.secret_key().secret_bytes());
 
-                    self.internal_utxo_insert_with_tx(&mut db_tx, outpoint, txout.clone(), Some(key_bytes))
-                        .await?;
-                }
-                None => {
-                    if let Err(e) = self
-                        .internal_utxo_insert_with_tx(&mut db_tx, outpoint, txout.clone(), None)
-                        .await
-                    {
-                        match e {
-                            StoreError::MissingBlinderKey(_) | StoreError::Unblind(_) => {
-                                // Skip this output - blinding key was optional
-                            }
-                            _ => return Err(e),
-                        }
-                    }
+            if let Err(e) = self
+                .internal_utxo_insert_with_tx(&mut db_tx, outpoint, txout.clone(), blinder_key_bytes)
+                .await
+            {
+                match e {
+                    // Skip outputs we can't unblind - the blinder key may not work for this output
+                    // (e.g., outputs belonging to other parties in the same transaction)
+                    StoreError::MissingBlinderKey(_) | StoreError::Unblind(_) => {}
+                    _ => return Err(e),
                 }
             }
         }
@@ -476,7 +468,7 @@ impl Store {
         let vout = i64::from(outpoint.vout);
 
         sqlx::query(
-            "INSERT INTO utxos (txid, vout, script_pubkey, asset_id, value, serialized, serialized_witness, is_confidential)
+            "INSERT OR IGNORE INTO utxos (txid, vout, script_pubkey, asset_id, value, serialized, serialized_witness, is_confidential)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
         )
         .bind(txid)
@@ -491,7 +483,7 @@ impl Store {
         .await?;
 
         if let Some(key) = blinder_key {
-            sqlx::query("INSERT INTO blinder_keys (txid, vout, blinding_key) VALUES (?, ?, ?)")
+            sqlx::query("INSERT OR IGNORE INTO blinder_keys (txid, vout, blinding_key) VALUES (?, ?, ?)")
                 .bind(txid)
                 .bind(vout)
                 .bind(key.as_slice())
@@ -1127,6 +1119,189 @@ mod tests {
                 assert_eq!(entries[0].value(), Some(3000));
             }
             _ => panic!("Expected Found result"),
+        }
+
+        let _ = fs::remove_file(path);
+    }
+
+    fn make_explicit_txout_with_script(asset_id: AssetId, value: u64) -> TxOut {
+        TxOut {
+            asset: Asset::Explicit(asset_id),
+            value: Value::Explicit(value),
+            nonce: Nonce::Null,
+            script_pubkey: Script::new_op_return(b"burn"),
+            witness: TxOutWitness::default(),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_insert_transaction_ignores_duplicates() {
+        let path = "/tmp/test_coin_store_tx_dup.db";
+        let _ = fs::remove_file(path);
+
+        let store = Store::create(path).await.unwrap();
+
+        let asset = test_asset_id();
+
+        let txout0 = make_explicit_txout_with_script(asset, 1000);
+        let txout1 = make_explicit_txout_with_script(asset, 2000);
+
+        let tx = Transaction {
+            version: 2,
+            lock_time: simplicityhl::elements::LockTime::ZERO,
+            input: vec![],
+            output: vec![txout0, txout1],
+        };
+
+        let result = store.insert_transaction(&tx, HashMap::new()).await;
+        assert!(result.is_ok(), "First insert_transaction should succeed");
+
+        let filter = UtxoFilter::new().asset_id(asset);
+        let results = store.query_utxos(std::slice::from_ref(&filter.clone())).await.unwrap();
+        match &results[0] {
+            UtxoQueryResult::Found(entries, _) => {
+                assert_eq!(entries.len(), 2, "Both UTXOs should be present after first insert");
+            }
+            _ => panic!("Expected Found result with 2 entries"),
+        }
+
+        let result = store.insert_transaction(&tx, HashMap::new()).await;
+        assert!(
+            result.is_ok(),
+            "Second insert_transaction should succeed (INSERT OR IGNORE)"
+        );
+
+        let results = store.query_utxos(&[filter]).await.unwrap();
+        match &results[0] {
+            UtxoQueryResult::Found(entries, _) => {
+                assert_eq!(entries.len(), 2, "Should still have exactly 2 UTXOs");
+            }
+            _ => panic!("Expected Found result with 2 entries"),
+        }
+
+        let _ = fs::remove_file(path);
+    }
+
+    #[tokio::test]
+    async fn test_insert_transaction_skips_unblindable_outputs() {
+        let path = "/tmp/test_coin_store_tx_unblind.db";
+        let _ = fs::remove_file(path);
+
+        let store = Store::create(path).await.unwrap();
+
+        let asset = test_asset_id();
+
+        let txout_explicit_0 = make_explicit_txout_with_script(asset, 1000);
+
+        let tag = secp256k1::Tag::from([1u8; 32]);
+        let generator = secp256k1::Generator::new_unblinded(secp256k1::SECP256K1, tag);
+        let txout_confidential = TxOut {
+            asset: Asset::Confidential(generator),
+            value: Value::Confidential(
+                secp256k1::PedersenCommitment::from_slice(&[
+                    0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                    0x01,
+                ])
+                .unwrap(),
+            ),
+            nonce: Nonce::Null,
+            script_pubkey: Script::new_op_return(b"burn"),
+            witness: TxOutWitness::default(),
+        };
+        let txout_explicit_2 = make_explicit_txout_with_script(asset, 3000);
+
+        let tx = Transaction {
+            version: 2,
+            lock_time: simplicityhl::elements::LockTime::ZERO,
+            input: vec![],
+            output: vec![txout_explicit_0, txout_confidential, txout_explicit_2],
+        };
+
+        let result = store.insert_transaction(&tx, HashMap::new()).await;
+        assert!(
+            result.is_ok(),
+            "insert_transaction should succeed, skipping unblindable outputs"
+        );
+
+        let filter = UtxoFilter::new().asset_id(asset);
+        let results = store.query_utxos(&[filter]).await.unwrap();
+        match &results[0] {
+            UtxoQueryResult::Found(entries, _) => {
+                assert_eq!(entries.len(), 2, "Only explicit outputs should be inserted");
+                let values: Vec<_> = entries.iter().map(super::super::entry::UtxoEntry::value).collect();
+                assert!(values.contains(&Some(1000)));
+                assert!(values.contains(&Some(3000)));
+            }
+            _ => panic!("Expected Found result"),
+        }
+
+        let _ = fs::remove_file(path);
+    }
+
+    #[tokio::test]
+    async fn test_insert_transaction_marks_inputs_as_spent() {
+        let path = "/tmp/test_coin_store_tx_spent.db";
+        let _ = fs::remove_file(path);
+
+        let store = Store::create(path).await.unwrap();
+
+        let asset = test_asset_id();
+
+        let prev_txout = make_explicit_txout_with_script(asset, 500);
+        let prev_tx = Transaction {
+            version: 2,
+            lock_time: simplicityhl::elements::LockTime::ZERO,
+            input: vec![],
+            output: vec![prev_txout],
+        };
+        store.insert_transaction(&prev_tx, HashMap::new()).await.unwrap();
+
+        let prev_txid = prev_tx.txid();
+        let prev_outpoint = OutPoint::new(prev_txid, 0);
+
+        let filter = UtxoFilter::new().asset_id(asset);
+        let results = store.query_utxos(std::slice::from_ref(&filter.clone())).await.unwrap();
+        assert!(matches!(&results[0], UtxoQueryResult::Found(e, _) if e.len() == 1));
+
+        let new_txout = make_explicit_txout_with_script(asset, 400);
+        let tx_input = simplicityhl::elements::TxIn {
+            previous_output: prev_outpoint,
+            is_pegin: false,
+            script_sig: Script::new(),
+            sequence: simplicityhl::elements::Sequence::MAX,
+            asset_issuance: simplicityhl::elements::AssetIssuance::default(),
+            witness: simplicityhl::elements::TxInWitness::default(),
+        };
+
+        let spending_tx = Transaction {
+            version: 2,
+            lock_time: simplicityhl::elements::LockTime::ZERO,
+            input: vec![tx_input],
+            output: vec![new_txout],
+        };
+
+        store.insert_transaction(&spending_tx, HashMap::new()).await.unwrap();
+
+        let results = store.query_utxos(std::slice::from_ref(&filter.clone())).await.unwrap();
+        match &results[0] {
+            UtxoQueryResult::Found(entries, _) => {
+                assert_eq!(entries.len(), 1);
+                assert_eq!(entries[0].value(), Some(400));
+            }
+            _ => panic!("Expected Found result with the new output"),
+        }
+
+        let filter_with_spent = UtxoFilter::new().asset_id(asset).include_spent();
+        let results = store
+            .query_utxos(std::slice::from_ref(&filter_with_spent))
+            .await
+            .unwrap();
+        match &results[0] {
+            UtxoQueryResult::Found(entries, _) => {
+                assert_eq!(entries.len(), 2);
+            }
+            _ => panic!("Expected Found result with both UTXOs"),
         }
 
         let _ = fs::remove_file(path);
