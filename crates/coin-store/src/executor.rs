@@ -91,6 +91,23 @@ pub trait UtxoStore {
     /// List all tracked script pubkeys from contracts.
     /// Returns distinct script pubkeys from the `simplicity_contracts` table.
     async fn list_tracked_script_pubkeys(&self) -> Result<Vec<simplicityhl::elements::Script>, Self::Error>;
+
+    /// Insert a token-to-contract association.
+    /// This maps an asset ID to a contract with a tag (e.g., "`option_token`", "`grantor_token`").
+    async fn insert_contract_token(
+        &self,
+        taproot_pubkey_gen: &TaprootPubkeyGen,
+        asset_id: AssetId,
+        tag: &str,
+    ) -> Result<(), Self::Error>;
+
+    /// Get contract identifier by token asset ID.
+    /// Returns (`taproot_pubkey_gen`, `tag`) if found.
+    async fn get_contract_by_token(&self, asset_id: AssetId) -> Result<Option<(String, String)>, Self::Error>;
+
+    /// List all asset IDs with a specific tag (e.g., "`option_token`").
+    /// Returns a list of (`asset_id`, `taproot_pubkey_gen`) tuples.
+    async fn list_tokens_by_tag(&self, tag: &str) -> Result<Vec<(AssetId, String)>, Self::Error>;
 }
 
 #[async_trait::async_trait]
@@ -359,6 +376,51 @@ impl UtxoStore for Store {
 
         Ok(scripts)
     }
+
+    async fn insert_contract_token(
+        &self,
+        taproot_pubkey_gen: &TaprootPubkeyGen,
+        asset_id: AssetId,
+        tag: &str,
+    ) -> Result<(), Self::Error> {
+        let taproot_gen_str = taproot_pubkey_gen.to_string();
+
+        sqlx::query("INSERT OR REPLACE INTO contract_tokens (taproot_pubkey_gen, asset_id, tag) VALUES (?, ?, ?)")
+            .bind(&taproot_gen_str)
+            .bind(asset_id.to_hex())
+            .bind(tag)
+            .execute(&self.pool)
+            .await?;
+
+        Ok(())
+    }
+
+    async fn get_contract_by_token(&self, asset_id: AssetId) -> Result<Option<(String, String)>, Self::Error> {
+        let result: Option<(String, String)> =
+            sqlx::query_as("SELECT taproot_pubkey_gen, tag FROM contract_tokens WHERE asset_id = ?")
+                .bind(asset_id.to_hex())
+                .fetch_optional(&self.pool)
+                .await?;
+
+        Ok(result)
+    }
+
+    async fn list_tokens_by_tag(&self, tag: &str) -> Result<Vec<(AssetId, String)>, Self::Error> {
+        let rows: Vec<(String, String)> =
+            sqlx::query_as("SELECT asset_id, taproot_pubkey_gen FROM contract_tokens WHERE tag = ?")
+                .bind(tag)
+                .fetch_all(&self.pool)
+                .await?;
+
+        let mut results = Vec::with_capacity(rows.len());
+        for (asset_id_hex, tpg) in rows {
+            if let Ok(asset_id) = asset_id_hex.parse::<AssetId>() {
+                results.push((asset_id, tpg));
+            }
+        }
+
+        Ok(results)
+    }
 }
 
 impl Store {
@@ -469,9 +531,9 @@ impl Store {
         );
 
         if needs_contract_join {
-            builder.push(", s.source, c.arguments");
+            builder.push(", s.source, c.arguments, c.taproot_pubkey_gen");
         } else {
-            builder.push(", NULL as source, NULL as arguments");
+            builder.push(", NULL as source, NULL as arguments, NULL as taproot_pubkey_gen");
         }
 
         if filter.include_entropy {
@@ -485,7 +547,11 @@ impl Store {
              LEFT JOIN blinder_keys b ON u.txid = b.txid AND u.vout = b.vout",
         );
 
-        if needs_contract_join {
+        if filter.is_token_join() {
+            builder.push(" INNER JOIN contract_tokens ct ON u.asset_id = ct.asset_id");
+            builder.push(" INNER JOIN simplicity_contracts c ON ct.taproot_pubkey_gen = c.taproot_pubkey_gen");
+            builder.push(" INNER JOIN simplicity_sources s ON c.source_hash = s.source_hash");
+        } else if needs_contract_join {
             builder.push(" INNER JOIN simplicity_contracts c ON u.script_pubkey = c.script_pubkey");
             builder.push(" INNER JOIN simplicity_sources s ON c.source_hash = s.source_hash");
         }
@@ -508,6 +574,11 @@ impl Store {
         if let Some(ref script) = filter.script_pubkey {
             builder.push(" AND u.script_pubkey = ");
             builder.push_bind(script.as_bytes().to_vec());
+        }
+
+        if let Some(ref token_tag) = filter.token_tag {
+            builder.push(" AND ct.tag = ");
+            builder.push_bind(token_tag.clone());
         }
 
         if let Some(ref cmr) = filter.cmr {
@@ -582,6 +653,7 @@ pub struct UtxoRow {
     blinding_key: Option<Vec<u8>>,
     pub source: Option<Vec<u8>>,
     pub arguments: Option<Vec<u8>>,
+    pub taproot_pubkey_gen: Option<String>,
     pub entropy: Option<Vec<u8>>,
     pub issuance_is_confidential: Option<i64>,
 }
@@ -607,6 +679,13 @@ impl UtxoRow {
         let outpoint = OutPoint::new(txid, self.vout);
         let mut txout: TxOut = encode::deserialize(&self.serialized)?;
 
+        // Parse arguments from row if present
+        let arguments: Option<Arguments> = self.arguments.as_ref().and_then(|args_bytes| {
+            bincode::serde::decode_from_slice(args_bytes, bincode::config::standard())
+                .ok()
+                .map(|(args, _)| args)
+        });
+
         if self.is_confidential != 1 {
             let mut entry = UtxoEntry::new_explicit(outpoint, txout);
 
@@ -615,6 +694,12 @@ impl UtxoRow {
             }
             if let Some((e, c)) = entropy.zip(issuance_is_confidential) {
                 entry = entry.with_issuance(e, c);
+            }
+            if let Some(tpg) = self.taproot_pubkey_gen {
+                entry = entry.with_taproot_pubkey_gen(tpg);
+            }
+            if let Some(args) = arguments {
+                entry = entry.with_arguments(args);
             }
 
             return Ok(entry);
@@ -644,6 +729,12 @@ impl UtxoRow {
         }
         if let Some((e, c)) = entropy.zip(issuance_is_confidential) {
             entry = entry.with_issuance(e, c);
+        }
+        if let Some(tpg) = self.taproot_pubkey_gen {
+            entry = entry.with_taproot_pubkey_gen(tpg);
+        }
+        if let Some(args) = arguments {
+            entry = entry.with_arguments(args);
         }
 
         Ok(entry)

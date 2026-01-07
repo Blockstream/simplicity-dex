@@ -307,64 +307,34 @@ pub async fn get_contract_tokens(wallet: &crate::wallet::Wallet, source: &str) -
     Ok(extract_entries_from_results(results))
 }
 
-/// Get grantor tokens from user's wallet by looking up stored option contracts.
+/// Get grantor tokens from user's wallet using the `contract_tokens` table.
 ///
-/// This function:
-/// 1. Lists all option contracts stored in the database
-/// 2. Extracts grantor token asset IDs from each contract's arguments
-/// 3. Queries user's wallet for those specific asset IDs
-/// 4. Returns all found grantor token UTXOs with their associated contract arguments
+/// This function queries UTXOs with the "`grantor_token`" tag, which automatically
+/// joins with the `contract_tokens` and `simplicity_contracts` tables to provide
+/// full contract context.
 pub async fn get_grantor_tokens_from_wallet(
     wallet: &crate::wallet::Wallet,
-    source: &str,
+    _source: &str,
     user_script_pubkey: &Script,
 ) -> Result<Vec<EnrichedTokenEntry>, Error> {
-    let contracts = <_ as UtxoStore>::list_contracts_by_source(wallet.store(), source).await?;
+    let filter = UtxoFilter::new()
+        .token_tag("grantor_token")
+        .script_pubkey(user_script_pubkey.clone());
 
-    if contracts.is_empty() {
-        return Ok(Vec::new());
-    }
-
-    let mut asset_to_args: std::collections::HashMap<simplicityhl::elements::AssetId, (OptionsArguments, String)> =
-        std::collections::HashMap::new();
-
-    for (arguments_bytes, taproot_pubkey_gen_str) in &contracts {
-        let arguments_result: Result<(simplicityhl::Arguments, usize), _> =
-            bincode::serde::decode_from_slice(arguments_bytes, bincode::config::standard());
-
-        if let Ok((arguments, _)) = arguments_result
-            && let Ok(option_arguments) = OptionsArguments::from_arguments(&arguments)
-        {
-            let (grantor_token_id, _) = option_arguments.get_grantor_token_ids();
-            asset_to_args.insert(grantor_token_id, (option_arguments, taproot_pubkey_gen_str.clone()));
-        }
-    }
-
-    if asset_to_args.is_empty() {
-        return Ok(Vec::new());
-    }
-
-    let filters: Vec<UtxoFilter> = asset_to_args
-        .keys()
-        .map(|asset_id| {
-            UtxoFilter::new()
-                .asset_id(*asset_id)
-                .script_pubkey(user_script_pubkey.clone())
-        })
-        .collect();
-
-    let results = <_ as UtxoStore>::query_utxos(wallet.store(), &filters).await?;
+    let results = <_ as UtxoStore>::query_utxos(wallet.store(), &[filter]).await?;
     let entries = extract_entries_from_results(results);
 
     let mut enriched: Vec<EnrichedTokenEntry> = entries
         .into_iter()
         .filter_map(|entry| {
-            entry.asset().and_then(|asset_id| {
-                asset_to_args.get(&asset_id).map(|(args, tpg_str)| EnrichedTokenEntry {
-                    entry,
-                    option_arguments: args.clone(),
-                    taproot_pubkey_gen_str: tpg_str.clone(),
-                })
+            let arguments = entry.arguments()?;
+            let option_arguments = OptionsArguments::from_arguments(arguments).ok()?;
+            let taproot_pubkey_gen_str = entry.taproot_pubkey_gen()?.to_string();
+
+            Some(EnrichedTokenEntry {
+                entry,
+                option_arguments,
+                taproot_pubkey_gen_str,
             })
         })
         .collect();
@@ -381,64 +351,34 @@ pub struct EnrichedTokenEntry {
     pub taproot_pubkey_gen_str: String,
 }
 
-/// Get option tokens from user's wallet by looking up stored option contracts.
+/// Get option tokens from user's wallet using the `contract_tokens` table.
 ///
-/// This function:
-/// 1. Lists all option contracts stored in the database
-/// 2. Extracts option token asset IDs from each contract's arguments
-/// 3. Queries user's wallet for those specific asset IDs
-/// 4. Returns all found option token UTXOs with their associated contract arguments
+/// This function queries UTXOs with the "`option_token`" tag, which automatically
+/// joins with the `contract_tokens` and `simplicity_contracts` tables to provide
+/// full contract context.
 pub async fn get_option_tokens_from_wallet(
     wallet: &crate::wallet::Wallet,
-    source: &str,
+    _source: &str,
     user_script_pubkey: &Script,
 ) -> Result<Vec<EnrichedTokenEntry>, Error> {
-    let contracts = <_ as UtxoStore>::list_contracts_by_source(wallet.store(), source).await?;
+    let filter = UtxoFilter::new()
+        .token_tag("option_token")
+        .script_pubkey(user_script_pubkey.clone());
 
-    if contracts.is_empty() {
-        return Ok(Vec::new());
-    }
-
-    let mut asset_to_args: std::collections::HashMap<simplicityhl::elements::AssetId, (OptionsArguments, String)> =
-        std::collections::HashMap::new();
-
-    for (arguments_bytes, taproot_pubkey_gen_str) in &contracts {
-        let arguments_result: Result<(simplicityhl::Arguments, usize), _> =
-            bincode::serde::decode_from_slice(arguments_bytes, bincode::config::standard());
-
-        if let Ok((arguments, _)) = arguments_result
-            && let Ok(option_arguments) = OptionsArguments::from_arguments(&arguments)
-        {
-            let (option_token_id, _) = option_arguments.get_option_token_ids();
-            asset_to_args.insert(option_token_id, (option_arguments, taproot_pubkey_gen_str.clone()));
-        }
-    }
-
-    if asset_to_args.is_empty() {
-        return Ok(Vec::new());
-    }
-
-    let filters: Vec<UtxoFilter> = asset_to_args
-        .keys()
-        .map(|asset_id| {
-            UtxoFilter::new()
-                .asset_id(*asset_id)
-                .script_pubkey(user_script_pubkey.clone())
-        })
-        .collect();
-
-    let results = <_ as UtxoStore>::query_utxos(wallet.store(), &filters).await?;
+    let results = <_ as UtxoStore>::query_utxos(wallet.store(), &[filter]).await?;
     let entries = extract_entries_from_results(results);
 
     let mut enriched: Vec<EnrichedTokenEntry> = entries
         .into_iter()
         .filter_map(|entry| {
-            entry.asset().and_then(|asset_id| {
-                asset_to_args.get(&asset_id).map(|(args, tpg_str)| EnrichedTokenEntry {
-                    entry,
-                    option_arguments: args.clone(),
-                    taproot_pubkey_gen_str: tpg_str.clone(),
-                })
+            let arguments = entry.arguments()?;
+            let option_arguments = OptionsArguments::from_arguments(arguments).ok()?;
+            let taproot_pubkey_gen_str = entry.taproot_pubkey_gen()?.to_string();
+
+            Some(EnrichedTokenEntry {
+                entry,
+                option_arguments,
+                taproot_pubkey_gen_str,
             })
         })
         .collect();

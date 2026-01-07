@@ -16,6 +16,7 @@ pub struct UtxoFilter {
     pub cmr: Option<Cmr>,
     pub taproot_pubkey_gen: Option<TaprootPubkeyGen>,
     pub source_hash: Option<[u8; 32]>,
+    pub token_tag: Option<String>,
 }
 
 impl UtxoFilter {
@@ -89,8 +90,22 @@ impl UtxoFilter {
     }
 
     #[must_use]
+    pub fn token_tag(mut self, tag: impl Into<String>) -> Self {
+        self.token_tag = Some(tag.into());
+        self
+    }
+
+    #[must_use]
     pub(crate) const fn is_contract_join(&self) -> bool {
-        self.cmr.is_some() || self.taproot_pubkey_gen.is_some() || self.source_hash.is_some()
+        self.cmr.is_some()
+            || self.taproot_pubkey_gen.is_some()
+            || self.source_hash.is_some()
+            || self.token_tag.is_some()
+    }
+
+    #[must_use]
+    pub(crate) const fn is_token_join(&self) -> bool {
+        self.token_tag.is_some()
     }
 
     #[must_use]

@@ -98,6 +98,8 @@ pub struct UtxoEntry {
     contract: Option<Arc<CompiledProgram>>,
     entropy: Option<sha256::Midstate>,
     is_confidential: Option<bool>,
+    taproot_pubkey_gen: Option<String>,
+    arguments: Option<Arguments>,
 }
 
 impl UtxoEntry {
@@ -110,6 +112,8 @@ impl UtxoEntry {
             contract: None,
             entropy: None,
             is_confidential: None,
+            taproot_pubkey_gen: None,
+            arguments: None,
         }
     }
 
@@ -122,6 +126,8 @@ impl UtxoEntry {
             contract: None,
             entropy: None,
             is_confidential: None,
+            taproot_pubkey_gen: None,
+            arguments: None,
         }
     }
 
@@ -135,6 +141,18 @@ impl UtxoEntry {
     pub const fn with_issuance(mut self, entropy: sha256::Midstate, is_confidential: bool) -> Self {
         self.entropy = Some(entropy);
         self.is_confidential = Some(is_confidential);
+        self
+    }
+
+    #[must_use]
+    pub fn with_taproot_pubkey_gen(mut self, tpg: String) -> Self {
+        self.taproot_pubkey_gen = Some(tpg);
+        self
+    }
+
+    #[must_use]
+    pub fn with_arguments(mut self, args: Arguments) -> Self {
+        self.arguments = Some(args);
         self
     }
 
@@ -198,6 +216,16 @@ impl UtxoEntry {
     #[must_use]
     pub const fn entropy(&self) -> (Option<sha256::Midstate>, Option<bool>) {
         (self.entropy, self.is_confidential)
+    }
+
+    #[must_use]
+    pub fn taproot_pubkey_gen(&self) -> Option<&str> {
+        self.taproot_pubkey_gen.as_deref()
+    }
+
+    #[must_use]
+    pub const fn arguments(&self) -> Option<&Arguments> {
+        self.arguments.as_ref()
     }
 }
 
