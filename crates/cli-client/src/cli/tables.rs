@@ -107,22 +107,38 @@ pub fn display_collateral_table(displays: &[CollateralDisplay]) {
     }
 }
 
-pub fn display_user_token_table(displays: &[UserTokenDisplay]) { 
+pub fn display_user_token_table(displays: &[UserTokenDisplay]) {
     if displays.is_empty() {
         println!("  (No option/grantor tokens found)");
         return;
     }
 
-    println!(
-        "  {:<3} | {:<8} | {:<10} | {:<14} | {:<18} | Contract",
-        "#", "Type", "Amount", "Strike/Token", "Expires"
-    );
-    println!("{}", "-".repeat(90));
+    let mut table = Table::new();
+
+    table.load_preset(UTF8_FULL);
+
+    table.set_header(vec![
+        Cell::new("#").add_attribute(Attribute::Bold),
+        Cell::new("Type").add_attribute(Attribute::Bold),
+        Cell::new("Amount").add_attribute(Attribute::Bold),
+        Cell::new("Strike/Token").add_attribute(Attribute::Bold),
+        Cell::new("Expires").add_attribute(Attribute::Bold),
+        Cell::new("Contract").add_attribute(Attribute::Bold),
+    ]);
 
     for display in displays {
-        println!(
-            "  {:<3} | {:<8} | {:<10} | {:<14} | {:<18} | {}",
-            display.index, display.token_type, display.amount, display.strike, display.expires, display.contract
-        );
+        table.add_row(vec![
+            display.index.to_string(),
+            display.token_type.clone(),
+            display.amount.to_string(),
+            display.strike.clone(),
+            display.expires.clone(),
+            display.contract.clone(),
+        ]);
+    }
+
+    let table_string = table.to_string();
+    for line in table_string.lines() {
+        println!("  {}", line);
     }
 }
