@@ -7,6 +7,7 @@ mod swap;
 mod sync;
 mod tx;
 mod wallet;
+mod tables;
 
 use crate::error::Error;
 
