@@ -1,4 +1,5 @@
 use crate::error::Error;
+use crate::cli::tables::display_token_table;
 
 use std::io::{self, Write};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -113,46 +114,6 @@ pub fn format_relative_time(expiry_timestamp: i64) -> String {
         format!("[SOON] {time_str}")
     } else {
         time_str
-    }
-}
-
-pub fn display_token_table(tokens: &[TokenDisplay]) {
-    if tokens.is_empty() {
-        println!("  (No tokens found)");
-        return;
-    }
-
-    println!(
-        "  {:<3} | {:<18} | {:<14} | {:<18} | Contract",
-        "#", "Collateral/Token", "Strike/Token", "Expires"
-    );
-    println!("{}", "-".repeat(80));
-
-    for token in tokens {
-        println!(
-            "  {:<3} | {:<18} | {:<14} | {:<18} | {}",
-            token.index, token.collateral, token.settlement, token.expires, token.status
-        );
-    }
-}
-
-pub fn display_swap_table(swaps: &[SwapDisplay]) {
-    if swaps.is_empty() {
-        println!("  (No swaps found)");
-        return;
-    }
-
-    println!(
-        "  {:<3} | {:<20} | {:<14} | {:<15} | Seller",
-        "#", "Price", "Wants", "Expires"
-    );
-    println!("{}", "-".repeat(80));
-
-    for swap in swaps {
-        println!(
-            "  {:<3} | {:<20} | {:<14} | {:<15} | {}",
-            swap.index, swap.offering, swap.wants, swap.expires, swap.seller
-        );
     }
 }
 
