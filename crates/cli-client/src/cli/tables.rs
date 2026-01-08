@@ -38,23 +38,37 @@ pub fn display_token_table(tokens: &[TokenDisplay]) {
     }
 }
 
-pub fn display_swap_table(swaps: &[SwapDisplay]) { 
+pub fn display_swap_table(swaps: &[SwapDisplay]) {
     if swaps.is_empty() {
         println!("  (No swaps found)");
         return;
     }
 
-    println!(
-        "  {:<3} | {:<20} | {:<14} | {:<15} | Seller",
-        "#", "Price", "Wants", "Expires"
-    );
-    println!("{}", "-".repeat(80));
+    let mut table = Table::new();
+
+    table.load_preset(UTF8_FULL);
+
+    table.set_header(vec![
+        Cell::new("#").add_attribute(Attribute::Bold),
+        Cell::new("Price").add_attribute(Attribute::Bold),
+        Cell::new("Wants").add_attribute(Attribute::Bold),
+        Cell::new("Expires").add_attribute(Attribute::Bold),
+        Cell::new("Seller").add_attribute(Attribute::Bold),
+    ]);
 
     for swap in swaps {
-        println!(
-            "  {:<3} | {:<20} | {:<14} | {:<15} | {}",
-            swap.index, swap.offering, swap.wants, swap.expires, swap.seller
-        );
+        table.add_row(vec![
+            swap.index.to_string(),
+            swap.offering.clone(),
+            swap.wants.clone(),
+            swap.expires.clone(),
+            swap.seller.clone(),
+        ]);
+    }
+
+    let table_string = table.to_string();
+    for line in table_string.lines() {
+        println!("  {}", line);
     }
 }
 
