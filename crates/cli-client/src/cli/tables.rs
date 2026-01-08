@@ -1,24 +1,40 @@
 use crate::cli::interactive::{TokenDisplay, SwapDisplay};
 use crate::cli::positions::{CollateralDisplay, UserTokenDisplay};
+use comfy_table::presets::UTF8_FULL;
+use comfy_table::{Attribute, Cell, Table};
 
 
-pub fn display_token_table(tokens: &[TokenDisplay]) { 
+pub fn display_token_table(tokens: &[TokenDisplay]) {
     if tokens.is_empty() {
         println!("  (No tokens found)");
         return;
     }
 
-    println!(
-        "  {:<3} | {:<18} | {:<14} | {:<18} | Contract",
-        "#", "Collateral/Token", "Strike/Token", "Expires"
-    );
-    println!("{}", "-".repeat(80));
+    let mut table = Table::new();
+
+    table.load_preset(UTF8_FULL);
+
+    table.set_header(vec![
+        Cell::new("#").add_attribute(Attribute::Bold),
+        Cell::new("Collateral/Token").add_attribute(Attribute::Bold),
+        Cell::new("Strike/Token").add_attribute(Attribute::Bold),
+        Cell::new("Expires").add_attribute(Attribute::Bold),
+        Cell::new("Contract").add_attribute(Attribute::Bold),
+    ]);
 
     for token in tokens {
-        println!(
-            "  {:<3} | {:<18} | {:<14} | {:<18} | {}",
-            token.index, token.collateral, token.settlement, token.expires, token.status
-        );
+        table.add_row(vec![
+            token.index.to_string(),
+            token.collateral.clone(),
+            token.settlement.clone(),
+            token.expires.clone(),
+            token.status.clone(),
+        ]);
+    }
+
+    let table_string = table.to_string();
+    for line in table_string.lines() {
+        println!("  {}", line);
     }
 }
 
