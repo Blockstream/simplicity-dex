@@ -73,23 +73,37 @@ pub fn display_swap_table(swaps: &[SwapDisplay]) {
 }
 
 
-pub fn display_collateral_table(displays: &[CollateralDisplay]) { 
+pub fn display_collateral_table(displays: &[CollateralDisplay]) {
     if displays.is_empty() {
         println!("  (No locked assets found)");
         return;
     }
 
-    println!(
-        "  {:<3} | {:<18} | {:<14} | {:<18} | Contract",
-        "#", "Locked Assets", "Settlement", "Expires"
-    );
-    println!("{}", "-".repeat(80));
+    let mut table = Table::new();
+
+    table.load_preset(UTF8_FULL);
+
+    table.set_header(vec![
+        Cell::new("#").add_attribute(Attribute::Bold),
+        Cell::new("Locked Assets").add_attribute(Attribute::Bold),
+        Cell::new("Settlement").add_attribute(Attribute::Bold),
+        Cell::new("Expires").add_attribute(Attribute::Bold),
+        Cell::new("Contract").add_attribute(Attribute::Bold),
+    ]);
 
     for display in displays {
-        println!(
-            "  {:<3} | {:<18} | {:<14} | {:<18} | {}",
-            display.index, display.collateral, display.settlement, display.expires, display.contract
-        );
+        table.add_row(vec![
+            display.index.to_string(),
+            display.collateral.clone(),
+            display.settlement.clone(),
+            display.expires.clone(),
+            display.contract.clone(),
+        ]);
+    }
+
+    let table_string = table.to_string();
+    for line in table_string.lines() {
+        println!("  {}", line);
     }
 }
 
