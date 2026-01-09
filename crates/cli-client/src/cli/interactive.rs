@@ -205,6 +205,7 @@ pub fn truncate_with_ellipsis(s: &str, max_len: usize) -> String {
     }
 }
 
+#[allow(clippy::cast_possible_wrap)]
 pub fn parse_expiry(expiry: &str) -> Result<i64, Error> {
     if let Ok(ts) = expiry.parse::<i64>() {
         return Ok(ts);
@@ -213,8 +214,15 @@ pub fn parse_expiry(expiry: &str) -> Result<i64, Error> {
     // Try parsing as relative duration (+30d, +2h, +1w, etc.)
     if let Some(duration_str) = expiry.strip_prefix('+') {
         let now = current_timestamp();
-        let duration_secs = parse_duration(duration_str)?;
-        return Ok(now + duration_secs);
+        let std_duration: std::time::Duration = duration_str
+            .parse::<humantime::Duration>()
+            .map_err(|err| Error::HumantimeParse {
+                str: duration_str.to_string(),
+                err,
+            })?
+            .into();
+
+        return Ok(now + std_duration.as_secs() as i64);
     }
 
     Err(Error::Config(format!(
@@ -228,29 +236,6 @@ pub fn current_timestamp() -> i64 {
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_secs() as i64)
         .unwrap_or(0)
-}
-
-pub fn parse_duration(s: &str) -> Result<i64, Error> {
-    let s = s.trim();
-    if s.is_empty() {
-        return Err(Error::Config("Empty duration".to_string()));
-    }
-
-    let (num_str, unit) = s.split_at(s.len() - 1);
-    let num: i64 = num_str
-        .parse()
-        .map_err(|_| Error::Config(format!("Invalid duration number: {num_str}")))?;
-
-    let multiplier = match unit {
-        "s" => 1,
-        "m" => 60,
-        "h" => 3600,
-        "d" => 86_400,
-        "w" => 604_800,
-        _ => return Err(Error::Config(format!("Invalid duration unit: {unit}. Use s/m/h/d/w"))),
-    };
-
-    Ok(num * multiplier)
 }
 
 pub fn extract_entries_from_result(result: &UtxoQueryResult) -> Vec<&UtxoEntry> {

@@ -23,6 +23,7 @@ Cargo.lock
 /logs
 *.log
 tmp/.env
+.env
 
 # RustRover
 #  JetBrains specific template is maintained in a separate JetBrains.gitignore that can
@@ -43,7 +44,7 @@ dist/
 # Logs
 logs/*
 
-/.simplicity-dex.config.toml
+/config.toml
 /.cache
 taker/
 simplicity-dex
