@@ -1,5 +1,5 @@
-use crate::error::Error;
 use crate::cli::tables::display_token_table;
+use crate::error::Error;
 
 use std::io::{self, Write};
 use std::time::{SystemTime, UNIX_EPOCH};
