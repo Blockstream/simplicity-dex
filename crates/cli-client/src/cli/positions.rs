@@ -1,13 +1,13 @@
 use crate::cli::Cli;
 use crate::cli::interactive::{
-    EnrichedTokenEntry, GRANTOR_TOKEN_TAG, OPTION_TOKEN_TAG, TokenDisplay,
-    format_asset_value_with_tag, format_asset_with_tag, format_relative_time, format_settlement_asset, format_time_ago,
+    EnrichedTokenEntry, GRANTOR_TOKEN_TAG, OPTION_TOKEN_TAG, TokenDisplay, format_asset_value_with_tag,
+    format_asset_with_tag, format_relative_time, format_settlement_asset, format_time_ago,
     get_grantor_tokens_from_wallet, get_option_tokens_from_wallet, truncate_with_ellipsis,
 };
+use crate::cli::tables::{display_collateral_table, display_token_table, display_user_token_table};
 use crate::config::Config;
 use crate::error::Error;
 use crate::metadata::ContractMetadata;
-use crate::cli::tables::{display_token_table, display_user_token_table, display_collateral_table};
 
 use coin_store::{Store, UtxoEntry, UtxoFilter, UtxoQueryResult, UtxoStore};
 use contracts::options::{OPTION_SOURCE, OptionsArguments, get_options_address};

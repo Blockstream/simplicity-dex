@@ -1,11 +1,10 @@
 use crate::cli::Cli;
 use crate::cli::interactive::{
-    SwapDisplay, TokenDisplay, format_relative_time, format_settlement_asset,
-    truncate_with_ellipsis,
+    SwapDisplay, TokenDisplay, format_relative_time, format_settlement_asset, truncate_with_ellipsis,
 };
+use crate::cli::tables::{display_swap_table, display_token_table};
 use crate::config::Config;
 use crate::error::Error;
-use crate::cli::tables::{display_swap_table, display_token_table};
 
 use options_relay::{OptionCreatedEvent, SwapCreatedEvent};
 use simplicityhl::elements::AssetId;
