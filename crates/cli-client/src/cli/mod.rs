@@ -5,6 +5,7 @@ mod option;
 mod positions;
 mod swap;
 mod sync;
+mod tables;
 mod tx;
 mod wallet;
 

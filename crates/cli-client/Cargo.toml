@@ -41,6 +41,7 @@ bincode = "2"
 toml = { version =  "0.8" }
 hex = { version =  "0.4" }
 dotenvy = { version =  "0.15" }
+comfy-table = { version = "7.2.1" }
 
 nostr = "0.44.2"
 nostr-sdk = "0.44.1"

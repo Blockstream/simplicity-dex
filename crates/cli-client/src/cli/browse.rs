@@ -1,8 +1,8 @@
 use crate::cli::Cli;
 use crate::cli::interactive::{
-    SwapDisplay, TokenDisplay, display_swap_table, display_token_table, format_relative_time, format_settlement_asset,
-    truncate_with_ellipsis,
+    SwapDisplay, TokenDisplay, format_relative_time, format_settlement_asset, truncate_with_ellipsis,
 };
+use crate::cli::tables::{display_swap_table, display_token_table};
 use crate::config::Config;
 use crate::error::Error;
 

@@ -1,9 +1,10 @@
 use crate::cli::Cli;
 use crate::cli::interactive::{
-    EnrichedTokenEntry, GRANTOR_TOKEN_TAG, OPTION_TOKEN_TAG, TokenDisplay, display_token_table,
-    format_asset_value_with_tag, format_asset_with_tag, format_relative_time, format_settlement_asset, format_time_ago,
+    EnrichedTokenEntry, GRANTOR_TOKEN_TAG, OPTION_TOKEN_TAG, TokenDisplay, format_asset_value_with_tag,
+    format_asset_with_tag, format_relative_time, format_settlement_asset, format_time_ago,
     get_grantor_tokens_from_wallet, get_option_tokens_from_wallet, truncate_with_ellipsis,
 };
+use crate::cli::tables::{display_collateral_table, display_token_table, display_user_token_table};
 use crate::config::Config;
 use crate::error::Error;
 use crate::metadata::ContractMetadata;
@@ -165,46 +166,6 @@ pub struct UserTokenDisplay {
     pub strike: String,
     pub expires: String,
     pub contract: String,
-}
-
-fn display_collateral_table(displays: &[CollateralDisplay]) {
-    if displays.is_empty() {
-        println!("  (No locked assets found)");
-        return;
-    }
-
-    println!(
-        "  {:<3} | {:<18} | {:<14} | {:<18} | Contract",
-        "#", "Locked Assets", "Settlement", "Expires"
-    );
-    println!("{}", "-".repeat(80));
-
-    for display in displays {
-        println!(
-            "  {:<3} | {:<18} | {:<14} | {:<18} | {}",
-            display.index, display.collateral, display.settlement, display.expires, display.contract
-        );
-    }
-}
-
-fn display_user_token_table(displays: &[UserTokenDisplay]) {
-    if displays.is_empty() {
-        println!("  (No option/grantor tokens found)");
-        return;
-    }
-
-    println!(
-        "  {:<3} | {:<8} | {:<10} | {:<14} | {:<18} | Contract",
-        "#", "Type", "Amount", "Strike/Token", "Expires"
-    );
-    println!("{}", "-".repeat(90));
-
-    for display in displays {
-        println!(
-            "  {:<3} | {:<8} | {:<10} | {:<14} | {:<18} | {}",
-            display.index, display.token_type, display.amount, display.strike, display.expires, display.contract
-        );
-    }
 }
 
 /// Build locked asset displays, filtering to only show collateral or settlement assets (not reissuance tokens)
