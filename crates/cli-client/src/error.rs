@@ -38,6 +38,9 @@ pub enum Error {
     #[error("Hex to array error: {0}")]
     HexToArray(#[from] HexToArrayError),
 
+    #[error("Failed to parse duration from string, str: '{str}', err: '{err}'")]
+    HumantimeParse { err: humantime::DurationError, str: String },
+
     #[error("Metadata encode error: {0}")]
     MetadataEncode(bincode::error::EncodeError),
 
