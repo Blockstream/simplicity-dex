@@ -205,7 +205,6 @@ pub fn truncate_with_ellipsis(s: &str, max_len: usize) -> String {
     }
 }
 
-#[allow(clippy::cast_possible_wrap)]
 pub fn parse_expiry(expiry: &str) -> Result<i64, Error> {
     if let Ok(ts) = expiry.parse::<i64>() {
         return Ok(ts);
@@ -222,7 +221,10 @@ pub fn parse_expiry(expiry: &str) -> Result<i64, Error> {
             })?
             .into();
 
-        return Ok(now + std_duration.as_secs() as i64);
+        let secs =
+            i64::try_from(std_duration.as_secs()).map_err(|_| Error::Config("Duration too large".to_string()))?;
+
+        return Ok(now + secs);
     }
 
     Err(Error::Config(format!(
