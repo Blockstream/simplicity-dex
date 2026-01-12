@@ -5,7 +5,7 @@ use simplicityhl::elements::secp256k1_zkp::{self as secp256k1, Keypair, Message,
 use simplicityhl::elements::{Address, AddressParams, BlockHash, Transaction, TxOut};
 use simplicityhl::simplicity::bitcoin::XOnlyPublicKey;
 use simplicityhl::simplicity::hashes::Hash as _;
-use simplicityhl_core::{ProgramError, get_and_verify_env, get_p2pk_address, get_p2pk_program, hash_script_pubkey};
+use simplicityhl_core::{ProgramError, get_and_verify_env, get_p2pk_address, get_p2pk_program, hash_script};
 
 #[derive(thiserror::Error, Debug)]
 pub enum SignerError {
@@ -56,7 +56,7 @@ impl Signer {
     pub fn p2pk_script_hash(&self, params: &'static AddressParams) -> Result<[u8; 32], SignerError> {
         let address = self.p2pk_address(params)?;
 
-        let mut script_hash: [u8; 32] = hash_script_pubkey(&address);
+        let mut script_hash: [u8; 32] = hash_script(&address.script_pubkey());
         script_hash.reverse();
 
         Ok(script_hash)
