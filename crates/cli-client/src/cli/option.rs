@@ -137,7 +137,7 @@ impl Cli {
 
                 let blinding_keypair = derive_public_blinder_key();
 
-                let actual_fee = estimate_fee_signed(
+                let creation_fee = estimate_fee_signed(
                     fee.as_ref(),
                     config.get_fee_rate(),
                     |f| {
@@ -155,7 +155,7 @@ impl Cli {
                     |tx, utxos| sign_p2pk_inputs(tx, utxos, &wallet, config.address_params(), 0),
                 )?;
 
-                println!("  Fee: {actual_fee} sats per transaction");
+                println!("  Creation fee: {creation_fee} sats");
 
                 let (pst, taproot_pubkey_gen) = contracts::sdk::build_option_creation(
                     &blinding_keypair.public_key(),
@@ -163,7 +163,7 @@ impl Cli {
                     second_fee_utxo.clone(),
                     &args,
                     issuance_asset_entropy,
-                    actual_fee,
+                    creation_fee,
                     config.address_params(),
                 )?;
 
@@ -193,15 +193,62 @@ impl Cli {
                 );
                 let collateral_utxo = (collateral_outpoint, collateral_txout);
 
+                let funding_fee = if let Some(f) = fee {
+                    *f
+                } else {
+                    let (pst, branch) = contracts::sdk::build_option_funding(
+                        &blinding_keypair,
+                        option_token_utxo.clone(),
+                        grantor_token_utxo.clone(),
+                        collateral_utxo.clone(),
+                        funding_fee_utxo.as_ref(),
+                        &args,
+                        *total_collateral,
+                        PLACEHOLDER_FEE,
+                    )?;
+                    let mut tx = pst.extract_tx()?;
+                    let mut utxos: Vec<TxOut> = vec![
+                        option_token_utxo.1.clone(),
+                        grantor_token_utxo.1.clone(),
+                        collateral_utxo.1.clone(),
+                    ];
+                    if let Some((_, fee_txout)) = &funding_fee_utxo {
+                        utxos.push(fee_txout.clone());
+                    }
+                    let options_program = get_options_program(&args)?;
+                    for i in 0..2 {
+                        tx = finalize_options_transaction(
+                            tx,
+                            &taproot_pubkey_gen.get_x_only_pubkey(),
+                            &options_program,
+                            &utxos,
+                            i,
+                            &branch,
+                            config.address_params(),
+                            *LIQUID_TESTNET_GENESIS,
+                        )?;
+                    }
+                    let tx = sign_p2pk_inputs(tx, &utxos, &wallet, config.address_params(), 2)?;
+                    let signed_weight = tx.weight();
+                    let fee_rate = config.get_fee_rate();
+                    let estimated = crate::fee::calculate_fee(signed_weight, fee_rate);
+                    println!(
+                        "Estimated funding fee: {estimated} sats (signed weight: {signed_weight}, rate: {fee_rate} sats/kvb)"
+                    );
+                    estimated
+                };
+
+                println!("  Funding fee: {funding_fee} sats");
+
                 let (funding_pst, option_branch) = contracts::sdk::build_option_funding(
-                    &blinding_keypair.public_key(),
+                    &blinding_keypair,
                     option_token_utxo.clone(),
                     grantor_token_utxo.clone(),
                     collateral_utxo.clone(),
                     funding_fee_utxo.as_ref(),
                     &args,
                     *total_collateral,
-                    actual_fee,
+                    funding_fee,
                 )?;
 
                 let mut funding_tx = funding_pst.extract_tx()?;
@@ -222,7 +269,7 @@ impl Cli {
                         &options_program,
                         &funding_utxos,
                         i,
-                        option_branch,
+                        &option_branch,
                         config.address_params(),
                         *LIQUID_TESTNET_GENESIS,
                     )?;
@@ -242,7 +289,7 @@ impl Cli {
                     let option_event =
                         OptionCreatedEvent::new(args.clone(), funding_outpoint, taproot_pubkey_gen.clone());
                     let nostr_event_id = publishing_client.publish_option_created(&option_event).await?;
-                    println!("Published to NOSTR: {nostr_event_id}");
+                    println!("Published option creation event to NOSTR: {nostr_event_id}");
 
                     let funded_action =
                         ActionCompletedEvent::new(nostr_event_id, ActionType::OptionFunded, funding_outpoint);
@@ -413,34 +460,65 @@ impl Cli {
 
                 println!("  Burning: {amount_to_burn} option tokens");
 
-                let fee_filter = UtxoFilter::new()
-                    .asset_id(*LIQUID_TESTNET_BITCOIN_ASSET)
-                    .script_pubkey(script_pubkey.clone())
-                    .required_value(fee.unwrap_or(PLACEHOLDER_FEE));
+                let initial_fee = fee.unwrap_or(PLACEHOLDER_FEE);
 
                 let settlement_asset_id = option_arguments.get_settlement_asset_id();
                 let settlement_required = amount_to_burn * option_arguments.settlement_per_contract();
 
-                let settlement_filter = UtxoFilter::new()
-                    .asset_id(settlement_asset_id)
-                    .script_pubkey(script_pubkey.clone())
-                    .required_value(settlement_required);
+                let settlement_is_lbtc = settlement_asset_id == *LIQUID_TESTNET_BITCOIN_ASSET;
 
-                let results = <_ as UtxoStore>::query_utxos(wallet.store(), &[fee_filter, settlement_filter]).await?;
-                let fee_entries = extract_entries_from_result(&results[0]);
-                let settlement_entries = extract_entries_from_result(&results[1]);
+                let (settlement_input, fee_input) = if settlement_is_lbtc {
+                    let combined_filter = UtxoFilter::new()
+                        .asset_id(*LIQUID_TESTNET_BITCOIN_ASSET)
+                        .script_pubkey(script_pubkey.clone())
+                        .required_value(settlement_required + initial_fee);
 
-                if fee_entries.is_empty() {
-                    return Err(Error::Config("No LBTC UTXOs found for fee".to_string()));
-                }
-                if settlement_entries.is_empty() {
-                    return Err(Error::Config(format!(
-                        "No settlement asset UTXOs found. Need {settlement_required} of {settlement_asset_id}"
-                    )));
-                }
+                    let results = <_ as UtxoStore>::query_utxos(wallet.store(), &[combined_filter]).await?;
+                    let entries = extract_entries_from_result(&results[0]);
 
-                let fee_utxo = &fee_entries[0];
-                let settlement_utxo = &settlement_entries[0];
+                    if entries.is_empty() {
+                        return Err(Error::Config(format!(
+                            "No LBTC UTXOs found for settlement + fee. Need {} sats",
+                            settlement_required + initial_fee
+                        )));
+                    }
+
+                    let utxo = &entries[0];
+                    ((*utxo.outpoint(), utxo.txout().clone()), None)
+                } else {
+                    // Separate queries for different assets
+                    let fee_filter = UtxoFilter::new()
+                        .asset_id(*LIQUID_TESTNET_BITCOIN_ASSET)
+                        .script_pubkey(script_pubkey.clone())
+                        .required_value(initial_fee);
+
+                    let settlement_filter = UtxoFilter::new()
+                        .asset_id(settlement_asset_id)
+                        .script_pubkey(script_pubkey.clone())
+                        .required_value(settlement_required);
+
+                    let results =
+                        <_ as UtxoStore>::query_utxos(wallet.store(), &[fee_filter, settlement_filter]).await?;
+                    let fee_entries = extract_entries_from_result(&results[0]);
+                    let settlement_entries = extract_entries_from_result(&results[1]);
+
+                    if fee_entries.is_empty() {
+                        return Err(Error::Config("No LBTC UTXOs found for fee".to_string()));
+                    }
+                    if settlement_entries.is_empty() {
+                        return Err(Error::Config(format!(
+                            "No settlement asset UTXOs found. Need {settlement_required} of {settlement_asset_id}"
+                        )));
+                    }
+
+                    let fee_utxo = &fee_entries[0];
+                    let settlement_utxo = &settlement_entries[0];
+
+                    (
+                        (*settlement_utxo.outpoint(), settlement_utxo.txout().clone()),
+                        Some((*fee_utxo.outpoint(), fee_utxo.txout().clone())),
+                    )
+                };
 
                 let collateral_filter = UtxoFilter::new()
                     .taproot_pubkey_gen(taproot_pubkey_gen.clone())
@@ -457,8 +535,6 @@ impl Cli {
 
                 let collateral_input = (*collateral_entry.outpoint(), collateral_entry.txout().clone());
                 let option_input = (*option_entry.outpoint(), option_entry.txout().clone());
-                let settlement_input = (*settlement_utxo.outpoint(), settlement_utxo.txout().clone());
-                let fee_input = (*fee_utxo.outpoint(), fee_utxo.txout().clone());
 
                 let actual_fee = if let Some(f) = fee {
                     *f
@@ -473,12 +549,14 @@ impl Cli {
                         &option_arguments,
                     )?;
                     let mut tx = pst.extract_tx()?;
-                    let utxos = vec![
+                    let mut utxos = vec![
                         collateral_input.1.clone(),
                         option_input.1.clone(),
                         settlement_input.1.clone(),
-                        fee_input.1.clone(),
                     ];
+                    if let Some(ref fi) = fee_input {
+                        utxos.push(fi.1.clone());
+                    }
                     let options_program = get_options_program(&option_arguments)?;
                     tx = finalize_options_transaction(
                         tx,
@@ -486,7 +564,7 @@ impl Cli {
                         &options_program,
                         &utxos,
                         0,
-                        branch,
+                        &branch,
                         config.address_params(),
                         *LIQUID_TESTNET_GENESIS,
                     )?;
@@ -513,7 +591,10 @@ impl Cli {
                 )?;
 
                 let mut tx = pst.extract_tx()?;
-                let utxos = vec![collateral_input.1, option_input.1, settlement_input.1, fee_input.1];
+                let mut utxos = vec![collateral_input.1, option_input.1, settlement_input.1];
+                if let Some(fi) = fee_input {
+                    utxos.push(fi.1);
+                }
 
                 let options_program = get_options_program(&option_arguments)?;
                 tx = finalize_options_transaction(
@@ -522,7 +603,7 @@ impl Cli {
                     &options_program,
                     &utxos,
                     0,
-                    option_branch,
+                    &option_branch,
                     config.address_params(),
                     *LIQUID_TESTNET_GENESIS,
                 )?;
@@ -620,8 +701,6 @@ impl Cli {
                         }
                     })
                     .collect();
-
-                dbg!("here");
 
                 if entries_with_collateral.is_empty() {
                     return Err(Error::Config(
@@ -725,7 +804,7 @@ impl Cli {
                         &options_program,
                         &utxos,
                         0,
-                        branch,
+                        &branch,
                         config.address_params(),
                         *LIQUID_TESTNET_GENESIS,
                     )?;
@@ -760,7 +839,7 @@ impl Cli {
                     &options_program,
                     &utxos,
                     0,
-                    option_branch,
+                    &option_branch,
                     config.address_params(),
                     *LIQUID_TESTNET_GENESIS,
                 )?;
@@ -971,7 +1050,7 @@ impl Cli {
                         &options_program,
                         &utxos,
                         0,
-                        branch,
+                        &branch,
                         config.address_params(),
                         *LIQUID_TESTNET_GENESIS,
                     )?;
@@ -1006,7 +1085,7 @@ impl Cli {
                     &options_program,
                     &utxos,
                     0,
-                    option_branch,
+                    &option_branch,
                     config.address_params(),
                     *LIQUID_TESTNET_GENESIS,
                 )?;
@@ -1176,7 +1255,7 @@ impl Cli {
                         &options_program,
                         &utxos,
                         0,
-                        branch,
+                        &branch,
                         config.address_params(),
                         *LIQUID_TESTNET_GENESIS,
                     )?;
@@ -1212,7 +1291,7 @@ impl Cli {
                     &options_program,
                     &utxos,
                     0,
-                    option_branch,
+                    &option_branch,
                     config.address_params(),
                     *LIQUID_TESTNET_GENESIS,
                 )?;
