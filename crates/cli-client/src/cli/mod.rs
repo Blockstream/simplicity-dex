@@ -99,7 +99,7 @@ impl Cli {
             Command::Option { command } => Box::pin(self.run_option(config, command)).await,
             Command::Swap { command } => Box::pin(self.run_swap(config, command)).await,
             Command::Browse => self.run_browse(config).await,
-            Command::Positions => self.run_positions(config).await,
+            Command::Positions { command } => self.run_positions(config, *command).await,
             Command::Sync { command } => self.run_sync(config, command).await,
             Command::Config => {
                 println!("{config:#?}");

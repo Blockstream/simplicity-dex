@@ -1,4 +1,5 @@
 use crate::cli::Cli;
+use crate::cli::commands::PositionsCommand;
 use crate::cli::interactive::{
     EnrichedTokenEntry, GRANTOR_TOKEN_TAG, OPTION_TOKEN_TAG, TokenDisplay, format_asset_value_with_tag,
     format_asset_with_tag, format_relative_time, format_settlement_asset, format_time_ago,
@@ -19,47 +20,73 @@ use simplicityhl::elements::Address;
 type ContractInfoResult = Result<Option<(Vec<u8>, Vec<u8>, String)>, coin_store::StoreError>;
 
 impl Cli {
-    pub(crate) async fn run_positions(&self, config: Config) -> Result<(), Error> {
+    pub(crate) async fn run_positions(&self, config: Config, command: Option<PositionsCommand>) -> Result<(), Error> {
         let wallet = self.get_wallet(&config).await?;
+        let sub_cmd = command.unwrap_or(PositionsCommand::All);
 
         println!("Your Positions:");
         println!("===============");
         println!();
 
-        let user_script_pubkey = wallet.signer().p2pk_address(config.address_params())?.script_pubkey();
+        match sub_cmd {
+            PositionsCommand::Options => self.show_options_section(&wallet, &config).await?,
+            PositionsCommand::Tokens => self.show_tokens_section(&wallet, &config).await?,
+            PositionsCommand::Swap => self.show_swaps_section(&wallet, &config).await?,
+            PositionsCommand::All => {
+                self.show_options_section(&wallet, &config).await?;
+                println!();
+                self.show_tokens_section(&wallet, &config).await?;
+                println!();
+                self.show_swaps_section(&wallet, &config).await?;
+                println!();
+                self.show_history_section(&wallet, &config).await?;
+            }
+        }
 
+        Ok(())
+    }
+
+    async fn show_options_section(&self, wallet: &crate::wallet::Wallet, config: &Config) -> Result<(), Error> {
         let options_filter = UtxoFilter::new().source(OPTION_SOURCE);
         let options_results = <_ as UtxoStore>::query_utxos(wallet.store(), &[options_filter]).await?;
         let option_entries = extract_entries(options_results);
 
-        let collateral_displays = build_collateral_displays(&wallet, &option_entries, config.address_params()).await;
+        let collateral_displays = build_collateral_displays(wallet, &option_entries, config.address_params()).await;
 
         println!("Option Contract Locked Assets:");
         println!("------------------------------");
         display_collateral_table(&collateral_displays);
-        println!();
+        Ok(())
+    }
 
-        let option_tokens = get_option_tokens_from_wallet(&wallet, OPTION_SOURCE, &user_script_pubkey).await?;
-        let grantor_tokens = get_grantor_tokens_from_wallet(&wallet, OPTION_SOURCE, &user_script_pubkey).await?;
+    async fn show_tokens_section(&self, wallet: &crate::wallet::Wallet, config: &Config) -> Result<(), Error> {
+        let user_script_pubkey = wallet.signer().p2pk_address(config.address_params())?.script_pubkey();
+
+        let option_tokens = get_option_tokens_from_wallet(wallet, OPTION_SOURCE, &user_script_pubkey).await?;
+        let grantor_tokens = get_grantor_tokens_from_wallet(wallet, OPTION_SOURCE, &user_script_pubkey).await?;
 
         let user_token_displays = build_user_token_displays(&option_tokens, &grantor_tokens, config.address_params());
 
         println!("Your Option/Grantor Tokens:");
         println!("---------------------------");
         display_user_token_table(&user_token_displays);
-        println!();
+        Ok(())
+    }
 
+    async fn show_swaps_section(&self, wallet: &crate::wallet::Wallet, _config: &Config) -> Result<(), Error> {
         let swap_filter = UtxoFilter::new().source(SWAP_WITH_CHANGE_SOURCE);
         let swap_results = <_ as UtxoStore>::query_utxos(wallet.store(), &[swap_filter]).await?;
         let swap_entries = extract_entries(swap_results);
 
-        let swap_displays = build_swap_displays_with_args(&wallet, &swap_entries).await;
+        let swap_displays = build_swap_displays_with_args(wallet, &swap_entries).await;
 
         println!("Pending Swaps:");
         println!("--------------");
         display_token_table(&swap_displays);
+        Ok(())
+    }
 
-        println!();
+    async fn show_history_section(&self, wallet: &crate::wallet::Wallet, config: &Config) -> Result<(), Error> {
         println!("Contract History:");
         println!("-----------------");
 
@@ -68,27 +95,20 @@ impl Cli {
         let swap_contracts =
             <_ as UtxoStore>::list_contracts_by_source_with_metadata(wallet.store(), SWAP_WITH_CHANGE_SOURCE).await?;
 
-        let mut contracts_with_history: Vec<(&str, Address, ContractMetadata, i64)> = Vec::new();
+        let mut contracts_with_history = Vec::new();
 
         for (args_bytes, tpg_str, metadata_bytes) in &option_contracts {
             if let Some(bytes) = metadata_bytes
                 && let Ok(metadata) = ContractMetadata::from_bytes(bytes)
                 && !metadata.history.is_empty()
-            {
-                let Ok((args, _)) = bincode::serde::decode_from_slice::<simplicityhl::Arguments, _>(
+                && let Ok((args, _)) = bincode::serde::decode_from_slice::<simplicityhl::Arguments, _>(
                     args_bytes,
                     bincode::config::standard(),
-                ) else {
-                    continue;
-                };
-                let Ok(opt_args) = OptionsArguments::from_arguments(&args) else {
-                    continue;
-                };
-                let Ok(tpg) =
+                )
+                && let Ok(opt_args) = OptionsArguments::from_arguments(&args)
+                && let Ok(tpg) =
                     TaprootPubkeyGen::build_from_str(tpg_str, &opt_args, config.address_params(), &get_options_address)
-                else {
-                    continue;
-                };
+            {
                 let most_recent = metadata.history.iter().map(|h| h.timestamp).max().unwrap_or(0);
                 contracts_with_history.push(("Option", tpg.address, metadata, most_recent));
             }
@@ -98,24 +118,18 @@ impl Cli {
             if let Some(bytes) = metadata_bytes
                 && let Ok(metadata) = ContractMetadata::from_bytes(bytes)
                 && !metadata.history.is_empty()
-            {
-                let Ok((args, _)) = bincode::serde::decode_from_slice::<simplicityhl::Arguments, _>(
+                && let Ok((args, _)) = bincode::serde::decode_from_slice::<simplicityhl::Arguments, _>(
                     args_bytes,
                     bincode::config::standard(),
-                ) else {
-                    continue;
-                };
-                let Ok(swap_args) = SwapWithChangeArguments::from_arguments(&args) else {
-                    continue;
-                };
-                let Ok(tpg) = TaprootPubkeyGen::build_from_str(
+                )
+                && let Ok(swap_args) = SwapWithChangeArguments::from_arguments(&args)
+                && let Ok(tpg) = TaprootPubkeyGen::build_from_str(
                     tpg_str,
                     &swap_args,
                     config.address_params(),
                     &contracts::swap_with_change::get_swap_with_change_address,
-                ) else {
-                    continue;
-                };
+                )
+            {
                 let most_recent = metadata.history.iter().map(|h| h.timestamp).max().unwrap_or(0);
                 contracts_with_history.push(("Swap", tpg.address, metadata, most_recent));
             }

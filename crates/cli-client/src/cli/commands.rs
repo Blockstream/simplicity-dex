@@ -31,7 +31,10 @@ pub enum Command {
     Browse,
 
     /// Show my holdings with expiration warnings
-    Positions,
+    Positions {
+        #[command(subcommand)]
+        command: Option<PositionsCommand>,
+    },
 
     /// Sync coin-store with blockchain via Esplora and/or NOSTR
     Sync {
@@ -305,6 +308,19 @@ pub enum SwapCommand {
         #[arg(long)]
         broadcast: bool,
     },
+}
+
+/// Positions display commands
+#[derive(Debug, Subcommand, Copy, Clone)]
+pub enum PositionsCommand {
+    /// Show all positions (default)
+    All,
+    /// Show only option contract locked assets
+    Options,
+    /// Show only held Option/Grantor tokens
+    Tokens,
+    /// Show only pending swaps
+    Swap,
 }
 
 /// Sync commands for reconciling coin-store with blockchain
