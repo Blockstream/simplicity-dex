@@ -4,6 +4,7 @@ mod interactive;
 mod option;
 mod option_offer;
 mod positions;
+mod price;
 mod sync;
 mod tables;
 mod tx;
@@ -102,6 +103,7 @@ impl Cli {
             Command::Browse => self.run_browse(config).await,
             Command::Positions => self.run_positions(config).await,
             Command::Sync { command } => self.run_sync(config, command).await,
+            Command::PriceFeed => price::run_price_feed().await,
             Command::Config => {
                 println!("{config:#?}");
                 Ok(())
