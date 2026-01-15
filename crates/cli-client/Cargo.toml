@@ -48,3 +48,4 @@ nostr = { version = "0.44.2" }
 nostr-sdk = { version = "0.44.1" }
 
 minreq = { version = "2.14", features = ["https", "json-using-serde"] }
+rust_decimal = { version = "1", features = ["serde"] }
