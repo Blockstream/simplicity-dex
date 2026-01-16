@@ -1,17 +1,15 @@
-use criterion::{criterion_group, criterion_main, Criterion, black_box};
+use criterion::{Criterion, black_box, criterion_group, criterion_main};
 use std::fs;
 use tokio::runtime::Runtime;
 
-use coin_store::executor::{UtxoStore};
+use coin_store::executor::UtxoStore;
 
 mod common;
 
 fn criterion_benchmark(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
 
-    let (store, filters, db_path) = rt.block_on(async {
-        common::setup_db().await
-    });
+    let (store, filters, db_path) = rt.block_on(async { common::setup_db().await });
 
     let mut group = c.benchmark_group("UTXO Queries (with contracts)");
     group.sample_size(10);

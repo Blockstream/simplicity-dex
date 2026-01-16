@@ -290,7 +290,7 @@ impl UtxoStore for Store {
                 .execute(&mut *db_tx)
                 .await?;
 
-             if input.has_issuance() && input.asset_issuance.asset_blinding_nonce == ZERO_TWEAK {
+            if input.has_issuance() && input.asset_issuance.asset_blinding_nonce == ZERO_TWEAK {
                 let contract_hash = ContractHash::from_byte_array(input.asset_issuance.asset_entropy);
                 let entropy = IssuanceAssetId::generate_asset_entropy(input.previous_output, contract_hash);
                 let asset_id = IssuanceAssetId::from_entropy(entropy);
@@ -988,7 +988,6 @@ mod tests {
 
         let _ = fs::remove_file(path);
     }
-
 
     #[tokio::test]
     async fn test_add_contract() {
