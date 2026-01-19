@@ -76,11 +76,14 @@ fn setup_tx_and_contract(
     Ok((pst_and_tpg, option_arguments))
 }
 
-pub async fn setup_db() -> (
-    Store,
-    (Vec<UtxoFilter>, Vec<UtxoFilter>, Vec<UtxoFilter>, Vec<UtxoFilter>),
-    String,
-) {
+pub async fn setup_db() -> Result<
+    (
+        Store,
+        (Vec<UtxoFilter>, Vec<UtxoFilter>, Vec<UtxoFilter>, Vec<UtxoFilter>),
+        String,
+    ),
+    Box<dyn std::error::Error>,
+> {
     let path = "/tmp/benchmark_stress.db";
     let _ = fs::remove_file(path);
 
@@ -88,21 +91,24 @@ pub async fn setup_db() -> (
     let mut filters_contracts = vec![];
     let mut filters_tokens = vec![];
     let mut filters_entropy = vec![];
-    let store = Store::create(path).await.unwrap();
+    let store = Store::create(path).await?;
 
     for _i in 0..10 {
         let secp = Secp256k1::new();
-        let keypair = Keypair::from_secret_key(&secp, &SecretKey::from_slice(&[1u8; 32]).unwrap());
+        let keypair = Keypair::from_secret_key(&secp, &SecretKey::from_slice(&[1u8; 32])?);
         let secret_key = keypair.secret_key();
 
-        let ((pst, tpg), opts_args) = setup_tx_and_contract(&keypair, 0, 0, 20, 25).unwrap();
-        let tx: Transaction = pst.extract_tx().unwrap();
+        let ((pst, tpg), opts_args) = setup_tx_and_contract(&keypair, 0, 0, 20, 25)?;
+        let tx: Transaction = pst.extract_tx()?;
 
         let mut blinder_keys = HashMap::new();
         for (i, _output) in tx.output.iter().enumerate() {
             blinder_keys.insert(i, keypair);
         }
-        store.insert_transaction(&tx, blinder_keys).await.unwrap();
+        store
+            .insert_transaction(&tx, blinder_keys)
+            .await
+            .expect("Failed to insert Tx");
 
         let source_code = OPTION_SOURCE;
 
@@ -112,14 +118,17 @@ pub async fn setup_db() -> (
         let tpg_for_filter = tpg.clone();
         let tpg_for_token = tpg;
 
-        store.add_contract(source_code, args, tpg_for_db, None).await.unwrap();
+        store
+            .add_contract(source_code, args, tpg_for_db, None)
+            .await
+            .expect("Failed to insert contract token");
 
         let option_asset_id = opts_args.option_token();
 
         store
             .insert_contract_token(&tpg_for_token.clone(), option_asset_id, "Name of token")
             .await
-            .expect("");
+            .expect("Failed to insert contract token");
 
         for output in tx.output.iter() {
             let asset_id = match output.asset {
@@ -156,9 +165,9 @@ pub async fn setup_db() -> (
         }
     }
 
-    (
+    Ok((
         store,
         (filters_default, filters_entropy, filters_contracts, filters_tokens),
         path.to_string(),
-    )
+    ))
 }

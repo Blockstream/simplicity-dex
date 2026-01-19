@@ -9,7 +9,7 @@ mod common;
 fn criterion_benchmark(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
 
-    let (store, filters, db_path) = rt.block_on(async { common::setup_db().await });
+    let (store, filters, db_path) = rt.block_on(async { common::setup_db().await.expect("DB Setup failed") });
 
     let mut group = c.benchmark_group("UTXO Queries (with contracts)");
     group.sample_size(10);
