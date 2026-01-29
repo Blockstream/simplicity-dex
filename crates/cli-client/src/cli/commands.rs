@@ -33,6 +33,9 @@ pub enum Command {
     /// Show my holdings with expiration warnings
     Positions,
 
+    /// Show current BTC/USD price feed
+    PriceFeed,
+
     /// Sync coin-store with blockchain via Esplora and/or NOSTR
     Sync {
         #[command(subcommand)]
