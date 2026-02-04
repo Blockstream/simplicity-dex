@@ -9,6 +9,7 @@ use crate::config::Config;
 use crate::error::Error;
 use crate::metadata::ContractMetadata;
 
+use crate::price_fetcher::{CoingeckoPriceFetcher, PriceFetcherError, fetch_btc_usd_price};
 use coin_store::{Store, UtxoEntry, UtxoFilter, UtxoQueryResult, UtxoStore};
 use contracts::option_offer::{OPTION_OFFER_SOURCE, OptionOfferArguments, get_option_offer_address};
 use contracts::options::{OPTION_SOURCE, OptionsArguments, get_options_address};
@@ -19,11 +20,30 @@ use simplicityhl::elements::Address;
 type ContractInfoResult = Result<Option<(Vec<u8>, Vec<u8>, String)>, coin_store::StoreError>;
 
 impl Cli {
+    #[allow(clippy::too_many_lines)]
     pub(crate) async fn run_positions(&self, config: Config) -> Result<(), Error> {
         let wallet = self.get_wallet(&config).await?;
 
         println!("Your Positions:");
         println!("===============");
+        println!();
+
+        let fetcher = CoingeckoPriceFetcher;
+        let btc_result = tokio::task::spawn_blocking(move || fetch_btc_usd_price(&fetcher))
+            .await
+            .unwrap_or_else(|e| Err(PriceFetcherError::Internal(e.to_string())));
+
+        let btc_price = match btc_result {
+            Ok(price) => format!("${price:.2}"),
+            Err(PriceFetcherError::RateLimit) => "Rate limit exceeded".to_string(),
+            Err(e) => {
+                eprintln!("Fetcher error: {e}");
+                "Price fetcher service unavailable".to_string()
+            }
+        };
+
+        println!("Current btc price: {btc_price}");
+        println!("-----------------------------");
         println!();
 
         let user_script_pubkey = wallet.signer().p2pk_address(config.address_params())?.script_pubkey();

@@ -7,6 +7,7 @@ mod explorer;
 mod fee;
 mod logging;
 mod metadata;
+mod price_fetcher;
 mod signing;
 mod sync;
 mod wallet;

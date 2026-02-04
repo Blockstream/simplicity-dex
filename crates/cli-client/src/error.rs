@@ -55,4 +55,7 @@ pub enum Error {
 
     #[error("Taproot pubkey generation error: {0}")]
     TaprootPubkeyGen(#[from] contracts::error::TaprootPubkeyGenError),
+
+    #[error("Price feed error: {0}")]
+    PriceFeed(#[from] crate::price_fetcher::PriceFetcherError),
 }
