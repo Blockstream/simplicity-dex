@@ -26,7 +26,7 @@ impl Cli {
 
                 let filter = coin_store::UtxoFilter::new()
                     .asset_id(*LIQUID_TESTNET_BITCOIN_ASSET)
-                    .script_pubkey(wallet.signer().p2pk_address(config.address_params())?.script_pubkey());
+                    .script_pubkey(wallet.signer().p2pk_address(config.network())?.script_pubkey());
 
                 let results: Vec<UtxoQueryResult> = <_ as UtxoStore>::query_utxos(wallet.store(), &[filter]).await?;
 
@@ -52,14 +52,14 @@ impl Cli {
                         let pst = contracts::sdk::split_native_any(fee_utxo.clone(), *count, f)?;
                         Ok((pst, vec![fee_utxo.1.clone()]))
                     },
-                    |tx, utxos| sign_p2pk_inputs(tx, utxos, &wallet, config.address_params(), 0),
+                    |tx, utxos| sign_p2pk_inputs(tx, utxos, &wallet, config.network(), 0),
                 )?;
 
                 let pst = contracts::sdk::split_native_any(fee_utxo.clone(), *count, actual_fee)?;
                 let tx = pst.extract_tx()?;
                 let utxos = vec![fee_utxo.1];
 
-                let tx = sign_p2pk_inputs(tx, &utxos, &wallet, config.address_params(), 0)?;
+                let tx = sign_p2pk_inputs(tx, &utxos, &wallet, config.network(), 0)?;
 
                 match broadcast {
                     false => {
@@ -85,7 +85,7 @@ impl Cli {
                 }
 
                 let wallet = self.get_wallet(&config).await?;
-                let script_pubkey = wallet.signer().p2pk_address(config.address_params())?.script_pubkey();
+                let script_pubkey = wallet.signer().p2pk_address(config.network())?.script_pubkey();
 
                 let target_asset = asset_id.unwrap_or(*LIQUID_TESTNET_BITCOIN_ASSET);
                 let is_native = target_asset == *LIQUID_TESTNET_BITCOIN_ASSET;
@@ -210,7 +210,7 @@ impl Cli {
                     fee.as_ref(),
                     config.get_fee_rate(),
                     |f| build_merge_pset(f, fee_entry_opt.as_ref()),
-                    |tx, utxos| sign_p2pk_inputs(tx, utxos, &wallet, config.address_params(), 0),
+                    |tx, utxos| sign_p2pk_inputs(tx, utxos, &wallet, config.network(), 0),
                 )?;
 
                 if !is_native && let Some(ref fee_e) = fee_entry_opt {
@@ -243,7 +243,7 @@ impl Cli {
                 }
 
                 let tx = pst.extract_tx()?;
-                let tx = sign_p2pk_inputs(tx, &utxos, &wallet, config.address_params(), 0)?;
+                let tx = sign_p2pk_inputs(tx, &utxos, &wallet, config.network(), 0)?;
 
                 match broadcast {
                     false => {
@@ -266,7 +266,7 @@ impl Cli {
                 broadcast,
             } => {
                 let wallet = self.get_wallet(&config).await?;
-                let script_pubkey = wallet.signer().p2pk_address(config.address_params())?.script_pubkey();
+                let script_pubkey = wallet.signer().p2pk_address(config.network())?.script_pubkey();
 
                 let target_asset = asset_id.unwrap_or(*LIQUID_TESTNET_BITCOIN_ASSET);
                 let is_native = target_asset == *LIQUID_TESTNET_BITCOIN_ASSET;
@@ -408,7 +408,7 @@ impl Cli {
                     fee.as_ref(),
                     config.get_fee_rate(),
                     |f| build_transfer_pset(f, fee_entry_opt.as_ref()),
-                    |tx, utxos| sign_p2pk_inputs(tx, utxos, &wallet, config.address_params(), 0),
+                    |tx, utxos| sign_p2pk_inputs(tx, utxos, &wallet, config.network(), 0),
                 )?;
 
                 if is_native && total_asset_value < *amount + actual_fee {
@@ -438,7 +438,7 @@ impl Cli {
                 }
 
                 let tx = pst.extract_tx()?;
-                let tx = sign_p2pk_inputs(tx, &utxos, &wallet, config.address_params(), 0)?;
+                let tx = sign_p2pk_inputs(tx, &utxos, &wallet, config.network(), 0)?;
 
                 match broadcast {
                     false => {
@@ -455,7 +455,7 @@ impl Cli {
             }
             TxCommand::IssueAsset { amount, fee, broadcast } => {
                 let wallet = self.get_wallet(&config).await?;
-                let script_pubkey = wallet.signer().p2pk_address(config.address_params())?.script_pubkey();
+                let script_pubkey = wallet.signer().p2pk_address(config.network())?.script_pubkey();
 
                 let fee_filter = coin_store::UtxoFilter::new()
                     .asset_id(*LIQUID_TESTNET_BITCOIN_ASSET)
@@ -492,7 +492,7 @@ impl Cli {
                             contracts::sdk::issue_asset(&blinding_keypair.public_key(), fee_utxo.clone(), *amount, f)?;
                         Ok((pst, vec![fee_utxo.1.clone()]))
                     },
-                    |tx, utxos| sign_p2pk_inputs(tx, utxos, &wallet, config.address_params(), 0),
+                    |tx, utxos| sign_p2pk_inputs(tx, utxos, &wallet, config.network(), 0),
                 )?;
 
                 if let Some(fee_input_value) = fee_entry.value()
@@ -519,7 +519,7 @@ impl Cli {
                 let tx = pst.extract_tx()?;
                 let utxos = vec![fee_utxo.1];
 
-                let tx = sign_p2pk_inputs(tx, &utxos, &wallet, config.address_params(), 0)?;
+                let tx = sign_p2pk_inputs(tx, &utxos, &wallet, config.network(), 0)?;
 
                 println!("Asset ID: {asset_id}");
                 println!("Reissuance Token ID: {token_id}");
@@ -547,7 +547,7 @@ impl Cli {
                 broadcast,
             } => {
                 let wallet = self.get_wallet(&config).await?;
-                let script_pubkey = wallet.signer().p2pk_address(config.address_params())?.script_pubkey();
+                let script_pubkey = wallet.signer().p2pk_address(config.network())?.script_pubkey();
 
                 let asset_filter = coin_store::UtxoFilter::new()
                     .asset_id(*asset_id)
@@ -634,7 +634,7 @@ impl Cli {
                         )?;
                         Ok((pst, vec![token_utxo.1.clone(), fee_utxo.1.clone()]))
                     },
-                    |tx, utxos| sign_p2pk_inputs(tx, utxos, &wallet, config.address_params(), 0),
+                    |tx, utxos| sign_p2pk_inputs(tx, utxos, &wallet, config.network(), 0),
                 )?;
 
                 if let Some(fee_input_value) = fee_entry.value()
@@ -658,7 +658,7 @@ impl Cli {
                 let tx = pst.extract_tx()?;
                 let utxos = vec![token_utxo.1, fee_utxo.1];
 
-                let tx = sign_p2pk_inputs(tx, &utxos, &wallet, config.address_params(), 0)?;
+                let tx = sign_p2pk_inputs(tx, &utxos, &wallet, config.network(), 0)?;
 
                 println!("Reissuing {amount} units of asset {asset_id}");
 

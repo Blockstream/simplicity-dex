@@ -197,7 +197,7 @@ impl Cli {
             let Ok(taproot_pubkey_gen) = contracts::sdk::taproot_pubkey_gen::TaprootPubkeyGen::build_from_str(
                 tpg_str,
                 &options_args,
-                config.address_params(),
+                config.network(),
                 &contracts::options::get_options_address,
             ) else {
                 errors.push(format!(
@@ -263,7 +263,7 @@ impl Cli {
             let Ok(taproot_pubkey_gen) = contracts::sdk::taproot_pubkey_gen::TaprootPubkeyGen::build_from_str(
                 tpg_str,
                 &option_offer_args,
-                config.address_params(),
+                config.network(),
                 &contracts::option_offer::get_option_offer_address,
             ) else {
                 errors.push(format!(
@@ -393,7 +393,7 @@ impl Cli {
         }
 
         println!("  Checking wallet address...");
-        let wallet_address = wallet.signer().p2pk_address(config.address_params())?;
+        let wallet_address = wallet.signer().p2pk_address(config.network())?;
 
         match fetch_address_utxos(&wallet_address) {
             Ok(utxos) => {
@@ -527,7 +527,7 @@ impl Cli {
         let wallet = self.get_wallet(config).await?;
 
         println!("  Fetching options from NOSTR...");
-        let options_results = client.fetch_options(config.address_params()).await?;
+        let options_results = client.fetch_options(config.network()).await?;
         let valid_options: Vec<OptionCreatedEvent> = options_results.into_iter().filter_map(Result::ok).collect();
 
         println!("    Found {} valid options", valid_options.len());
@@ -555,7 +555,7 @@ impl Cli {
         }
 
         println!("  Fetching option offers from NOSTR...");
-        let offers_results = client.fetch_option_offers(config.address_params()).await?;
+        let offers_results = client.fetch_option_offers(config.network()).await?;
         let valid_offers: Vec<OptionOfferCreatedEvent> = offers_results.into_iter().filter_map(Result::ok).collect();
 
         println!("    Found {} valid option offers", valid_offers.len());
@@ -681,7 +681,7 @@ impl Cli {
             let Ok(taproot_pubkey_gen) = contracts::sdk::taproot_pubkey_gen::TaprootPubkeyGen::build_from_str(
                 tpg_str,
                 &options_args,
-                config.address_params(),
+                config.network(),
                 &contracts::options::get_options_address,
             ) else {
                 stats.errors.push(format!(
@@ -747,7 +747,7 @@ impl Cli {
             let Ok(taproot_pubkey_gen) = contracts::sdk::taproot_pubkey_gen::TaprootPubkeyGen::build_from_str(
                 tpg_str,
                 &option_offer_args,
-                config.address_params(),
+                config.network(),
                 &contracts::option_offer::get_option_offer_address,
             ) else {
                 stats.errors.push(format!(

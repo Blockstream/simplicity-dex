@@ -2,10 +2,12 @@
 #![allow(clippy::missing_errors_doc)]
 
 use simplicityhl::elements::secp256k1_zkp::{self as secp256k1, Keypair, Message, schnorr::Signature};
-use simplicityhl::elements::{Address, AddressParams, BlockHash, Transaction, TxOut};
+use simplicityhl::elements::{Address, Transaction, TxOut};
 use simplicityhl::simplicity::bitcoin::XOnlyPublicKey;
 use simplicityhl::simplicity::hashes::Hash as _;
-use simplicityhl_core::{ProgramError, get_and_verify_env, get_p2pk_address, get_p2pk_program, hash_script};
+use simplicityhl_core::{
+    ProgramError, SimplicityNetwork, get_and_verify_env, get_p2pk_address, get_p2pk_program, hash_script,
+};
 
 #[derive(thiserror::Error, Debug)]
 pub enum SignerError {
@@ -46,15 +48,15 @@ impl Signer {
         self.keypair.x_only_public_key().0
     }
 
-    pub fn p2pk_address(&self, params: &'static AddressParams) -> Result<Address, SignerError> {
+    pub fn p2pk_address(&self, network: SimplicityNetwork) -> Result<Address, SignerError> {
         let public_key = self.keypair.x_only_public_key().0;
-        let address = get_p2pk_address(&public_key, params)?;
+        let address = get_p2pk_address(&public_key, network)?;
 
         Ok(address)
     }
 
-    pub fn p2pk_script_hash(&self, params: &'static AddressParams) -> Result<[u8; 32], SignerError> {
-        let address = self.p2pk_address(params)?;
+    pub fn p2pk_script_hash(&self, network: SimplicityNetwork) -> Result<[u8; 32], SignerError> {
+        let address = self.p2pk_address(network)?;
 
         let mut script_hash: [u8; 32] = hash_script(&address.script_pubkey());
         script_hash.reverse();
@@ -64,8 +66,8 @@ impl Signer {
 
     pub fn print_details(&self) -> Result<(), SignerError> {
         let public_key = self.public_key();
-        let address = self.p2pk_address(&AddressParams::LIQUID_TESTNET)?;
-        let script_hash = self.p2pk_script_hash(&AddressParams::LIQUID_TESTNET)?;
+        let address = self.p2pk_address(SimplicityNetwork::LiquidTestnet)?;
+        let script_hash = self.p2pk_script_hash(SimplicityNetwork::LiquidTestnet)?;
 
         println!("X Only Public Key: {public_key}");
         println!("P2PK Address: {address}");
@@ -79,21 +81,12 @@ impl Signer {
         tx: &Transaction,
         utxos: &[TxOut],
         input_index: usize,
-        params: &'static AddressParams,
-        genesis_hash: BlockHash,
+        network: SimplicityNetwork,
     ) -> Result<Signature, SignerError> {
         let x_only_public_key = self.keypair.x_only_public_key().0;
         let p2pk_program = get_p2pk_program(&x_only_public_key)?;
 
-        let env = get_and_verify_env(
-            tx,
-            &p2pk_program,
-            &x_only_public_key,
-            utxos,
-            params,
-            genesis_hash,
-            input_index,
-        )?;
+        let env = get_and_verify_env(tx, &p2pk_program, &x_only_public_key, utxos, network, input_index)?;
 
         let sighash_all = Message::from_digest(env.c_tx_env().sighash_all().to_byte_array());
 
@@ -102,7 +95,6 @@ impl Signer {
 
     /// Sign a contract transaction input.
     /// This is used for Simplicity contracts that require a user signature (e.g., swap withdraw).
-    #[allow(clippy::too_many_arguments)]
     pub fn sign_contract(
         &self,
         tx: &Transaction,
@@ -110,10 +102,9 @@ impl Signer {
         x_only_pubkey: &XOnlyPublicKey,
         utxos: &[TxOut],
         input_index: usize,
-        params: &'static AddressParams,
-        genesis_hash: BlockHash,
+        network: SimplicityNetwork,
     ) -> Result<Signature, SignerError> {
-        let env = get_and_verify_env(tx, program, x_only_pubkey, utxos, params, genesis_hash, input_index)?;
+        let env = get_and_verify_env(tx, program, x_only_pubkey, utxos, network, input_index)?;
 
         let sighash_all = Message::from_digest(env.c_tx_env().sighash_all().to_byte_array());
 

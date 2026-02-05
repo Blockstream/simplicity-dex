@@ -17,7 +17,7 @@ impl Cli {
         println!("Browsing available options and option offers from NOSTR...");
         println!();
 
-        let options_results = client.fetch_options(config.address_params()).await?;
+        let options_results = client.fetch_options(config.network()).await?;
         let valid_options: Vec<OptionCreatedEvent> = options_results.into_iter().filter_map(Result::ok).collect();
 
         println!("Available Options:");
@@ -46,7 +46,7 @@ impl Cli {
 
         println!();
 
-        let offers_results = client.fetch_option_offers(config.address_params()).await?;
+        let offers_results = client.fetch_option_offers(config.network()).await?;
         let valid_offers: Vec<OptionOfferCreatedEvent> = offers_results.into_iter().filter_map(Result::ok).collect();
 
         println!("Available Option Offers (from NOSTR):");

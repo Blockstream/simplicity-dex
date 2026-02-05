@@ -4,8 +4,8 @@ use crate::events::kinds::{OPTION_CREATED, TAG_EXPIRY, TAG_OPTIONS_ARGS, TAG_OPT
 use contracts::options::{OptionsArguments, get_options_address};
 use contracts::sdk::taproot_pubkey_gen::TaprootPubkeyGen;
 use nostr::{Event, EventBuilder, EventId, PublicKey, Tag, TagKind, Timestamp};
-use simplicityhl::elements::{AddressParams, OutPoint};
-use simplicityhl_core::Encodable;
+use simplicityhl::elements::OutPoint;
+use simplicityhl_core::{Encodable, SimplicityNetwork};
 
 #[derive(Debug, Clone)]
 pub struct OptionCreatedEvent {
@@ -47,7 +47,7 @@ impl OptionCreatedEvent {
             )))
     }
 
-    pub fn from_event(event: &Event, params: &'static AddressParams) -> Result<Self, ParseError> {
+    pub fn from_event(event: &Event, network: SimplicityNetwork) -> Result<Self, ParseError> {
         event.verify()?;
 
         if event.kind != OPTION_CREATED {
@@ -80,7 +80,7 @@ impl OptionCreatedEvent {
             .ok_or(ParseError::MissingTag(TAG_TAPROOT_GEN))?;
 
         let taproot_pubkey_gen =
-            TaprootPubkeyGen::build_from_str(taproot_str, &options_args, params, &get_options_address)?;
+            TaprootPubkeyGen::build_from_str(taproot_str, &options_args, network, &get_options_address)?;
 
         Ok(Self {
             event_id: event.id,
@@ -102,7 +102,7 @@ mod tests {
     use contracts::sdk::taproot_pubkey_gen::get_random_seed;
 
     use simplicityhl::elements::{AssetId, Txid};
-    use simplicityhl_core::{LIQUID_TESTNET_BITCOIN_ASSET, LIQUID_TESTNET_TEST_ASSET_ID_STR};
+    use simplicityhl_core::{LIQUID_TESTNET_BITCOIN_ASSET, LIQUID_TESTNET_TEST_ASSET_ID_STR, SimplicityNetwork};
 
     fn get_mocked_data() -> anyhow::Result<(OptionsArguments, TaprootPubkeyGen)> {
         let settlement_asset_id = AssetId::from_slice(&hex::decode(LIQUID_TESTNET_TEST_ASSET_ID_STR)?)?;
@@ -122,7 +122,7 @@ mod tests {
             (grantor_creation_outpoint, false),
         );
 
-        let taproot_pubkey_gen = TaprootPubkeyGen::from(&args, &AddressParams::LIQUID_TESTNET, &get_options_address)?;
+        let taproot_pubkey_gen = TaprootPubkeyGen::from(&args, SimplicityNetwork::LiquidTestnet, &get_options_address)?;
 
         Ok((args, taproot_pubkey_gen))
     }
@@ -138,7 +138,7 @@ mod tests {
         let builder = event.to_event_builder(keys.public_key())?;
         let built_event = builder.sign_with_keys(&keys)?;
 
-        let parsed = OptionCreatedEvent::from_event(&built_event, &AddressParams::LIQUID_TESTNET)?;
+        let parsed = OptionCreatedEvent::from_event(&built_event, SimplicityNetwork::LiquidTestnet)?;
 
         assert_eq!(parsed.options_args, args);
         assert_eq!(parsed.utxo, utxo);

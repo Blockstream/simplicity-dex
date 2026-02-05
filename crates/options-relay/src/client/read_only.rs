@@ -6,7 +6,7 @@ use crate::events::{ActionCompletedEvent, OptionCreatedEvent, OptionOfferCreated
 use nostr::prelude::*;
 use nostr_sdk::Client;
 use nostr_sdk::prelude::Events;
-use simplicityhl::elements::AddressParams;
+use simplicityhl_core::SimplicityNetwork;
 use tracing::instrument;
 
 /// Check if an event is still active (not expired) based on its expiry tag.
@@ -58,25 +58,25 @@ impl ReadOnlyClient {
 
     pub async fn fetch_options(
         &self,
-        params: &'static AddressParams,
+        network: SimplicityNetwork,
     ) -> Result<Vec<Result<OptionCreatedEvent, ParseError>>, RelayError> {
         let events = self.fetch_events(filters::option_created()).await?;
         Ok(events
             .iter()
             .filter(|e| is_active(e))
-            .map(|e| OptionCreatedEvent::from_event(e, params))
+            .map(|e| OptionCreatedEvent::from_event(e, network))
             .collect())
     }
 
     pub async fn fetch_option_offers(
         &self,
-        params: &'static AddressParams,
+        network: SimplicityNetwork,
     ) -> Result<Vec<Result<OptionOfferCreatedEvent, ParseError>>, RelayError> {
         let events = self.fetch_events(filters::option_offer_created()).await?;
         Ok(events
             .iter()
             .filter(|e| is_active(e))
-            .map(|e| OptionOfferCreatedEvent::from_event(e, params))
+            .map(|e| OptionOfferCreatedEvent::from_event(e, network))
             .collect())
     }
 

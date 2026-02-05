@@ -46,13 +46,13 @@ impl Cli {
         println!("-----------------------------");
         println!();
 
-        let user_script_pubkey = wallet.signer().p2pk_address(config.address_params())?.script_pubkey();
+        let user_script_pubkey = wallet.signer().p2pk_address(config.network())?.script_pubkey();
 
         let options_filter = UtxoFilter::new().source(OPTION_SOURCE);
         let options_results = <_ as UtxoStore>::query_utxos(wallet.store(), &[options_filter]).await?;
         let option_entries = extract_entries(options_results);
 
-        let collateral_displays = build_collateral_displays(&wallet, &option_entries, config.address_params()).await;
+        let collateral_displays = build_collateral_displays(&wallet, &option_entries, config.network()).await;
 
         println!("Option Contract Locked Assets:");
         println!("------------------------------");
@@ -62,7 +62,7 @@ impl Cli {
         let option_tokens = get_option_tokens_from_wallet(&wallet, OPTION_SOURCE, &user_script_pubkey).await?;
         let grantor_tokens = get_grantor_tokens_from_wallet(&wallet, OPTION_SOURCE, &user_script_pubkey).await?;
 
-        let user_token_displays = build_user_token_displays(&option_tokens, &grantor_tokens, config.address_params());
+        let user_token_displays = build_user_token_displays(&option_tokens, &grantor_tokens, config.network());
 
         println!("Your Option/Grantor Tokens:");
         println!("---------------------------");
@@ -105,7 +105,7 @@ impl Cli {
                     continue;
                 };
                 let Ok(tpg) =
-                    TaprootPubkeyGen::build_from_str(tpg_str, &opt_args, config.address_params(), &get_options_address)
+                    TaprootPubkeyGen::build_from_str(tpg_str, &opt_args, config.network(), &get_options_address)
                 else {
                     continue;
                 };
@@ -131,7 +131,7 @@ impl Cli {
                 let Ok(tpg) = TaprootPubkeyGen::build_from_str(
                     tpg_str,
                     &option_offer_args,
-                    config.address_params(),
+                    config.network(),
                     &get_option_offer_address,
                 ) else {
                     continue;
@@ -192,7 +192,7 @@ pub struct UserTokenDisplay {
 async fn build_collateral_displays(
     wallet: &crate::wallet::Wallet,
     entries: &[UtxoEntry],
-    address_params: &'static simplicityhl::elements::AddressParams,
+    network: simplicityhl_core::SimplicityNetwork,
 ) -> Vec<CollateralDisplay> {
     let mut displays = Vec::new();
     let mut display_idx = 0;
@@ -202,7 +202,7 @@ async fn build_collateral_displays(
         let contract_info = <_ as UtxoStore>::get_contract_by_script_pubkey(wallet.store(), &script_pubkey).await;
 
         // Try to get option arguments to check if this is collateral
-        let Some(info) = extract_collateral_info(wallet.store(), contract_info, entry, address_params).await else {
+        let Some(info) = extract_collateral_info(wallet.store(), contract_info, entry, network).await else {
             continue;
         };
 
@@ -224,7 +224,7 @@ async fn extract_collateral_info(
     store: &Store,
     contract_info: ContractInfoResult,
     entry: &UtxoEntry,
-    address_params: &'static simplicityhl::elements::AddressParams,
+    network: simplicityhl_core::SimplicityNetwork,
 ) -> Option<(String, String, String, String)> {
     let (_metadata, args_bytes, tpg_str) = contract_info.ok().flatten()?;
 
@@ -241,7 +241,7 @@ async fn extract_collateral_info(
         return None;
     }
 
-    let tpg = TaprootPubkeyGen::build_from_str(&tpg_str, &opt_args, address_params, &get_options_address).ok()?;
+    let tpg = TaprootPubkeyGen::build_from_str(&tpg_str, &opt_args, network, &get_options_address).ok()?;
 
     let locked_str = format_asset_value_with_tag(store, entry.value(), entry.asset()).await;
     let settlement_str = format_asset_with_tag(store, &opt_args.get_settlement_asset_id()).await;
@@ -255,7 +255,7 @@ async fn extract_collateral_info(
 fn build_user_token_displays(
     option_tokens: &[EnrichedTokenEntry],
     grantor_tokens: &[EnrichedTokenEntry],
-    address_params: &'static simplicityhl::elements::AddressParams,
+    network: simplicityhl_core::SimplicityNetwork,
 ) -> Vec<UserTokenDisplay> {
     let mut displays = Vec::new();
     let mut idx = 0;
@@ -270,7 +270,7 @@ fn build_user_token_displays(
         let contract_addr = TaprootPubkeyGen::build_from_str(
             &entry.taproot_pubkey_gen_str,
             &entry.option_arguments,
-            address_params,
+            network,
             &get_options_address,
         )
         .map_or_else(|_| "???".to_string(), |tpg| format_contract_address(&tpg.address));
@@ -299,7 +299,7 @@ fn build_user_token_displays(
         let contract_addr = TaprootPubkeyGen::build_from_str(
             &entry.taproot_pubkey_gen_str,
             &entry.option_arguments,
-            address_params,
+            network,
             &get_options_address,
         )
         .map_or_else(|_| "???".to_string(), |tpg| format_contract_address(&tpg.address));

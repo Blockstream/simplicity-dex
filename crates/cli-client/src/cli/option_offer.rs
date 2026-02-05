@@ -23,7 +23,7 @@ use options_relay::{ActionCompletedEvent, ActionType, OptionOfferCreatedEvent};
 use simplicityhl::elements::pset::serialize::Serialize;
 use simplicityhl::simplicity::hex::DisplayHex;
 use simplicityhl::tracker::TrackerLogLevel;
-use simplicityhl_core::{LIQUID_TESTNET_BITCOIN_ASSET, LIQUID_TESTNET_GENESIS};
+use simplicityhl_core::LIQUID_TESTNET_BITCOIN_ASSET;
 
 pub const OPTION_OFFER_COLLATERAL_TAG: &str = "option_offer_collateral";
 
@@ -94,7 +94,7 @@ impl Cli {
             } => {
                 println!("Creating option offer...");
 
-                let user_script_pubkey = wallet.signer().p2pk_address(config.address_params())?.script_pubkey();
+                let user_script_pubkey = wallet.signer().p2pk_address(config.network())?.script_pubkey();
 
                 let wallet_assets = get_wallet_assets(&wallet, &user_script_pubkey).await?;
 
@@ -254,14 +254,14 @@ impl Cli {
                             collateral_amt,
                             f,
                             &option_offer_args,
-                            config.address_params(),
+                            config.network(),
                         )?;
                         Ok((
                             pst,
                             vec![collateral_input.1.clone(), premium_input.1.clone(), fee_input.1.clone()],
                         ))
                     },
-                    |tx, utxos| sign_p2pk_inputs(tx, utxos, &wallet, config.address_params(), 0),
+                    |tx, utxos| sign_p2pk_inputs(tx, utxos, &wallet, config.network(), 0),
                 )?;
 
                 println!("  Fee: {actual_fee} sats");
@@ -273,13 +273,13 @@ impl Cli {
                     collateral_amt,
                     actual_fee,
                     &option_offer_args,
-                    config.address_params(),
+                    config.network(),
                 )?;
 
                 let tx = pst.extract_tx()?;
                 let utxos = vec![collateral_input.1.clone(), premium_input.1, fee_input.1];
 
-                let tx = sign_p2pk_inputs(tx, &utxos, &wallet, config.address_params(), 0)?;
+                let tx = sign_p2pk_inputs(tx, &utxos, &wallet, config.network(), 0)?;
 
                 if *broadcast {
                     cli_helper::explorer::broadcast_tx(&tx).await?;
@@ -363,7 +363,7 @@ impl Cli {
                     let Ok(taproot_pubkey_gen) = contracts::sdk::taproot_pubkey_gen::TaprootPubkeyGen::build_from_str(
                         &tpg_str,
                         &option_offer_args,
-                        config.address_params(),
+                        config.network(),
                         &contracts::option_offer::get_option_offer_address,
                     ) else {
                         continue;
@@ -463,7 +463,7 @@ impl Cli {
 
                 println!("  Settlement required: {settlement_required}");
 
-                let script_pubkey = wallet.signer().p2pk_address(config.address_params())?.script_pubkey();
+                let script_pubkey = wallet.signer().p2pk_address(config.network())?.script_pubkey();
                 let settlement_asset = args.get_settlement_asset_id();
 
                 let settlement_filter = UtxoFilter::new()
@@ -553,8 +553,7 @@ impl Cli {
                         &utxos,
                         0,
                         &branch,
-                        config.address_params(),
-                        *LIQUID_TESTNET_GENESIS,
+                        config.network(),
                         TrackerLogLevel::None,
                     )?;
                     tx = finalize_option_offer_transaction(
@@ -564,11 +563,10 @@ impl Cli {
                         &utxos,
                         1,
                         &branch,
-                        config.address_params(),
-                        *LIQUID_TESTNET_GENESIS,
+                        config.network(),
                         TrackerLogLevel::None,
                     )?;
-                    let tx = sign_p2pk_inputs(tx, &utxos, &wallet, config.address_params(), 2)?;
+                    let tx = sign_p2pk_inputs(tx, &utxos, &wallet, config.network(), 2)?;
                     let signed_weight = tx.weight();
                     let fee_rate = config.get_fee_rate();
                     let estimated = crate::fee::calculate_fee(signed_weight, fee_rate);
@@ -607,8 +605,7 @@ impl Cli {
                     &utxos,
                     0,
                     &branch,
-                    config.address_params(),
-                    *LIQUID_TESTNET_GENESIS,
+                    config.network(),
                     TrackerLogLevel::None,
                 )?;
 
@@ -619,12 +616,11 @@ impl Cli {
                     &utxos,
                     1,
                     &branch,
-                    config.address_params(),
-                    *LIQUID_TESTNET_GENESIS,
+                    config.network(),
                     TrackerLogLevel::None,
                 )?;
 
-                let tx = sign_p2pk_inputs(tx, &utxos, &wallet, config.address_params(), 2)?;
+                let tx = sign_p2pk_inputs(tx, &utxos, &wallet, config.network(), 2)?;
 
                 if *broadcast {
                     cli_helper::explorer::broadcast_tx(&tx).await?;
@@ -701,7 +697,7 @@ impl Cli {
                     let Ok(taproot_pubkey_gen) = contracts::sdk::taproot_pubkey_gen::TaprootPubkeyGen::build_from_str(
                         &tpg_str,
                         &option_offer_args,
-                        config.address_params(),
+                        config.network(),
                         &contracts::option_offer::get_option_offer_address,
                     ) else {
                         continue;
@@ -778,7 +774,7 @@ impl Cli {
 
                 let initial_fee = fee.unwrap_or(PLACEHOLDER_FEE);
 
-                let script_pubkey = wallet.signer().p2pk_address(config.address_params())?.script_pubkey();
+                let script_pubkey = wallet.signer().p2pk_address(config.network())?.script_pubkey();
                 let fee_filter = UtxoFilter::new()
                     .asset_id(*LIQUID_TESTNET_BITCOIN_ASSET)
                     .script_pubkey(script_pubkey.clone())
@@ -843,8 +839,7 @@ impl Cli {
                         &taproot_pubkey_gen.get_x_only_pubkey(),
                         &utxos,
                         0,
-                        config.address_params(),
-                        *LIQUID_TESTNET_GENESIS,
+                        config.network(),
                     )?;
                     let branch = contracts::option_offer::build_witness::OptionOfferBranch::Expiry {
                         schnorr_signature: signature,
@@ -856,8 +851,7 @@ impl Cli {
                         &utxos,
                         0,
                         &branch,
-                        config.address_params(),
-                        *LIQUID_TESTNET_GENESIS,
+                        config.network(),
                         TrackerLogLevel::None,
                     )?;
                     let signature = wallet.signer().sign_contract(
@@ -866,8 +860,7 @@ impl Cli {
                         &taproot_pubkey_gen.get_x_only_pubkey(),
                         &utxos,
                         1,
-                        config.address_params(),
-                        *LIQUID_TESTNET_GENESIS,
+                        config.network(),
                     )?;
                     let branch = contracts::option_offer::build_witness::OptionOfferBranch::Expiry {
                         schnorr_signature: signature,
@@ -879,11 +872,10 @@ impl Cli {
                         &utxos,
                         1,
                         &branch,
-                        config.address_params(),
-                        *LIQUID_TESTNET_GENESIS,
+                        config.network(),
                         TrackerLogLevel::None,
                     )?;
-                    let tx = sign_p2pk_inputs(tx, &utxos, &wallet, config.address_params(), 2)?;
+                    let tx = sign_p2pk_inputs(tx, &utxos, &wallet, config.network(), 2)?;
                     let signed_weight = tx.weight();
                     let fee_rate = config.get_fee_rate();
                     let estimated = crate::fee::calculate_fee(signed_weight, fee_rate);
@@ -914,8 +906,7 @@ impl Cli {
                     &taproot_pubkey_gen.get_x_only_pubkey(),
                     &utxos,
                     0,
-                    config.address_params(),
-                    *LIQUID_TESTNET_GENESIS,
+                    config.network(),
                 )?;
 
                 let branch = contracts::option_offer::build_witness::OptionOfferBranch::Expiry {
@@ -929,8 +920,7 @@ impl Cli {
                     &utxos,
                     0,
                     &branch,
-                    config.address_params(),
-                    *LIQUID_TESTNET_GENESIS,
+                    config.network(),
                     TrackerLogLevel::None,
                 )?;
 
@@ -940,8 +930,7 @@ impl Cli {
                     &taproot_pubkey_gen.get_x_only_pubkey(),
                     &utxos,
                     1,
-                    config.address_params(),
-                    *LIQUID_TESTNET_GENESIS,
+                    config.network(),
                 )?;
 
                 let branch = contracts::option_offer::build_witness::OptionOfferBranch::Expiry {
@@ -955,12 +944,11 @@ impl Cli {
                     &utxos,
                     1,
                     &branch,
-                    config.address_params(),
-                    *LIQUID_TESTNET_GENESIS,
+                    config.network(),
                     TrackerLogLevel::None,
                 )?;
 
-                let tx = sign_p2pk_inputs(tx, &utxos, &wallet, config.address_params(), 2)?;
+                let tx = sign_p2pk_inputs(tx, &utxos, &wallet, config.network(), 2)?;
 
                 if *broadcast {
                     cli_helper::explorer::broadcast_tx(&tx).await?;
@@ -1032,7 +1020,7 @@ impl Cli {
                     let Ok(taproot_pubkey_gen) = contracts::sdk::taproot_pubkey_gen::TaprootPubkeyGen::build_from_str(
                         &tpg_str,
                         &option_offer_args,
-                        config.address_params(),
+                        config.network(),
                         &contracts::option_offer::get_option_offer_address,
                     ) else {
                         continue;
@@ -1111,7 +1099,7 @@ impl Cli {
 
                 let initial_fee = fee.unwrap_or(PLACEHOLDER_FEE);
 
-                let script_pubkey = wallet.signer().p2pk_address(config.address_params())?.script_pubkey();
+                let script_pubkey = wallet.signer().p2pk_address(config.network())?.script_pubkey();
                 let fee_filter = UtxoFilter::new()
                     .asset_id(*LIQUID_TESTNET_BITCOIN_ASSET)
                     .script_pubkey(script_pubkey.clone())
@@ -1171,8 +1159,7 @@ impl Cli {
                         &taproot_pubkey_gen.get_x_only_pubkey(),
                         &utxos,
                         0,
-                        config.address_params(),
-                        *LIQUID_TESTNET_GENESIS,
+                        config.network(),
                     )?;
                     let branch = contracts::option_offer::build_witness::OptionOfferBranch::Withdraw {
                         schnorr_signature: signature,
@@ -1184,11 +1171,10 @@ impl Cli {
                         &utxos,
                         0,
                         &branch,
-                        config.address_params(),
-                        *LIQUID_TESTNET_GENESIS,
+                        config.network(),
                         TrackerLogLevel::None,
                     )?;
-                    let tx = sign_p2pk_inputs(tx, &utxos, &wallet, config.address_params(), 1)?;
+                    let tx = sign_p2pk_inputs(tx, &utxos, &wallet, config.network(), 1)?;
                     let signed_weight = tx.weight();
                     let fee_rate = config.get_fee_rate();
                     let estimated = crate::fee::calculate_fee(signed_weight, fee_rate);
@@ -1218,8 +1204,7 @@ impl Cli {
                     &taproot_pubkey_gen.get_x_only_pubkey(),
                     &utxos,
                     0,
-                    config.address_params(),
-                    *LIQUID_TESTNET_GENESIS,
+                    config.network(),
                 )?;
 
                 let branch = contracts::option_offer::build_witness::OptionOfferBranch::Withdraw {
@@ -1233,12 +1218,11 @@ impl Cli {
                     &utxos,
                     0,
                     &branch,
-                    config.address_params(),
-                    *LIQUID_TESTNET_GENESIS,
+                    config.network(),
                     TrackerLogLevel::None,
                 )?;
 
-                let tx = sign_p2pk_inputs(tx, &utxos, &wallet, config.address_params(), 1)?;
+                let tx = sign_p2pk_inputs(tx, &utxos, &wallet, config.network(), 1)?;
 
                 if *broadcast {
                     cli_helper::explorer::broadcast_tx(&tx).await?;

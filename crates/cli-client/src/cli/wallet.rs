@@ -15,7 +15,7 @@ impl Cli {
                 let db_path = config.database_path();
 
                 std::fs::create_dir_all(&config.storage.data_dir)?;
-                Wallet::create(&seed, &db_path, config.address_params()).await?;
+                Wallet::create(&seed, &db_path, config.network()).await?;
 
                 println!("Wallet initialized at {}", db_path.display());
 
@@ -32,7 +32,7 @@ impl Cli {
                 let wallet = self.get_wallet(&config).await?;
 
                 let filter = coin_store::UtxoFilter::new()
-                    .script_pubkey(wallet.signer().p2pk_address(config.address_params())?.script_pubkey());
+                    .script_pubkey(wallet.signer().p2pk_address(config.network())?.script_pubkey());
                 let results = <_ as UtxoStore>::query_utxos(wallet.store(), &[filter]).await?;
 
                 let mut balances: std::collections::HashMap<simplicityhl::elements::AssetId, u64> =

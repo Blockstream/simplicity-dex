@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 use nostr::prelude::*;
 use nostr_sdk::prelude::Events;
-use simplicityhl::elements::AddressParams;
+use simplicityhl_core::SimplicityNetwork;
 use tracing::instrument;
 
 use super::ReadOnlyClient;
@@ -93,16 +93,16 @@ impl PublishingClient {
 
     pub async fn fetch_options(
         &self,
-        params: &'static AddressParams,
+        network: SimplicityNetwork,
     ) -> Result<Vec<Result<OptionCreatedEvent, ParseError>>, RelayError> {
-        self.reader.fetch_options(params).await
+        self.reader.fetch_options(network).await
     }
 
     pub async fn fetch_option_offers(
         &self,
-        params: &'static AddressParams,
+        network: SimplicityNetwork,
     ) -> Result<Vec<Result<OptionOfferCreatedEvent, ParseError>>, RelayError> {
-        self.reader.fetch_option_offers(params).await
+        self.reader.fetch_option_offers(network).await
     }
 
     pub async fn fetch_actions_for_event(

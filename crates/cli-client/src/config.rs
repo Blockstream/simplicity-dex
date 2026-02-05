@@ -6,7 +6,7 @@ use crate::explorer;
 use crate::fee::DEFAULT_FEE_RATE;
 use options_relay::NostrRelayConfig;
 use serde::{Deserialize, Serialize};
-use simplicityhl::elements::AddressParams;
+use simplicityhl_core::SimplicityNetwork;
 
 const DEFAULT_CONFIG_PATH: &str = "config.toml";
 const DEFAULT_DATA_DIR: &str = ".data";
@@ -42,10 +42,10 @@ pub enum NetworkName {
 
 impl NetworkName {
     #[must_use]
-    pub const fn address_params(self) -> &'static AddressParams {
+    pub const fn network(self) -> SimplicityNetwork {
         match self {
-            Self::Testnet => &AddressParams::LIQUID_TESTNET,
-            Self::Mainnet => &AddressParams::LIQUID,
+            Self::Testnet => SimplicityNetwork::LiquidTestnet,
+            Self::Mainnet => SimplicityNetwork::Liquid,
         }
     }
 }
@@ -95,8 +95,8 @@ impl Config {
     }
 
     #[must_use]
-    pub const fn address_params(&self) -> &'static AddressParams {
-        self.network.name.address_params()
+    pub const fn network(&self) -> SimplicityNetwork {
+        self.network.name.network()
     }
 
     /// Get fee rate from config or Esplora.

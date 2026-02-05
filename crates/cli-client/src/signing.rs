@@ -1,6 +1,6 @@
-use simplicityhl::elements::{AddressParams, Transaction, TxOut};
+use simplicityhl::elements::{Transaction, TxOut};
 use simplicityhl::tracker::TrackerLogLevel;
-use simplicityhl_core::{LIQUID_TESTNET_GENESIS, finalize_p2pk_transaction};
+use simplicityhl_core::{SimplicityNetwork, finalize_p2pk_transaction};
 
 use crate::error::Error;
 use crate::wallet::Wallet;
@@ -15,7 +15,7 @@ use crate::wallet::Wallet;
 /// * `tx` - The transaction to sign
 /// * `utxos` - The UTXOs being spent (must correspond to the transaction inputs)
 /// * `wallet` - The wallet containing the signing key
-/// * `params` - Address parameters for the network (must be static)
+/// * `network` - The Simplicity network to use
 /// * `start_index` - The index of the first input to sign (allows skipping contract inputs)
 ///
 /// # Returns
@@ -29,13 +29,11 @@ pub fn sign_p2pk_inputs(
     mut tx: Transaction,
     utxos: &[TxOut],
     wallet: &Wallet,
-    params: &'static AddressParams,
+    network: SimplicityNetwork,
     start_index: usize,
 ) -> Result<Transaction, Error> {
     for i in start_index..utxos.len() {
-        let signature = wallet
-            .signer()
-            .sign_p2pk(&tx, utxos, i, params, *LIQUID_TESTNET_GENESIS)?;
+        let signature = wallet.signer().sign_p2pk(&tx, utxos, i, network)?;
 
         tx = finalize_p2pk_transaction(
             tx,
@@ -43,8 +41,7 @@ pub fn sign_p2pk_inputs(
             &wallet.signer().public_key(),
             &signature,
             i,
-            params,
-            *LIQUID_TESTNET_GENESIS,
+            network,
             TrackerLogLevel::None,
         )?;
     }

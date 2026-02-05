@@ -67,7 +67,7 @@ impl Cli {
         let seed = self.parse_seed()?;
         let db_path = config.database_path();
 
-        Wallet::open(&seed, &db_path, config.address_params()).await
+        Wallet::open(&seed, &db_path, config.network()).await
     }
 
     async fn get_read_only_client(&self, config: &Config) -> Result<ReadOnlyClient, Error> {
