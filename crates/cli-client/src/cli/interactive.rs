@@ -26,12 +26,8 @@ pub struct TokenDisplay {
 
 /// Format a past timestamp as "X ago" for history entries.
 #[must_use]
-#[allow(clippy::cast_possible_wrap)]
 pub fn format_time_ago(timestamp: i64) -> String {
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_secs() as i64)
-        .unwrap_or(0);
+    let now = current_timestamp();
 
     let diff_secs = now - timestamp;
 
@@ -63,12 +59,8 @@ pub fn format_time_ago(timestamp: i64) -> String {
 
 /// Format a future expiry timestamp as "in X days" or "[EXPIRED]".
 #[must_use]
-#[allow(clippy::cast_possible_wrap)]
 pub fn format_relative_time(expiry_timestamp: i64) -> String {
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_secs() as i64)
-        .unwrap_or(0);
+    let now = current_timestamp();
 
     let diff_secs = expiry_timestamp - now;
 
@@ -556,7 +548,7 @@ mod tests {
     #[test]
     #[allow(clippy::cast_possible_wrap)]
     fn test_format_relative_time() {
-        let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs() as i64;
+        let now = current_timestamp();
 
         assert_eq!(format_relative_time(now - 100), "[EXPIRED]");
 
