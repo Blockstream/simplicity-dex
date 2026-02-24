@@ -2,13 +2,31 @@ use crate::cli::interactive::{TokenDisplay, WalletAssetDisplay};
 use crate::cli::option_offer::{
     ActiveOptionOfferDisplay, CancellableOptionOfferDisplay, WithdrawableOptionOfferDisplay,
 };
-use crate::cli::positions::{CollateralDisplay, UserTokenDisplay};
+use crate::cli::positions::{ActiveOptionsDisplay, CollateralDisplay, UserTokenDisplay};
 use comfy_table::presets::UTF8_FULL;
 use comfy_table::{Attribute, Cell, Table};
 
 trait TableData {
     fn get_header() -> Vec<String>;
     fn to_row(&self) -> Vec<String>;
+}
+
+impl TableData for ActiveOptionsDisplay {
+    fn get_header() -> Vec<String> {
+        vec!["#", "Option-tokens", "Grantor-tokens", "Expiry", "Contract"]
+            .into_iter()
+            .map(String::from)
+            .collect()
+    }
+    fn to_row(&self) -> Vec<String> {
+        vec![
+            self.index.to_string(),
+            self.option_tokens.to_string(),
+            self.grantor_tokens.to_string(),
+            self.expires.clone(),
+            self.contract_id.clone(),
+        ]
+    }
 }
 
 impl TableData for TokenDisplay {
@@ -175,6 +193,10 @@ fn render_table<T: TableData>(items: &[T], empty_msg: &str) {
     for line in table.to_string().lines() {
         println!("  {line}");
     }
+}
+
+pub fn display_active_options_table(active_options: &[ActiveOptionsDisplay]) {
+    render_table(active_options, "No active options found");
 }
 
 pub fn display_token_table(tokens: &[TokenDisplay]) {
