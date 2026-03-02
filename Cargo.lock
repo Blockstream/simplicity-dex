@@ -432,7 +432,7 @@ checksum = "c3e64b0cc0439b12df2fa678eae89a1c56a529fd067a9115f7827f1fffd22b32"
 [[package]]
 name = "cli"
 version = "0.1.0"
-source = "git+https://github.com/BlockstreamResearch/simplicity-contracts.git?rev=b0ffdf1#b0ffdf1cb895a0ac895d8a04304a35dff5ef7136"
+source = "git+https://github.com/BlockstreamResearch/simplicity-contracts.git?rev=116b0eb#116b0eb17c3fd84e302d5288ea884c46ba702b77"
 dependencies = [
  "anyhow",
  "clap",
@@ -568,7 +568,7 @@ dependencies = [
 [[package]]
 name = "contracts"
 version = "0.1.0"
-source = "git+https://github.com/BlockstreamResearch/simplicity-contracts.git?rev=b0ffdf1#b0ffdf1cb895a0ac895d8a04304a35dff5ef7136"
+source = "git+https://github.com/BlockstreamResearch/simplicity-contracts.git?rev=116b0eb#116b0eb17c3fd84e302d5288ea884c46ba702b77"
 dependencies = [
  "bincode",
  "hex",
