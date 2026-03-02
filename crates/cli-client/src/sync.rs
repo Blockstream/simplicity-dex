@@ -1,7 +1,10 @@
 use std::collections::HashMap;
 
 use coin_store::{Store, UtxoStore};
+use contracts::sdk::{IssuanceInputConstraints, IssuanceTxConstraints, verify_issuance};
 use options_relay::{ActionType, OptionCreatedEvent, OptionOfferCreatedEvent};
+use simplicityhl::elements::secp256k1_zkp::SecretKey;
+use simplicityhl::elements::{Transaction, Txid};
 use simplicityhl_core::derive_public_blinder_key;
 
 use crate::cli::{GRANTOR_TOKEN_TAG, OPTION_OFFER_COLLATERAL_TAG, OPTION_TOKEN_TAG};
@@ -16,6 +19,11 @@ pub async fn sync_option_event(
     source: &str,
     arguments: simplicityhl::Arguments,
 ) -> Result<(), Error> {
+    let funding_tx = fetch_transaction(event.utxo.txid)?;
+    let creation_txid = option_creation_txid_from_funding_tx(&funding_tx, event.utxo.txid)?;
+    let creation_tx = fetch_transaction(creation_txid)?;
+    verify_synced_option_creation(&creation_tx, event, derive_public_blinder_key().secret_key())?;
+
     #[allow(clippy::cast_possible_wrap)]
     let created_at = event.created_at.as_secs() as i64;
 
@@ -55,6 +63,80 @@ pub async fn sync_option_event(
     }
 
     Ok(())
+}
+
+/// Extract the creation txid from a funding transaction.
+fn option_creation_txid_from_funding_tx(funding_tx: &Transaction, funding_txid: Txid) -> Result<Txid, Error> {
+    if funding_tx.input.len() < 2 {
+        return Err(Error::Config(format!(
+            "Invalid option funding transaction {funding_txid}: expected at least 2 inputs"
+        )));
+    }
+
+    let option_creation_txid = funding_tx.input[0].previous_output.txid;
+    let grantor_creation_txid = funding_tx.input[1].previous_output.txid;
+    if option_creation_txid != grantor_creation_txid {
+        return Err(Error::Config(format!(
+            "Invalid option funding transaction {funding_txid}: first two inputs must spend the same creation txid"
+        )));
+    }
+
+    Ok(option_creation_txid)
+}
+
+/// Validate a synced option creation transaction against the expected SDK issuance policy.
+fn verify_synced_option_creation(
+    creation_tx: &Transaction,
+    event: &OptionCreatedEvent,
+    blinding_secret_key: SecretKey,
+) -> Result<(), Error> {
+    let expected_option_ids = event.options_args.get_option_token_ids();
+    let expected_grantor_ids = event.options_args.get_grantor_token_ids();
+
+    if creation_tx.input.len() < 2 {
+        return Err(Error::Config(format!(
+            "Invalid option creation transaction {}: expected at least 2 inputs",
+            creation_tx.txid()
+        )));
+    }
+
+    if creation_tx.input[0].issuance_ids() != expected_option_ids {
+        return Err(Error::Config(format!(
+            "Invalid option creation transaction {}: option issuance ids mismatch",
+            creation_tx.txid()
+        )));
+    }
+
+    if creation_tx.input[1].issuance_ids() != expected_grantor_ids {
+        return Err(Error::Config(format!(
+            "Invalid option creation transaction {}: grantor issuance ids mismatch",
+            creation_tx.txid()
+        )));
+    }
+
+    let contract_script = event.taproot_pubkey_gen.address.script_pubkey();
+    let constraints = IssuanceTxConstraints {
+        inputs: vec![
+            IssuanceInputConstraints {
+                input_idx: 0,
+                issuance_destination: None,
+                reissuance_destination: Some((contract_script.clone(), 1, Some(blinding_secret_key))),
+            },
+            IssuanceInputConstraints {
+                input_idx: 1,
+                issuance_destination: None,
+                reissuance_destination: Some((contract_script, 1, Some(blinding_secret_key))),
+            },
+        ],
+        allow_unconstrained_issuances: false,
+    };
+
+    verify_issuance(creation_tx, &constraints).map_err(|e| {
+        Error::Config(format!(
+            "Invalid option creation issuance in tx {}: {e}",
+            creation_tx.txid()
+        ))
+    })
 }
 
 /// Attempt to fetch and insert a transaction using the public blinder key.
