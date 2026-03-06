@@ -13,7 +13,7 @@ trait TableData {
 
 impl TableData for ActiveOptionsDisplay {
     fn get_header() -> Vec<String> {
-        vec!["#", "Option-tokens", "Grantor-tokens", "Expiry", "Contract"]
+        vec!["#", "Role", "Option-tokens", "Grantor-tokens", "Expiry", "Contract"]
             .into_iter()
             .map(String::from)
             .collect()
@@ -21,6 +21,7 @@ impl TableData for ActiveOptionsDisplay {
     fn to_row(&self) -> Vec<String> {
         vec![
             self.index.to_string(),
+            self.role.clone(),
             self.option_tokens.to_string(),
             self.grantor_tokens.to_string(),
             self.expires.clone(),

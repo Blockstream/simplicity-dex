@@ -18,6 +18,7 @@ use coin_store::{Store, UtxoEntry, UtxoFilter, UtxoQueryResult, UtxoStore};
 use contracts::option_offer::{OPTION_OFFER_SOURCE, OptionOfferArguments, get_option_offer_address};
 use contracts::options::{OPTION_SOURCE, OptionsArguments, get_options_address};
 use contracts::sdk::taproot_pubkey_gen::TaprootPubkeyGen;
+use options_relay::ActionType;
 use simplicityhl::elements::Address;
 use simplicityhl::elements::AssetId;
 
@@ -28,6 +29,7 @@ type ContractInfoResult = Result<Option<(Vec<u8>, Vec<u8>, String)>, coin_store:
 struct ContractState {
     args: OptionsArguments,
     address: Address,
+    user_is_maker: bool,
     user_options: u64,
     user_grantors: u64,
     locked_in_offers: u64,
@@ -50,6 +52,11 @@ impl ContractState {
         if collateral_per_contract == 0 {
             return Some(false);
         }
+
+        if !self.user_is_maker {
+            return Some(true);
+        }
+
         let total_issued = self.total_collateral / collateral_per_contract;
         let user_share = self
             .user_options
@@ -218,6 +225,7 @@ fn extract_entries(results: Vec<UtxoQueryResult>) -> Vec<UtxoEntry> {
 #[derive(Debug, Clone)]
 pub struct ActiveOptionsDisplay {
     pub index: usize,
+    pub role: String,
     pub option_tokens: u64,
     pub grantor_tokens: u64,
     pub expires: String,
@@ -312,6 +320,7 @@ async fn query_contract_tokens_in_offers(
 struct ParsedContract {
     args: OptionsArguments,
     tpg: TaprootPubkeyGen,
+    funding_txid: Option<String>,
 }
 
 /// Raw contract data from DB: (`args_bytes`, `tpg_string`, `metadata_bytes`).
@@ -325,7 +334,7 @@ fn parse_option_contracts(
     let mut parsed_contracts: HashMap<String, ParsedContract> = HashMap::new();
     let mut token_to_contract: HashMap<AssetId, String> = HashMap::new();
 
-    for (args_bytes, tpg_str, _metadata_bytes) in option_contracts {
+    for (args_bytes, tpg_str, metadata_bytes) in option_contracts {
         let Ok((arguments, _)) =
             bincode::serde::decode_from_slice::<simplicityhl::Arguments, _>(args_bytes, bincode::config::standard())
         else {
@@ -339,10 +348,21 @@ fn parse_option_contracts(
         };
 
         let contract_id = tpg_str.clone();
+        let funding_txid = metadata_bytes
+            .as_ref()
+            .and_then(|bytes| ContractMetadata::from_bytes(bytes).ok())
+            .and_then(|metadata| extract_funding_txid(&metadata));
         token_to_contract.insert(args.option_token(), contract_id.clone());
         let (grantor_token_id, _) = args.get_grantor_token_ids();
         token_to_contract.insert(grantor_token_id, contract_id.clone());
-        parsed_contracts.insert(contract_id, ParsedContract { args, tpg });
+        parsed_contracts.insert(
+            contract_id,
+            ParsedContract {
+                args,
+                tpg,
+                funding_txid,
+            },
+        );
     }
 
     (parsed_contracts, token_to_contract)
@@ -356,6 +376,24 @@ fn aggregate_token_balances(tokens: &[EnrichedTokenEntry]) -> HashMap<String, u6
         *balances.entry(contract_id).or_default() += amount;
     }
     balances
+}
+
+fn extract_funding_txid(metadata: &ContractMetadata) -> Option<String> {
+    metadata
+        .history
+        .iter()
+        .find_map(|h| {
+            (h.action == ActionType::OptionFunded.as_str())
+                .then(|| h.txid.clone())
+                .flatten()
+        })
+        .or_else(|| {
+            metadata.history.iter().find_map(|h| {
+                (h.action == ActionType::OptionCreated.as_str())
+                    .then(|| h.txid.clone())
+                    .flatten()
+            })
+        })
 }
 
 fn map_offers_to_contracts(
@@ -406,11 +444,13 @@ async fn query_collateral_for_candidates(
     total_collateral_by_contract
 }
 
+#[allow(clippy::too_many_arguments)]
 fn build_and_filter_contract_states(
     candidate_ids: HashSet<String>,
     mut parsed_contracts: HashMap<String, ParsedContract>,
     option_balances: &HashMap<String, u64>,
     grantor_balances: &HashMap<String, u64>,
+    maker_contract_ids: &HashSet<String>,
     locked_in_offers_by_contract: &HashMap<String, u64>,
     total_collateral_by_contract: &HashMap<String, u64>,
     now: i64,
@@ -422,6 +462,7 @@ fn build_and_filter_contract_states(
             let state = ContractState {
                 args: parsed.args,
                 address: parsed.tpg.address,
+                user_is_maker: maker_contract_ids.contains(&contract_id),
                 user_options: option_balances.get(&contract_id).copied().unwrap_or(0),
                 user_grantors: grantor_balances.get(&contract_id).copied().unwrap_or(0),
                 locked_in_offers: locked_in_offers_by_contract.get(&contract_id).copied().unwrap_or(0),
@@ -455,6 +496,16 @@ async fn fetch_active_contract_states(
 
     let locked_in_offers_by_contract = map_offers_to_contracts(&tokens_in_offers, &token_to_contract);
 
+    let maker_contract_ids: HashSet<String> = option_tokens
+        .iter()
+        .chain(grantor_tokens.iter())
+        .filter_map(|entry| {
+            let parsed = parsed_contracts.get(&entry.taproot_pubkey_gen_str)?;
+            let funding_txid = parsed.funding_txid.as_deref()?;
+            (entry.entry.outpoint().txid.to_string() == funding_txid).then(|| entry.taproot_pubkey_gen_str.clone())
+        })
+        .collect();
+
     let candidate_ids: HashSet<String> = option_balances
         .keys()
         .chain(grantor_balances.keys())
@@ -469,6 +520,7 @@ async fn fetch_active_contract_states(
         parsed_contracts,
         &option_balances,
         &grantor_balances,
+        &maker_contract_ids,
         &locked_in_offers_by_contract,
         &total_collateral_by_contract,
         now,
@@ -493,6 +545,11 @@ async fn build_active_options_displays(
             let contract_addr = truncate_with_ellipsis(&state.address.to_string(), 12);
             ActiveOptionsDisplay {
                 index: idx + 1,
+                role: if state.user_is_maker {
+                    "maker".to_string()
+                } else {
+                    "taker".to_string()
+                },
                 option_tokens: state.user_options,
                 grantor_tokens: state.user_grantors,
                 expires: format_relative_time(state.expiry_time()),
